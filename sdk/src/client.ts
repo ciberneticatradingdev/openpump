@@ -157,8 +157,8 @@ export class OpenpumpClient {
     };
   }
 
-  async fetchPool(mint: PublicKey): Promise<PoolState | null> {
-    const addr = pda.migrationPool(mint);
+  async fetchPool(mint: PublicKey, quoteMint: PublicKey = WSOL_MINT): Promise<PoolState | null> {
+    const addr = quoteMint.equals(WSOL_MINT) ? pda.migrationPool(mint) : pda.migrationPoolV2(mint, quoteMint);
     const info = await this.connection.getAccountInfo(addr, "confirmed");
     return info ? this.decodePool(addr, info.data) : null;
   }
@@ -179,6 +179,13 @@ export class OpenpumpClient {
       protocolFeeRecipient: c.protocolFeeRecipient,
       disableFlags: c.disableFlags,
     };
+  }
+
+  /** Claimable quote tokens for a creator on a custom pair: curve vault ATA + AMM vault ATA. */
+  async creatorClaimableQuote(creator: PublicKey, quoteMint: PublicKey) {
+    const [a, b] = await this.connection.getMultipleAccountsInfo([pda.creatorVaultQuote(creator, quoteMint), pda.ammCreatorVaultAta(creator, quoteMint)], "confirmed");
+    const amt = (i: any) => (i ? i.data.readBigUInt64LE(64) : 0n);
+    return { curve: amt(a), amm: amt(b) };
   }
 
   /** Lamports claimable by a creator from curve trades (vault balance above rent). */
@@ -291,20 +298,21 @@ export class OpenpumpClient {
   // ------------------------------------------------------------- AMM instructions (quote = WSOL)
 
   private swapAccounts(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey) {
+    const q = pool.quoteMint;
     return {
       pool: pool.address,
       user,
       globalConfig: pda.ammGlobalConfig(),
       baseMint: mint,
-      quoteMint: WSOL_MINT,
+      quoteMint: q,
       userBaseTokenAccount: getAssociatedTokenAddressSync(mint, user),
-      userQuoteTokenAccount: getAssociatedTokenAddressSync(WSOL_MINT, user),
+      userQuoteTokenAccount: getAssociatedTokenAddressSync(q, user),
       poolBaseTokenAccount: pool.poolBaseTokenAccount,
       poolQuoteTokenAccount: pool.poolQuoteTokenAccount,
       protocolFeeRecipient,
-      protocolFeeRecipientTokenAccount: getAssociatedTokenAddressSync(WSOL_MINT, protocolFeeRecipient),
+      protocolFeeRecipientTokenAccount: getAssociatedTokenAddressSync(q, protocolFeeRecipient, true),
       coinCreatorVaultAuthority: pda.ammCreatorVaultAuthority(pool.coinCreator),
-      coinCreatorVaultAta: pda.ammCreatorVaultAta(pool.coinCreator),
+      coinCreatorVaultAta: pda.ammCreatorVaultAta(pool.coinCreator, q),
       baseTokenProgram: TOKEN_PROGRAM_ID,
       quoteTokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -327,33 +335,37 @@ export class OpenpumpClient {
     return createCloseAccountInstruction(getAssociatedTokenAddressSync(WSOL_MINT, user), user, user);
   }
 
-  /** Buy on the AMM paying from SOL: wrap -> buy -> unwrap, all in one tx. */
+  /** Buy on the AMM. WSOL pools: wrap -> buy -> unwrap in one tx. Custom quote: pay from the user's quote ATA. */
   async ammBuyIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseOut: bigint, maxQuoteIn: bigint) {
     const buy = await this.amm.methods.buy(bn(baseOut), bn(maxQuoteIn)).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient)).instruction();
+    if (!pool.quoteMint.equals(WSOL_MINT)) return [buy];
     return [...this.wrapSolIxs(user, maxQuoteIn), buy, this.unwrapSolIx(user)];
   }
 
   async ammSellIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseIn: bigint, minQuoteOut: bigint) {
-    const ata = getAssociatedTokenAddressSync(WSOL_MINT, user);
+    const q = pool.quoteMint;
+    const ata = getAssociatedTokenAddressSync(q, user);
     const sell = await this.amm.methods.sell(bn(baseIn), bn(minQuoteOut)).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient)).instruction();
-    return [createAssociatedTokenAccountIdempotentInstruction(user, ata, user, WSOL_MINT), sell, this.unwrapSolIx(user)];
+    const ensure = createAssociatedTokenAccountIdempotentInstruction(user, ata, user, q);
+    if (!q.equals(WSOL_MINT)) return [ensure, sell];
+    return [ensure, sell, this.unwrapSolIx(user)];
   }
 
-  async ammCollectCreatorFeeIxs(creator: PublicKey) {
+  async ammCollectCreatorFeeIxs(creator: PublicKey, quoteMint: PublicKey = WSOL_MINT) {
     const ix = await this.amm.methods
       .collectCoinCreatorFee()
       .accounts({
         coinCreator: creator,
-        quoteMint: WSOL_MINT,
+        quoteMint,
         coinCreatorVaultAuthority: pda.ammCreatorVaultAuthority(creator),
-        coinCreatorVaultAta: pda.ammCreatorVaultAta(creator),
-        coinCreatorTokenAccount: getAssociatedTokenAddressSync(WSOL_MINT, creator),
+        coinCreatorVaultAta: pda.ammCreatorVaultAta(creator, quoteMint),
+        coinCreatorTokenAccount: getAssociatedTokenAddressSync(quoteMint, creator),
         quoteTokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       } as any)
       .instruction();
-    return [ix, this.unwrapSolIx(creator)];
+    return quoteMint.equals(WSOL_MINT) ? [ix, this.unwrapSolIx(creator)] : [ix];
   }
 
   // ------------------------------------------------------------- custom pairs (v2)

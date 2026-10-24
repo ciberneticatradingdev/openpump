@@ -19,6 +19,24 @@ export const compact = (n: number, d = 1) => {
 
 export const tokens = (units: number | string | bigint) => compact(Number(units) / 1e6);
 
+/** Quote-asset amount with its own decimals (SOL = 9, custom pairs vary). */
+export const qty = (units: number | string | bigint, decimals = 9, d = 2) => {
+  const n = Number(units) / 10 ** decimals;
+  if (n === 0) return "0";
+  if (n < 0.001) return n.toFixed(Math.min(decimals, 6));
+  if (n < 1) return n.toFixed(3);
+  if (n >= 1e6) return compact(n);
+  return n.toLocaleString("en-US", { maximumFractionDigits: d });
+};
+/** price in quote base units per whole token -> human quote per token */
+export const priceQ = (unitsPerToken: number, decimals = 9) => {
+  const p = unitsPerToken / 10 ** decimals;
+  if (p === 0) return "0";
+  if (p >= 1) return p.toFixed(4);
+  const digits = Math.min(10, Math.max(4, -Math.floor(Math.log10(p)) + 3));
+  return p.toFixed(digits);
+};
+
 /** lamports per whole token -> "0.0000412 SOL" style with significant digits */
 export const price = (lamportsPerToken: number) => {
   const p = lamportsPerToken / LAMPORTS;

@@ -8,6 +8,7 @@ import fs from "node:fs";
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { DEFAULT_AMM_FEES, DEFAULT_PARAMS, OpenpumpClient, curve as curveMath, pda } from "@openpump/sdk";
+import { createMint, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 
 const RPC = process.env.RPC_URL || "http://127.0.0.1:8899";
 const API = process.env.API_URL || "http://localhost:8787";
@@ -132,6 +133,35 @@ async function main() {
       }
       console.log("  4 AMM buys done");
     }
+  }
+  // ---- custom pair demo: a quote token "OPEN" + one coin paired with it (local or QUOTE_MINT provided)
+  if (process.env.SEED_PAIR || local) {
+    let quoteMint: PublicKey;
+    if (process.env.QUOTE_MINT) quoteMint = new PublicKey(process.env.QUOTE_MINT);
+    else {
+      quoteMint = await createMint(conn, admin, admin.publicKey, null, 6);
+      console.log("quote mint OPEN", quoteMint.toBase58(), "(set QUOTE_MINTS=" + quoteMint.toBase58() + ":OPEN:6 on the server)");
+    }
+    for (const who of [admin, ...traders]) {
+      const ata = await getOrCreateAssociatedTokenAccount(conn, admin, quoteMint, who.publicKey);
+      await mintTo(conn, admin, quoteMint, ata.address, admin, 5_000_000 * 1e6);
+    }
+    if (!(await client.fetchQuoteConfig(quoteMint))) {
+      await send([await client.setQuoteConfigIx(admin.publicKey, quoteMint, { enabled: true, initialVirtualQuoteReserves: 1_000_000_000_000n, initialVirtualTokenReserves: DEFAULT_PARAMS.initialVirtualTokenReserves, initialRealTokenReserves: DEFAULT_PARAMS.initialRealTokenReserves, migrationFee: 0n })]);
+      console.log("quote config set");
+    }
+    const kp = Keypair.generate();
+    const { uri } = await uploadMeta({ name: "Open Pair", symbol: "PAIR", desc: "first coin paired with OPEN", color: "27c4ff" });
+    await send([await client.createV2Ix(admin.publicKey, kp.publicKey, quoteMint, "Open Pair", "PAIR", uri)], [kp]);
+    console.log("created PAIR (quote OPEN)", kp.publicKey.toBase58());
+    for (const t of traders.slice(0, 3)) {
+      const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });
+      const tc = new OpenpumpClient(conn, tp);
+      const units = BigInt(Math.floor((500 + Math.random() * 2000) * 1e6));
+      const ix = await tc.buyExactQuoteInIx(t.publicKey, kp.publicKey, admin.publicKey, global.feeRecipient, quoteMint, units, 0n);
+      await tp.sendAndConfirm(new Transaction().add(ix), [t]);
+    }
+    console.log("  3 PAIR buys in OPEN");
   }
   console.log("seed done");
 }

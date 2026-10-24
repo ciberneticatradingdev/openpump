@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { Coin } from "../lib/api";
-import { ago, short, sol } from "../lib/format";
+import { ago, qty, short } from "../lib/format";
 import Avatar from "./Avatar";
 import Progress from "./Progress";
 
@@ -21,6 +21,7 @@ export default function CoinCard({ c, initialReal, flash }: { c: Coin; initialRe
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-head font-semibold text-[14px] truncate">{c.symbol}</span>
             <span className="text-mute text-[12px] truncate">{c.name}</span>
+            {c.quote_symbol && c.quote_symbol !== "SOL" && <span className="text-[10px] font-semibold text-mute border border-line rounded-full px-1.5 py-0.5">/{c.quote_symbol}</span>}
             {graduated && <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-acc bg-acc/10 border border-acc/30 rounded-full px-1.5 py-0.5">AMM</span>}
             {!graduated && c.complete === 1 && <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-gold bg-gold/10 border border-gold/30 rounded-full px-1.5 py-0.5">graduating</span>}
           </div>
@@ -37,10 +38,10 @@ export default function CoinCard({ c, initialReal, flash }: { c: Coin; initialRe
           </div>
           <div className="flex items-center justify-between mt-1.5">
             <span className="text-[12px] text-mute">
-              MC <span className="text-ink font-semibold num">{sol(c.mcap, 1)} SOL</span>
+              MC <span className="text-ink font-semibold num">{qty(c.mcap, c.quote_decimals ?? 9, 1)} {c.quote_symbol || "SOL"}</span>
             </span>
-            {!graduated && <span className="text-[11px] num text-dim">{sol(c.r_sol, 1)} SOL raised</span>}
-            {graduated && <span className="text-[11px] num text-dim">pool {sol(c.pool_quote || 0, 1)} SOL</span>}
+            {!graduated && <span className="text-[11px] num text-dim">{qty(c.r_sol, c.quote_decimals ?? 9, 1)} {c.quote_symbol || "SOL"} raised</span>}
+            {graduated && <span className="text-[11px] num text-dim">pool {qty(c.pool_quote || 0, c.quote_decimals ?? 9, 1)} {c.quote_symbol || "SOL"}</span>}
           </div>
           {!graduated && <Progress value={p} className="mt-1.5" color={c.complete ? "bg-gold" : "bg-acc"} />}
         </div>

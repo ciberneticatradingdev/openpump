@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { curve as curveMath } from "@openpump/sdk";
-import { API, useConfig } from "../lib/api";
+import { API, WSOL, useConfig, type QuoteMintInfo } from "../lib/api";
 import { useClient, useSendTx, useToast } from "../lib/solana";
-import { sol as fmtSol, tokens as fmtTokens } from "../lib/format";
+import { qty, tokens as fmtTokens } from "../lib/format";
 
 export default function CreatePage() {
   const { data: cfg } = useConfig();
@@ -21,28 +21,50 @@ export default function CreatePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [devBuy, setDevBuy] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pair, setPair] = useState<QuoteMintInfo | null>(null);
+  const [quoteCfg, setQuoteCfg] = useState<{ initialVirtualQuoteReserves: bigint; initialVirtualTokenReserves: bigint; initialRealTokenReserves: bigint; enabled: boolean } | null>(null);
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value }));
 
+  const pairs = cfg?.quoteMints ?? [];
+  useEffect(() => { if (!pair && pairs.length) setPair(pairs[0]); }, [pairs, pair]);
+  const v2 = !!pair && pair.mint !== WSOL;
+
+  // custom pairs carry their own curve parameters on-chain
+  useEffect(() => {
+    if (!v2 || !pair) return setQuoteCfg(null);
+    client.fetchQuoteConfig(new PublicKey(pair.mint)).then((q) => setQuoteCfg(q ? { ...q } : null)).catch(() => setQuoteCfg(null));
+  }, [v2, pair, client]);
+
   const g = cfg?.global;
+  const qDec = pair?.decimals ?? 9;
+  const qSym = pair?.symbol ?? "SOL";
+  const curveState = useMemo(() => {
+    if (!g) return null;
+    if (v2) {
+      if (!quoteCfg) return null;
+      return { virtualSolReserves: quoteCfg.initialVirtualQuoteReserves, virtualTokenReserves: quoteCfg.initialVirtualTokenReserves, realSolReserves: 0n, realTokenReserves: quoteCfg.initialRealTokenReserves, tokenTotalSupply: BigInt(g.tokenTotalSupply), complete: false };
+    }
+    return { virtualSolReserves: BigInt(g.initialVirtualSolReserves), virtualTokenReserves: BigInt(g.initialVirtualTokenReserves), realSolReserves: 0n, realTokenReserves: BigInt(g.initialRealTokenReserves), tokenTotalSupply: BigInt(g.tokenTotalSupply), complete: false };
+  }, [g, v2, quoteCfg]);
+
   const quote = useMemo(() => {
-    if (!g || !devBuy || Number(devBuy) <= 0) return null;
-    const c = { virtualSolReserves: BigInt(g.initialVirtualSolReserves), virtualTokenReserves: BigInt(g.initialVirtualTokenReserves), realSolReserves: 0n, realTokenReserves: BigInt(g.initialRealTokenReserves), tokenTotalSupply: BigInt(g.tokenTotalSupply), complete: false };
+    if (!g || !curveState || !devBuy || Number(devBuy) <= 0) return null;
     try {
-      const q = curveMath.quoteBuyExactSol(BigInt(Math.floor(Number(devBuy) * 1e9)), c, { feeBasisPoints: BigInt(g.feeBasisPoints), creatorFeeBasisPoints: BigInt(g.creatorFeeBasisPoints) });
+      const q = curveMath.quoteBuyExactSol(BigInt(Math.floor(Number(devBuy) * 10 ** qDec)), curveState, { feeBasisPoints: BigInt(g.feeBasisPoints), creatorFeeBasisPoints: BigInt(g.creatorFeeBasisPoints) });
       return { ...q, pct: (Number(q.tokensOut) / Number(g.tokenTotalSupply)) * 100 };
     } catch { return null; }
-  }, [devBuy, g]);
+  }, [devBuy, g, curveState, qDec]);
 
   const onFile = (file: File | null) => {
     setFile(file);
     setPreview(file ? URL.createObjectURL(file) : null);
   };
 
-  const valid = f.name.trim().length > 0 && f.name.length <= 32 && /^[A-Za-z0-9$._-]{1,10}$/.test(f.symbol) && !!file;
+  const valid = f.name.trim().length > 0 && f.name.length <= 32 && /^[A-Za-z0-9$._-]{1,10}$/.test(f.symbol) && !!file && (!v2 || !!quoteCfg?.enabled);
 
   const submit = async () => {
     if (!publicKey) return setVisible(true);
-    if (!valid || !cfg) return;
+    if (!valid || !cfg || !pair) return;
     setBusy(true);
     try {
       const fd = new FormData();
@@ -53,9 +75,22 @@ export default function CreatePage() {
       const { uri } = await up.json();
 
       const mintKp = Keypair.generate();
-      const ixs = [await client.createIx(publicKey, mintKp.publicKey, f.name.trim(), f.symbol.trim().toUpperCase(), uri)];
-      if (quote) ixs.push(await client.buyExactSolIx(publicKey, mintKp.publicKey, publicKey, new PublicKey(cfg.global.feeRecipient!), BigInt(Math.floor(Number(devBuy) * 1e9)), (quote.tokensOut * 97n) / 100n));
-      const sig = await send(ixs, `Launch ${f.symbol.toUpperCase()}`, { cu: 400_000, signers: [mintKp] });
+      const name = f.name.trim();
+      const symbol = f.symbol.trim().toUpperCase();
+      const feeRecipient = new PublicKey(cfg.global.feeRecipient!);
+      const ixs = v2
+        ? [await client.createV2Ix(publicKey, mintKp.publicKey, new PublicKey(pair.mint), name, symbol, uri)]
+        : [await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri)];
+      if (quote) {
+        const units = BigInt(Math.floor(Number(devBuy) * 10 ** qDec));
+        const minOut = (quote.tokensOut * 97n) / 100n;
+        ixs.push(
+          v2
+            ? await client.buyExactQuoteInIx(publicKey, mintKp.publicKey, publicKey, feeRecipient, new PublicKey(pair.mint), units, minOut)
+            : await client.buyExactSolIx(publicKey, mintKp.publicKey, publicKey, feeRecipient, units, minOut)
+        );
+      }
+      const sig = await send(ixs, `Launch ${symbol}`, { cu: 400_000, signers: [mintKp] });
       if (sig) {
         toast.push({ kind: "ok", title: "Coin is live", body: "The board updates in a few seconds." });
         setTimeout(() => nav(`/coin/${mintKp.publicKey.toBase58()}`), 1500);
@@ -83,11 +118,11 @@ export default function CreatePage() {
           <div className="space-y-3">
             <div>
               <div className="label mb-1">Name</div>
-              <input className="input" placeholder="People Coin" maxLength={32} value={f.name} onChange={set("name")} />
+              <input className="input" placeholder="OpenPump Coin" maxLength={32} value={f.name} onChange={set("name")} />
             </div>
             <div>
               <div className="label mb-1">Ticker</div>
-              <input className="input uppercase" placeholder="PEOPLE" maxLength={10} value={f.symbol} onChange={set("symbol")} />
+              <input className="input uppercase" placeholder="OPEN" maxLength={10} value={f.symbol} onChange={set("symbol")} />
             </div>
           </div>
         </div>
@@ -105,24 +140,45 @@ export default function CreatePage() {
         </div>
       </div>
 
+      {/* pair */}
       <div className="panel p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-head font-semibold text-[14px]">Buy on launch <span className="text-dim font-normal text-[12px]">(optional)</span></div>
-            <div className="text-[12px] text-mute">Be the first buyer in the same transaction. Snipers can't front-run you.</div>
+        <div>
+          <div className="font-head font-semibold text-[14px]">Trading pair</div>
+          <div className="text-[12px] text-mute">What your coin is priced and traded in, on the curve and on the AMM after graduation.</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {pairs.map((p) => (
+            <button key={p.mint} onClick={() => setPair(p)} className={`pill !h-9 !px-3 ${pair?.mint === p.mint ? "pill-active" : ""}`}>
+              {p.symbol}
+              {p.mint === WSOL ? <span className="text-dim font-normal">native</span> : <span className="text-dim font-normal">custom pair</span>}
+            </button>
+          ))}
+          {pairs.length <= 1 && <span className="text-[12px] text-dim self-center">No custom pairs enabled on this cluster yet.</span>}
+        </div>
+        {v2 && quoteCfg && (
+          <div className="text-[12px] text-mute rounded-xl bg-black/30 border border-line p-3">
+            Starts at <b className="text-ink num">{qty(quoteCfg.initialVirtualQuoteReserves, qDec, 0)} {qSym}</b> virtual liquidity · graduates after ~<b className="text-ink num">{qty(curveMath.solInForTokensOut(quoteCfg.initialRealTokenReserves, { ...curveState! }), qDec, 0)} {qSym}</b> is raised.
           </div>
+        )}
+        {v2 && !quoteCfg && <div className="text-[12px] text-red">This pair is not configured on-chain yet.</div>}
+      </div>
+
+      <div className="panel p-4 space-y-3">
+        <div>
+          <div className="font-head font-semibold text-[14px]">Buy on launch <span className="text-dim font-normal text-[12px]">(optional)</span></div>
+          <div className="text-[12px] text-mute">Be the first buyer in the same transaction. Snipers can't front-run you.</div>
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <input value={devBuy} onChange={(e) => setDevBuy(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.0" className="input num pr-14" />
-            <span className="absolute right-3 top-3 text-[12px] font-semibold text-mute">SOL</span>
+            <input value={devBuy} onChange={(e) => setDevBuy(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.0" className="input num pr-20" />
+            <span className="absolute right-3 top-3 text-[12px] font-semibold text-mute">{qSym}</span>
           </div>
-          {[0.5, 1, 2].map((q) => <button key={q} onClick={() => setDevBuy(String(q))} className="pill !h-11 !px-3">{q}</button>)}
+          {(v2 ? [100, 1000, 10000] : [0.5, 1, 2]).map((q) => <button key={q} onClick={() => setDevBuy(String(q))} className="pill !h-11 !px-3">{q >= 1000 ? `${q / 1000}K` : q}</button>)}
         </div>
         {quote && (
           <div className="text-[12px] text-mute rounded-xl bg-black/30 border border-line p-3 flex justify-between">
             <span>You receive <b className="text-ink num">{fmtTokens(quote.tokensOut)}</b> tokens (<span className="num">{quote.pct.toFixed(2)}%</span> of supply)</span>
-            <span>Total <b className="text-ink num">{fmtSol(quote.totalCost, 4)} SOL</b></span>
+            <span>Total <b className="text-ink num">{qty(quote.totalCost, qDec, 4)} {qSym}</b></span>
           </div>
         )}
       </div>

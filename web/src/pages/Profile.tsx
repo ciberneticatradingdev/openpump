@@ -6,7 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useCoins, useConfig, useCreator, type Coin } from "../lib/api";
 import { useClient, useSendTx, useToast } from "../lib/solana";
-import { short, sol, tokens as fmtTokens } from "../lib/format";
+import { qty, short, sol, tokens as fmtTokens } from "../lib/format";
 import CoinCard from "../components/CoinCard";
 import Avatar from "../components/Avatar";
 
@@ -70,6 +70,18 @@ export default function ProfilePage() {
     } finally { setBusy(false); }
   };
 
+  const claimQuote = async (q: { mint: string; symbol: string; curve: string; amm: string }) => {
+    if (!publicKey) return;
+    setBusy(true);
+    try {
+      const qm = new PublicKey(q.mint);
+      const ixs = [];
+      if (Number(q.curve) > 0) ixs.push(await client.collectCreatorFeeV2Ix(publicKey, qm));
+      if (Number(q.amm) > 0) ixs.push(...(await client.ammCollectCreatorFeeIxs(publicKey, qm)));
+      const sig = await send(ixs, `Claim ${q.symbol} fees`);
+      if (sig) setTimeout(() => refetch(), 1500);
+    } finally { setBusy(false); }
+  };
   const curveClaim = Number(data?.claimable.curveLamports || 0);
   const ammClaim = Number(data?.claimable.ammWsolLamports || 0);
   const lifetime = (data?.coins || []).reduce((a, c) => a + Number(c.creator_fees), 0);
@@ -93,6 +105,13 @@ export default function ProfilePage() {
             <div className="kpi">{sol(ammClaim, 4)} SOL</div>
             {isMe && <button onClick={claimAmm} disabled={busy || ammClaim <= 0} className="btn btn-acc !h-8 w-full mt-2 text-[12px]">Claim</button>}
           </div>
+          {(data?.claimable.quotes || []).map((q) => (
+            <div key={q.mint} className="panel px-3 py-2 min-w-[150px]">
+              <div className="label">Claimable ({q.symbol} pair)</div>
+              <div className="kpi">{qty(Number(q.curve) + Number(q.amm), q.decimals, 4)} {q.symbol}</div>
+              {isMe && <button onClick={() => claimQuote(q)} disabled={busy || Number(q.curve) + Number(q.amm) <= 0} className="btn btn-acc !h-8 w-full mt-2 text-[12px]">Claim</button>}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -109,7 +128,7 @@ export default function ProfilePage() {
                   <div className="text-[11px] text-dim num">{fmtTokens(amount)} tokens</div>
                 </div>
                 <div className="text-right num">
-                  <div className="text-[13px] font-semibold">{sol((Number(amount) / 1e6) * coin.price, 3)} SOL</div>
+                  <div className="text-[13px] font-semibold">{qty((Number(amount) / 1e6) * coin.price, coin.quote_decimals ?? 9, 3)} {coin.quote_symbol || "SOL"}</div>
                   <div className="text-[11px] text-dim">{coin.migrated ? "AMM" : "curve"}</div>
                 </div>
               </Link>

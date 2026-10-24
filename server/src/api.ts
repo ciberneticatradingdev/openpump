@@ -156,9 +156,17 @@ export function apiRouter(db: Db, conn: Connection) {
   r.get("/api/creator/:pubkey", async (req, res) => {
     try {
       const creator = new PublicKey(req.params.pubkey);
-      const coins = db.prepare("SELECT * FROM coins WHERE creator=? ORDER BY created_at DESC").all(req.params.pubkey);
+      const coins = db.prepare("SELECT * FROM coins WHERE creator=? ORDER BY created_at DESC").all(req.params.pubkey) as any[];
       const claimable = await client.creatorClaimable(creator);
-      res.json({ coins, claimable: { curveLamports: claimable.curveLamports.toString(), ammWsolLamports: claimable.ammWsolLamports.toString() } });
+      const quotes: any[] = [];
+      const seen = new Set<string>();
+      for (const c of coins) {
+        if (!c.quote_mint || c.quote_mint === "So11111111111111111111111111111111111111112" || seen.has(c.quote_mint)) continue;
+        seen.add(c.quote_mint);
+        const q = await client.creatorClaimableQuote(creator, new PublicKey(c.quote_mint)).catch(() => ({ curve: 0n, amm: 0n }));
+        quotes.push({ mint: c.quote_mint, symbol: c.quote_symbol, decimals: c.quote_decimals, curve: q.curve.toString(), amm: q.amm.toString() });
+      }
+      res.json({ coins, claimable: { curveLamports: claimable.curveLamports.toString(), ammWsolLamports: claimable.ammWsolLamports.toString(), quotes } });
     } catch (e) {
       res.status(400).json({ error: (e as Error).message });
     }

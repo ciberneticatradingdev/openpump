@@ -33,7 +33,14 @@ export interface Coin {
   last_trade_at: number | null;
   creator_fees: string;
   protocol_fees: string;
+  quote_mint: string;
+  quote_symbol: string;
+  quote_decimals: number;
 }
+
+export const WSOL = "So11111111111111111111111111111111111111112";
+export const isV2 = (c: { quote_mint?: string | null }) => !!c.quote_mint && c.quote_mint !== WSOL;
+export interface QuoteMintInfo { mint: string; symbol: string; decimals: number }
 
 export interface Trade {
   id: string;
@@ -55,6 +62,7 @@ export interface Trade {
 }
 
 export interface Config {
+  quoteMints: QuoteMintInfo[];
   curveProgram: string;
   ammProgram: string;
   rpc: string;
@@ -98,4 +106,9 @@ export const useHolders = (mint?: string) =>
   useQuery({ queryKey: ["holders", mint], queryFn: () => get<any[]>(`/api/coins/${mint}/holders`), enabled: !!mint, refetchInterval: 20_000 });
 export const useActivity = (limit = 30) => useQuery({ queryKey: ["activity", limit], queryFn: () => get<Trade[]>(`/api/activity?limit=${limit}`), refetchInterval: 8_000 });
 export const useCreator = (pubkey?: string) =>
-  useQuery({ queryKey: ["creator", pubkey], queryFn: () => get<{ coins: Coin[]; claimable: { curveLamports: string; ammWsolLamports: string } }>(`/api/creator/${pubkey}`), enabled: !!pubkey, refetchInterval: 10_000 });
+  useQuery({
+    queryKey: ["creator", pubkey],
+    queryFn: () => get<{ coins: Coin[]; claimable: { curveLamports: string; ammWsolLamports: string; quotes: { mint: string; symbol: string; decimals: number; curve: string; amm: string }[] } }>(`/api/creator/${pubkey}`),
+    enabled: !!pubkey,
+    refetchInterval: 10_000,
+  });

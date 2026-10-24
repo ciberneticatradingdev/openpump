@@ -11,7 +11,7 @@ const RES = [
 ];
 
 /** Candles as market cap in SOL (price × 1B supply) — far more readable than 5e-7 SOL/token. */
-export default function Chart({ mint, height = 380 }: { mint: string; height?: number }) {
+export default function Chart({ mint, height = 380, qSym = "SOL", qDec = 9 }: { mint: string; height?: number; qSym?: string; qDec?: number }) {
   const [res, setRes] = useState(60);
   const { data } = useCandles(mint, res);
   const box = useRef<HTMLDivElement>(null);
@@ -45,11 +45,12 @@ export default function Chart({ mint, height = 380 }: { mint: string; height?: n
   useEffect(() => {
     if (!series.current || !data) return;
     // lamports/token × 1e9 tokens supply / 1e9 lamports = SOL market cap
-    const cs = data.map((k) => ({ time: k.time as any, open: k.open, high: k.high, low: k.low, close: k.close }));
+    const f = 1e9 / 10 ** qDec; // price is quote-units/token; ×1e9 tokens supply ÷ quote decimals = mcap in quote
+    const cs = data.map((k) => ({ time: k.time as any, open: k.open * f, high: k.high * f, low: k.low * f, close: k.close * f }));
     series.current.setData(cs);
     vol.current?.setData(data.map((k) => ({ time: k.time as any, value: k.volume, color: k.close >= k.open ? "rgba(121,255,119,0.25)" : "rgba(255,92,122,0.25)" })));
     chart.current?.timeScale().fitContent();
-  }, [data]);
+  }, [data, qDec]);
 
   return (
     <div className="panel overflow-hidden">
@@ -57,7 +58,7 @@ export default function Chart({ mint, height = 380 }: { mint: string; height?: n
         {RES.map((r) => (
           <button key={r.s} onClick={() => setRes(r.s)} className={`pill !h-7 !px-2.5 ${res === r.s ? "pill-active" : "!border-transparent !bg-transparent text-mute hover:text-ink"}`}>{r.label}</button>
         ))}
-        <span className="ml-auto text-[11px] text-dim pr-2">market cap · SOL</span>
+        <span className="ml-auto text-[11px] text-dim pr-2">market cap · {qSym}</span>
       </div>
       <div ref={box} className="w-full" style={{ height }} />
       {data && data.length === 0 && <div className="text-center text-dim text-[12px] -mt-48 mb-44 relative">No trades yet — be the first.</div>}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCoin, useConfig, useHolders, useTrades } from "../lib/api";
-import { ago, compact, explorer, price as fmtPrice, short, sol } from "../lib/format";
+import { ago, compact, explorer, priceQ, qty, short, sol } from "../lib/format";
 import Avatar from "../components/Avatar";
 import Chart from "../components/Chart";
 import Progress from "../components/Progress";
@@ -24,7 +24,9 @@ export default function CoinPage() {
   const graduated = !!coin.migrated;
   const p = progressOf(coin, cfg.global.initialRealTokenReserves);
   const ex = explorer(cfg.cluster);
-  const target = Number(cfg.global.initialVirtualSolReserves) === 30e9 ? 85 : null;
+  const qSym = coin.quote_symbol || "SOL";
+  const qDec = coin.quote_decimals ?? 9;
+  const target = qSym === "SOL" && Number(cfg.global.initialVirtualSolReserves) === 30e9 ? 85 : null;
   const copy = (s: string) => { navigator.clipboard.writeText(s); toast.push({ kind: "ok", title: "Copied" }); };
   const isCreator = publicKey?.toBase58() === coin.creator;
 
@@ -39,6 +41,7 @@ export default function CoinPage() {
               <h1 className="font-head font-bold text-[20px] tracking-tight">{coin.symbol}</h1>
               <span className="text-mute text-[14px] truncate">{coin.name}</span>
               {graduated ? <Badge color="acc">AMM</Badge> : coin.complete ? <Badge color="gold">graduating</Badge> : <Badge>bonding curve</Badge>}
+              {qSym !== "SOL" && <Badge>pair /{qSym}</Badge>}
             </div>
             <div className="flex items-center gap-2 flex-wrap text-[12px] text-mute mt-1">
               <button onClick={() => copy(coin.mint)} className="pill !h-7 num hover:border-line2" title="Copy contract address">{short(coin.mint, 5)} <span className="text-dim">⧉</span></button>
@@ -54,14 +57,14 @@ export default function CoinPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-          <Kpi k="Market cap" v={`${sol(coin.mcap, 1)} SOL`} />
-          <Kpi k="Price" v={`${fmtPrice(coin.price)} SOL`} />
-          <Kpi k="Volume" v={`${sol(coin.volume_sol, 1)} SOL`} />
+          <Kpi k="Market cap" v={`${qty(coin.mcap, qDec, 1)} ${qSym}`} />
+          <Kpi k="Price" v={`${priceQ(coin.price, qDec)} ${qSym}`} />
+          <Kpi k="Volume" v={`${qty(coin.volume_sol, qDec, 1)} ${qSym}`} />
           <Kpi k="Trades" v={coin.trades} />
-          <Kpi k="Creator earned" v={`${sol(coin.creator_fees, 3)} SOL`} />
+          <Kpi k="Creator earned" v={`${qty(coin.creator_fees, qDec, 3)} ${qSym}`} />
         </div>
 
-        <Chart mint={coin.mint} />
+        <Chart mint={coin.mint} qSym={qSym} qDec={qDec} />
 
         {/* tabs */}
         <div className="panel">
@@ -70,7 +73,7 @@ export default function CoinPage() {
               <button key={t} onClick={() => setTab(t)} className={`pill capitalize ${tab === t ? "pill-active" : "!border-transparent !bg-transparent text-mute hover:text-ink"}`}>{t}</button>
             ))}
           </div>
-          {tab === "trades" && <Trades mint={coin.mint} symbol={coin.symbol} cluster={cfg.cluster} />}
+          {tab === "trades" && <Trades mint={coin.mint} symbol={coin.symbol} cluster={cfg.cluster} qSym={qSym} qDec={qDec} />}
           {tab === "holders" && <Holders mint={coin.mint} cluster={cfg.cluster} />}
           {tab === "about" && (
             <div className="p-4 text-[13px] text-mute space-y-2">
@@ -96,9 +99,9 @@ export default function CoinPage() {
           <Progress value={p} className="mt-2" color={graduated ? "bg-acc" : coin.complete ? "bg-gold" : "bg-acc"} />
           <p className="text-[12px] text-mute mt-2">
             {graduated ? (
-              <>Trading on the AMM with <b className="text-ink num">{sol(coin.pool_quote || 0, 1)} SOL</b> liquidity. LP burned, so liquidity can never be pulled.</>
+              <>Trading on the AMM with <b className="text-ink num">{qty(coin.pool_quote || 0, qDec, 1)} {qSym}</b> liquidity. LP burned, so liquidity can never be pulled.</>
             ) : (
-              <><b className="text-ink num">{sol(coin.r_sol, 2)} SOL</b> raised{target ? <> of ~{target} SOL</> : null}. When the curve sells out, all of it + the remaining supply becomes permanent AMM liquidity.</>
+              <><b className="text-ink num">{qty(coin.r_sol, qDec, 2)} {qSym}</b> raised{target ? <> of ~{target} SOL</> : null}. When the curve sells out, all of it + the remaining supply becomes permanent AMM liquidity.</>
             )}
           </p>
         </div>
@@ -128,7 +131,7 @@ const Row = ({ k, v }: { k: string; v: any }) => (
   <div className="flex justify-between"><span>{k}</span><span className="text-ink num">{v}</span></div>
 );
 
-function Trades({ mint, symbol, cluster }: { mint: string; symbol: string; cluster: string }) {
+function Trades({ mint, symbol, cluster, qSym, qDec }: { mint: string; symbol: string; cluster: string; qSym: string; qDec: number }) {
   const { data } = useTrades(mint, 100);
   const ex = explorer(cluster);
   return (
@@ -136,7 +139,7 @@ function Trades({ mint, symbol, cluster }: { mint: string; symbol: string; clust
       <table className="w-full text-[12px] num">
         <thead className="text-dim text-left">
           <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">
-            <th>account</th><th>type</th><th className="text-right">SOL</th><th className="text-right">{symbol}</th><th className="text-right">venue</th><th className="text-right">time</th><th className="text-right">tx</th>
+            <th>account</th><th>type</th><th className="text-right">{qSym}</th><th className="text-right">{symbol}</th><th className="text-right">venue</th><th className="text-right">time</th><th className="text-right">tx</th>
           </tr>
         </thead>
         <tbody>
@@ -144,7 +147,7 @@ function Trades({ mint, symbol, cluster }: { mint: string; symbol: string; clust
             <tr key={t.id} className="border-t border-line hover:bg-panel2 [&>td]:px-3 [&>td]:py-2">
               <td><Link to={`/profile/${t.user}`} className="hover:text-acc">{short(t.user)}</Link></td>
               <td className={t.is_buy ? "text-acc font-semibold" : "text-red font-semibold"}>{t.is_buy ? "buy" : "sell"}</td>
-              <td className="text-right">{sol(t.sol, 4)}</td>
+              <td className="text-right">{qty(t.sol, qDec, 4)}</td>
               <td className="text-right">{compact(Number(t.tokens) / 1e6)}</td>
               <td className="text-right text-mute">{t.venue}</td>
               <td className="text-right text-mute">{ago(t.ts)} ago</td>
