@@ -17,7 +17,8 @@ const db = openDb(process.env.DB_PATH || "./data/peoplepad.sqlite");
 const conn = new Connection(RPC_URL, { commitment: "confirmed", wsEndpoint: process.env.RPC_WS_URL || undefined });
 
 const app = express();
-app.use(cors({ origin: (process.env.WEB_ORIGIN || "*").split(",") }));
+const origins = process.env.WEB_ORIGIN || "*";
+app.use(cors({ origin: origins === "*" ? true : origins.split(",").map((o) => o.trim()) }));
 app.use(express.json({ limit: "1mb" }));
 app.get("/health", (_req, res) => res.json({ ok: true, rpc: RPC_URL }));
 app.use(uploadRouter());
