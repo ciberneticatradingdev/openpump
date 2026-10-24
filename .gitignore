@@ -1,0 +1,13 @@
+node_modules/
+target/
+!target/deploy/*-keypair.json
+!target/idl/
+!target/types/
+.anchor/
+test-ledger/
+.DS_Store
+.env
+.env.*
+!.env.example
+dist/
+*.log
