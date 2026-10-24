@@ -20,15 +20,22 @@ export class Indexer {
   async start() {
     this.running = true;
     for (const p of [CURVE_PROGRAM_ID, AMM_PROGRAM_ID]) await this.backfill(p).catch((e) => console.error("backfill", p.toBase58(), e));
+    const interval = Number(process.env.POLL_MS || (this.conn.rpcEndpoint.includes("api.devnet") || this.conn.rpcEndpoint.includes("api.mainnet") ? 6000 : 2500));
+    let flip = 0;
+    let backoff = 0;
     const tick = async () => {
       if (!this.running) return;
       try {
-        for (const p of [CURVE_PROGRAM_ID, AMM_PROGRAM_ID]) await this.pollNew(p);
-        await this.fetchPendingMetadata();
+        // alternate programs per tick to stay under public-RPC rate limits
+        await this.pollNew(flip++ % 2 === 0 ? CURVE_PROGRAM_ID : AMM_PROGRAM_ID);
+        if (flip % 4 === 0) await this.fetchPendingMetadata();
+        backoff = 0;
       } catch (e) {
-        console.error("indexer tick", (e as Error).message);
+        const msg = (e as Error).message || "";
+        backoff = Math.min(60_000, backoff ? backoff * 2 : 5000);
+        console.error("indexer tick", msg.slice(0, 120), msg.includes("429") ? `(backing off ${backoff}ms)` : "");
       }
-      this.timer = setTimeout(tick, 2500);
+      this.timer = setTimeout(tick, interval + backoff);
     };
     tick();
   }
@@ -79,15 +86,38 @@ export class Indexer {
     this.setCursor(p, ok[ok.length - 1].signature, 1);
   }
 
+  private get publicRpc() {
+    return /api\.(devnet|mainnet-beta|testnet)\.solana\.com/.test(this.conn.rpcEndpoint);
+  }
+
+  /** Public Solana RPCs cap getTransaction hard: fetch one at a time with spacing and patient retries. */
+  private async fetchTx(sig: string) {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      try {
+        return await this.conn.getParsedTransaction(sig, { maxSupportedTransactionVersion: 0, commitment: "confirmed" });
+      } catch (e) {
+        const msg = (e as Error).message || "";
+        if (!/429|Too many requests/i.test(msg)) throw e;
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
+    }
+    throw new Error(`gave up fetching ${sig.slice(0, 8)} after 429s`);
+  }
+
   private async processSignatures(sigs: string[]) {
-    for (let i = 0; i < sigs.length; i += 20) {
-      const chunk = sigs.slice(i, i + 20);
-      const txs = await this.conn.getParsedTransactions(chunk, { maxSupportedTransactionVersion: 0, commitment: "confirmed" });
+    const BATCH = Number(process.env.TX_BATCH || (this.publicRpc ? 1 : 10));
+    const spacing = Number(process.env.TX_SPACING_MS || (this.publicRpc ? 700 : 0));
+    for (let i = 0; i < sigs.length; i += BATCH) {
+      const chunk = sigs.slice(i, i + BATCH);
+      const txs = BATCH === 1
+        ? [await this.fetchTx(chunk[0])]
+        : await this.conn.getParsedTransactions(chunk, { maxSupportedTransactionVersion: 0, commitment: "confirmed" });
       txs.forEach((tx, j) => {
         if (!tx || tx.meta?.err) return;
         const events = decodeEventsFromParsedTx(tx, chunk[j]);
         events.forEach((ev, k) => this.apply(ev, k));
       });
+      if (spacing) await new Promise((r) => setTimeout(r, spacing));
     }
   }
 
