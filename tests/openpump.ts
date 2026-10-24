@@ -12,8 +12,8 @@ import {
 } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction } from "@solana/web3.js";
 import { assert } from "chai";
-import { PeoplepadCurve } from "../target/types/peoplepad_curve";
-import { PeoplepadAmm } from "../target/types/peoplepad_amm";
+import { OpenpumpCurve } from "../target/types/openpump_curve";
+import { OpenpumpAmm } from "../target/types/openpump_amm";
 
 const MPL_TOKEN_METADATA = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
@@ -31,13 +31,13 @@ const PARAMS = {
   paused: false,
 };
 
-describe("PEOPLE'S PAD — curve + amm", () => {
+describe("OpenPump — curve + amm", () => {
   const base = anchor.AnchorProvider.env();
   const provider = new anchor.AnchorProvider(base.connection, base.wallet, { commitment: "confirmed", preflightCommitment: "confirmed" });
   anchor.setProvider(provider);
   const conn = provider.connection;
-  const curve = new Program<PeoplepadCurve>(require("../target/idl/peoplepad_curve.json"), provider);
-  const amm = new Program<PeoplepadAmm>(require("../target/idl/peoplepad_amm.json"), provider);
+  const curve = new Program<OpenpumpCurve>(require("../target/idl/openpump_curve.json"), provider);
+  const amm = new Program<OpenpumpAmm>(require("../target/idl/openpump_amm.json"), provider);
   const logsOf = async (e: any) => { try { return e.logs ?? (await e.getLogs?.(conn)) ?? []; } catch { return []; } };
   const admin = (provider.wallet as anchor.Wallet).payer;
 

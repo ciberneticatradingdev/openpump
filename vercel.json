@@ -1,6 +1,6 @@
 {
   "installCommand": "pnpm install",
-  "buildCommand": "pnpm --filter @peoplepad/web build",
+  "buildCommand": "pnpm --filter @openpump/web build",
   "outputDirectory": "web/dist",
   "framework": null,
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]

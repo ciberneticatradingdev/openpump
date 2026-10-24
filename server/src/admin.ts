@@ -8,7 +8,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { DEFAULT_AMM_FEES, DEFAULT_PARAMS, PeoplepadClient, bs58decode } from "@peoplepad/sdk";
+import { DEFAULT_AMM_FEES, DEFAULT_PARAMS, OpenpumpClient, bs58decode } from "@openpump/sdk";
 
 function loadKeypair(): Keypair {
   const raw = process.env.ADMIN_KEYPAIR || fs.readFileSync(`${process.env.HOME}/.config/solana/id.json`, "utf8");
@@ -21,7 +21,7 @@ async function main() {
   const conn = new Connection(process.env.RPC_URL || "https://api.devnet.solana.com", "confirmed");
   const admin = loadKeypair();
   const provider = new AnchorProvider(conn, new Wallet(admin), { commitment: "confirmed" });
-  const client = new PeoplepadClient(conn, provider);
+  const client = new OpenpumpClient(conn, provider);
   const feeRecipient = new PublicKey(process.env.FEE_RECIPIENT || admin.publicKey.toBase58());
   const params = { feeRecipient, ...DEFAULT_PARAMS };
   console.log("admin", admin.publicKey.toBase58(), "fee recipient", feeRecipient.toBase58());

@@ -34,7 +34,7 @@ export default function Home() {
         <div>
           <h1 className="font-head font-bold text-[22px] sm:text-[26px] tracking-tight leading-none">{BRAND.tagline}</h1>
           <p className="text-mute text-[13px] mt-1.5">
-            Launch a coin in one click. Creators earn <b className="text-ink">{cfg ? Number(cfg.global.creatorFeeBasisPoints) / 100 : 0.5}%</b> of every trade from trade one. Graduation at ~85 SOL moves everything into an AMM with the LP burned.
+            Open-source pump.fun. Launch a coin in one click. Creators earn <b className="text-ink">{cfg ? Number(cfg.global.creatorFeeBasisPoints) / 100 : 0.5}%</b> of every trade from trade one. Graduation at ~85 SOL moves everything into an AMM with the LP burned.
             {" "}<Link to="/how-it-works" className="text-acc hover:underline">How it works →</Link>
           </p>
         </div>

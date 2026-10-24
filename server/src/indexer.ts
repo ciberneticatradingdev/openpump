@@ -1,20 +1,31 @@
 import { Connection, PublicKey, type ConfirmedSignatureInfo } from "@solana/web3.js";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, PeoplepadClient, decodeEventsFromParsedTx, type DecodedEvent } from "@peoplepad/sdk";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, OpenpumpClient, decodeEventsFromParsedTx, type DecodedEvent } from "@openpump/sdk";
 import type { Db } from "./db";
 import { fetchMetadata } from "./metadata";
 
 type Broadcast = (msg: any) => void;
 
+export const WSOL = "So11111111111111111111111111111111111111112";
+/** Known quote mints: QUOTE_MINTS="mint:SYMBOL:decimals,..." (SOL is always present). */
+export function quoteInfo(mint: string | null) {
+  if (!mint || mint === WSOL || /^1{32}$/.test(mint) || mint === "11111111111111111111111111111111") return { mint: WSOL, symbol: "SOL", decimals: 9 };
+  for (const entry of (process.env.QUOTE_MINTS || "").split(",")) {
+    const [m, sym, dec] = entry.split(":");
+    if (m === mint) return { mint, symbol: sym || "QUOTE", decimals: Number(dec || 9) };
+  }
+  return { mint, symbol: mint.slice(0, 4), decimals: 9 };
+}
+
 const toStr = (v: any) => (v == null ? null : typeof v === "object" && "toString" in v ? v.toString() : String(v));
 const num = (v: any) => Number(toStr(v));
 
 export class Indexer {
-  private client: PeoplepadClient;
+  private client: OpenpumpClient;
   private running = false;
   private timer: NodeJS.Timeout | null = null;
 
   constructor(private conn: Connection, private db: Db, private broadcast: Broadcast) {
-    this.client = new PeoplepadClient(conn);
+    this.client = new OpenpumpClient(conn);
   }
 
   async start() {
@@ -128,16 +139,18 @@ export class Indexer {
     const ts = ev.blockTime ?? Math.floor(Date.now() / 1000);
     const handlers: Record<string, () => void> = {
       "curve:CreateEvent": () => {
+        const q = quoteInfo(toStr(d.quoteMint));
         this.db
           .prepare(
-            `INSERT INTO coins(mint,name,symbol,uri,creator,bonding_curve,created_at,created_slot,create_sig,v_sol,v_tok,r_sol,r_tok,supply,price,mcap)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(mint) DO NOTHING`
+            `INSERT INTO coins(mint,name,symbol,uri,creator,bonding_curve,created_at,created_slot,create_sig,v_sol,v_tok,r_sol,r_tok,supply,price,mcap,quote_mint,quote_symbol,quote_decimals)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(mint) DO NOTHING`
           )
           .run(
             toStr(d.mint), d.name, d.symbol, d.uri, toStr(d.creator), toStr(d.bondingCurve), ts, ev.slot, ev.signature,
             toStr(d.virtualSolReserves), toStr(d.virtualTokenReserves), "0", toStr(d.realTokenReserves), toStr(d.tokenTotalSupply),
             (num(d.virtualSolReserves) / num(d.virtualTokenReserves)) * 1e6,
-            (num(d.virtualSolReserves) / num(d.virtualTokenReserves)) * num(d.tokenTotalSupply)
+            (num(d.virtualSolReserves) / num(d.virtualTokenReserves)) * num(d.tokenTotalSupply),
+            q.mint, q.symbol, q.decimals
           );
         this.broadcast({ type: "create", mint: toStr(d.mint), name: d.name, symbol: d.symbol, creator: toStr(d.creator), ts });
       },

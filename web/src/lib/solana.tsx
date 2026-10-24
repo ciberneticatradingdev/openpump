@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { ConnectionProvider, WalletProvider, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { ComputeBudgetProgram, PublicKey, Transaction, type TransactionInstruction } from "@solana/web3.js";
-import { PeoplepadClient } from "@peoplepad/sdk";
+import { OpenpumpClient } from "@openpump/sdk";
 import { useConfig } from "./api";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -41,7 +41,7 @@ export function SolanaProviders({ children }: { children: ReactNode }) {
 
 export function useClient() {
   const { connection } = useConnection();
-  return useMemo(() => new PeoplepadClient(connection), [connection]);
+  return useMemo(() => new OpenpumpClient(connection), [connection]);
 }
 
 /** Sign + send + confirm with toasts; returns the signature or null. */

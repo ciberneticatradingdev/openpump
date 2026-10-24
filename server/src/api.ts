@@ -1,6 +1,6 @@
 import express from "express";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, DEFAULT_PARAMS, PeoplepadClient, pda } from "@peoplepad/sdk";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, DEFAULT_PARAMS, OpenpumpClient, pda } from "@openpump/sdk";
 import type { Db } from "./db";
 
 const SORTS: Record<string, string> = {
@@ -14,7 +14,7 @@ const SORTS: Record<string, string> = {
 
 export function apiRouter(db: Db, conn: Connection) {
   const r = express.Router();
-  const client = new PeoplepadClient(conn);
+  const client = new OpenpumpClient(conn);
   let globalCache: { at: number; value: any } | null = null;
 
   const getGlobal = async () => {
@@ -53,7 +53,13 @@ export function apiRouter(db: Db, conn: Connection) {
   };
 
   r.get("/api/config", async (_req, res) => {
+    const quoteMints = [{ mint: "So11111111111111111111111111111111111111112", symbol: "SOL", decimals: 9 }];
+    for (const entry of (process.env.QUOTE_MINTS || "").split(",").filter(Boolean)) {
+      const [mint, symbol, dec] = entry.split(":");
+      quoteMints.push({ mint, symbol: symbol || "QUOTE", decimals: Number(dec || 9) });
+    }
     res.json({
+      quoteMints,
       curveProgram: CURVE_PROGRAM_ID.toBase58(),
       ammProgram: AMM_PROGRAM_ID.toBase58(),
       rpc: process.env.PUBLIC_RPC_URL || process.env.RPC_URL,

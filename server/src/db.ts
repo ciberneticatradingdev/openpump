@@ -31,7 +31,10 @@ export function openDb(file: string) {
       last_trade_at INTEGER,
       creator_fees TEXT DEFAULT '0',
       protocol_fees TEXT DEFAULT '0',
-      metadata_fetched INTEGER DEFAULT 0
+      metadata_fetched INTEGER DEFAULT 0,
+      quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112',
+      quote_symbol TEXT DEFAULT 'SOL',
+      quote_decimals INTEGER DEFAULT 9
     );
     CREATE INDEX IF NOT EXISTS coins_created ON coins(created_at DESC);
     CREATE INDEX IF NOT EXISTS coins_last_trade ON coins(last_trade_at DESC);
@@ -59,6 +62,9 @@ export function openDb(file: string) {
     CREATE TABLE IF NOT EXISTS cursors (program TEXT PRIMARY KEY, last_sig TEXT, backfilled INTEGER DEFAULT 0);
     CREATE TABLE IF NOT EXISTS pools (pool TEXT PRIMARY KEY, mint TEXT NOT NULL);
   `);
+  for (const col of ["quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112'", "quote_symbol TEXT DEFAULT 'SOL'", "quote_decimals INTEGER DEFAULT 9"]) {
+    try { db.exec(`ALTER TABLE coins ADD COLUMN ${col}`); } catch {}
+  }
   return db;
 }
 

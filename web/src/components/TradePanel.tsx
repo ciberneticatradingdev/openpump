@@ -3,7 +3,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { amm as ammMath, curve as curveMath, type PoolState } from "@peoplepad/sdk";
+import { amm as ammMath, curve as curveMath, type PoolState } from "@openpump/sdk";
 import type { Coin, Config } from "../lib/api";
 import { useClient, useSendTx } from "../lib/solana";
 import { sol as fmtSol, tokens as fmtTokens } from "../lib/format";

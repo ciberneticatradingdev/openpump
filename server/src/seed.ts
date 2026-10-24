@@ -1,20 +1,20 @@
 /**
  * Dev-only: populate a localnet/devnet with a few coins and trades so the UI has data.
- *   RPC_URL=http://127.0.0.1:8899 pnpm --filter @peoplepad/server exec tsx src/seed.ts
+ *   RPC_URL=http://127.0.0.1:8899 pnpm --filter @openpump/server exec tsx src/seed.ts
  * Uses ~/.config/solana/id.json (must be INITIAL_AUTHORITY) and airdrops when on localnet.
  */
 import "dotenv/config";
 import fs from "node:fs";
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import { DEFAULT_AMM_FEES, DEFAULT_PARAMS, PeoplepadClient, curve as curveMath, pda } from "@peoplepad/sdk";
+import { DEFAULT_AMM_FEES, DEFAULT_PARAMS, OpenpumpClient, curve as curveMath, pda } from "@openpump/sdk";
 
 const RPC = process.env.RPC_URL || "http://127.0.0.1:8899";
 const API = process.env.API_URL || "http://localhost:8787";
 const conn = new Connection(RPC, "confirmed");
 const admin = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(`${process.env.HOME}/.config/solana/id.json`, "utf8"))));
 const provider = new AnchorProvider(conn, new Wallet(admin), { commitment: "confirmed" });
-const client = new PeoplepadClient(conn, provider);
+const client = new OpenpumpClient(conn, provider);
 
 const COINS = [
   { name: "People Coin", symbol: "PEOPLE", desc: "the launchpad the community asked for", color: "ff5c1a" },
@@ -94,7 +94,7 @@ async function main() {
     for (let k = 0; k < n; k++) {
       const t = traders[k % traders.length];
       const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });
-      const tc = new PeoplepadClient(conn, tp);
+      const tc = new OpenpumpClient(conn, tp);
       const bc = (await client.fetchBondingCurve(mint.publicKey))!;
       if (bc.complete) break;
       const sellTurn = i !== 0 && k % 4 === 3;
@@ -121,11 +121,11 @@ async function main() {
       const cfg = await client.fetchAmmConfig();
       const t = traders[0];
       const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });
-      const tc = new PeoplepadClient(conn, tp);
+      const tc = new OpenpumpClient(conn, tp);
       for (let k = 0; k < 4; k++) {
         const { baseReserve, quoteReserve } = await client.fetchPoolReserves(pool);
         const budget = BigInt(Math.floor((1 + Math.random() * 3) * 1e9));
-        const { amm } = await import("@peoplepad/sdk");
+        const { amm } = await import("@openpump/sdk");
         const q = amm.quoteBuyWithBudget(budget, baseReserve, quoteReserve, cfg);
         const ixs = await tc.ammBuyIxs(t.publicKey, mint.publicKey, pool, cfg.protocolFeeRecipient, q.baseOut, q.totalIn);
         await tp.sendAndConfirm(new Transaction().add(...ixs), [t]);

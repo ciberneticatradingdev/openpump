@@ -1,12 +1,12 @@
 [package]
-name = "peoplepad-curve"
+name = "openpump-curve"
 version = "0.1.0"
-description = "PEOPLE'S PAD bonding curve launchpad (clean-room, pump.fun-shaped)"
+description = "OpenPump bonding curve launchpad (clean-room, pump.fun-shaped)"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "peoplepad_curve"
+name = "openpump_curve"
 
 [features]
 default = []
@@ -14,12 +14,12 @@ cpi = ["no-entrypoint"]
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
-idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "peoplepad-amm/idl-build"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "openpump-amm/idl-build"]
 
 [dependencies]
 anchor-lang = { version = "0.31.1", features = ["init-if-needed", "event-cpi"] }
 anchor-spl = { version = "0.31.1", features = ["metadata"] }
-peoplepad-amm = { path = "../peoplepad-amm", features = ["cpi"] }
+openpump-amm = { path = "../openpump-amm", features = ["cpi"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("anchor-debug", "custom-heap", "custom-panic"))'] }

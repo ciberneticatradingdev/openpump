@@ -1,12 +1,12 @@
 [package]
-name = "peoplepad-amm"
+name = "openpump-amm"
 version = "0.1.0"
-description = "PEOPLE'S PAD constant-product AMM: graduated coins trade here (clean-room, PumpSwap-shaped)"
+description = "OpenPump constant-product AMM: graduated coins trade here (clean-room, PumpSwap-shaped)"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "peoplepad_amm"
+name = "openpump_amm"
 
 [features]
 default = []

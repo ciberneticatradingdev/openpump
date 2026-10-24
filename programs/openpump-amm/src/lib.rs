@@ -1,4 +1,4 @@
-//! PEOPLE'S PAD AMM — a constant-product AMM where graduated coins trade.
+//! OpenPump AMM — a constant-product AMM where graduated coins trade.
 //!
 //! Clean-room implementation. The instruction *shape* mirrors PumpSwap's public
 //! IDL (create_config / create_pool / deposit / withdraw / buy / sell /
@@ -43,7 +43,7 @@ pub const DISABLE_SELL: u8 = 1 << 4;
 pub const INITIAL_ADMIN: Pubkey = pubkey!("J37KbWUsm9NrVMQjS7b1UtrnxhrLjbot2m8R8REfz3jE");
 
 #[program]
-pub mod peoplepad_amm {
+pub mod openpump_amm {
     use super::*;
 
     pub fn create_config(

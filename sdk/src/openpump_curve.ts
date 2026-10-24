@@ -1,10 +1,16 @@
-{
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/openpump_curve.json`.
+ */
+export type OpenpumpCurve = {
   "address": "AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB",
   "metadata": {
-    "name": "peoplepad_curve",
+    "name": "openpumpCurve",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "PEOPLE'S PAD bonding curve launchpad (clean-room, pump.fun-shaped)"
+    "description": "OpenPump bonding curve launchpad (clean-room, pump.fun-shaped)"
   },
   "instructions": [
     {
@@ -43,17 +49,17 @@
           }
         },
         {
-          "name": "fee_recipient",
+          "name": "feeRecipient",
           "writable": true
         },
         {
           "name": "mint",
           "relations": [
-            "bonding_curve"
+            "bondingCurve"
           ]
         },
         {
-          "name": "bonding_curve",
+          "name": "bondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
@@ -83,13 +89,13 @@
           }
         },
         {
-          "name": "associated_bonding_curve",
+          "name": "associatedBondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "bonding_curve"
+                "path": "bondingCurve"
               },
               {
                 "kind": "const",
@@ -173,7 +179,7 @@
           }
         },
         {
-          "name": "associated_user",
+          "name": "associatedUser",
           "writable": true,
           "pda": {
             "seeds": [
@@ -268,7 +274,7 @@
           "signer": true
         },
         {
-          "name": "creator_vault",
+          "name": "creatorVault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -293,25 +299,25 @@
               {
                 "kind": "account",
                 "path": "bonding_curve.creator",
-                "account": "BondingCurve"
+                "account": "bondingCurve"
               }
             ]
           }
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -349,13 +355,13 @@
           "type": "u64"
         },
         {
-          "name": "max_sol_cost",
+          "name": "maxSolCost",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "buy_exact_sol_in",
+      "name": "buyExactSolIn",
       "docs": [
         "Spend exactly `sol_in` lamports (before fees) for at least `min_tokens_out` tokens.",
         "If that would overshoot the curve, it partial-fills the remainder and charges only for it."
@@ -390,17 +396,17 @@
           }
         },
         {
-          "name": "fee_recipient",
+          "name": "feeRecipient",
           "writable": true
         },
         {
           "name": "mint",
           "relations": [
-            "bonding_curve"
+            "bondingCurve"
           ]
         },
         {
-          "name": "bonding_curve",
+          "name": "bondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
@@ -430,13 +436,13 @@
           }
         },
         {
-          "name": "associated_bonding_curve",
+          "name": "associatedBondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "bonding_curve"
+                "path": "bondingCurve"
               },
               {
                 "kind": "const",
@@ -520,7 +526,7 @@
           }
         },
         {
-          "name": "associated_user",
+          "name": "associatedUser",
           "writable": true,
           "pda": {
             "seeds": [
@@ -615,7 +621,7 @@
           "signer": true
         },
         {
-          "name": "creator_vault",
+          "name": "creatorVault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -640,25 +646,25 @@
               {
                 "kind": "account",
                 "path": "bonding_curve.creator",
-                "account": "BondingCurve"
+                "account": "bondingCurve"
               }
             ]
           }
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -692,17 +698,17 @@
       ],
       "args": [
         {
-          "name": "sol_in",
+          "name": "solIn",
           "type": "u64"
         },
         {
-          "name": "min_tokens_out",
+          "name": "minTokensOut",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "collect_creator_fee",
+      "name": "collectCreatorFee",
       "docs": [
         "The creator sweeps their vault (all SOL above rent-exemption) to their wallet."
       ],
@@ -723,7 +729,7 @@
           "signer": true
         },
         {
-          "name": "creator_vault",
+          "name": "creatorVault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -753,11 +759,11 @@
           }
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -814,7 +820,7 @@
           "signer": true
         },
         {
-          "name": "mint_authority",
+          "name": "mintAuthority",
           "pda": {
             "seeds": [
               {
@@ -840,7 +846,7 @@
           }
         },
         {
-          "name": "bonding_curve",
+          "name": "bondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
@@ -870,13 +876,13 @@
           }
         },
         {
-          "name": "associated_bonding_curve",
+          "name": "associatedBondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "bonding_curve"
+                "path": "bondingCurve"
               },
               {
                 "kind": "const",
@@ -978,7 +984,7 @@
           }
         },
         {
-          "name": "mpl_token_metadata",
+          "name": "mplTokenMetadata",
           "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
         },
         {
@@ -991,15 +997,15 @@
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
@@ -1007,7 +1013,7 @@
           "address": "SysvarRent111111111111111111111111111111111"
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -1092,11 +1098,11 @@
           }
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -1133,7 +1139,7 @@
           "name": "params",
           "type": {
             "defined": {
-              "name": "GlobalParams"
+              "name": "globalParams"
             }
           }
         }
@@ -1176,17 +1182,17 @@
           }
         },
         {
-          "name": "fee_recipient",
+          "name": "feeRecipient",
           "writable": true
         },
         {
           "name": "mint",
           "relations": [
-            "bonding_curve"
+            "bondingCurve"
           ]
         },
         {
-          "name": "bonding_curve",
+          "name": "bondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1216,13 +1222,13 @@
           }
         },
         {
-          "name": "associated_bonding_curve",
+          "name": "associatedBondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "bonding_curve"
+                "path": "bondingCurve"
               },
               {
                 "kind": "const",
@@ -1306,11 +1312,11 @@
           }
         },
         {
-          "name": "bonding_curve_wsol",
+          "name": "bondingCurveWsol",
           "writable": true
         },
         {
-          "name": "bonding_curve_lp",
+          "name": "bondingCurveLp",
           "writable": true
         },
         {
@@ -1319,60 +1325,60 @@
           "signer": true
         },
         {
-          "name": "wsol_mint",
+          "name": "wsolMint",
           "address": "So11111111111111111111111111111111111111112"
         },
         {
-          "name": "amm_program",
+          "name": "ammProgram",
           "address": "BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb"
         },
         {
-          "name": "amm_global_config"
+          "name": "ammGlobalConfig"
         },
         {
           "name": "pool",
           "writable": true
         },
         {
-          "name": "lp_mint",
+          "name": "lpMint",
           "writable": true
         },
         {
-          "name": "locked_lp_token_account",
+          "name": "lockedLpTokenAccount",
           "writable": true
         },
         {
-          "name": "pool_base_token_account",
+          "name": "poolBaseTokenAccount",
           "writable": true
         },
         {
-          "name": "pool_quote_token_account",
+          "name": "poolQuoteTokenAccount",
           "writable": true
         },
         {
-          "name": "coin_creator_vault_authority"
+          "name": "coinCreatorVaultAuthority"
         },
         {
-          "name": "coin_creator_vault_ata",
+          "name": "coinCreatorVaultAta",
           "writable": true
         },
         {
-          "name": "amm_event_authority"
+          "name": "ammEventAuthority"
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -1441,17 +1447,17 @@
           }
         },
         {
-          "name": "fee_recipient",
+          "name": "feeRecipient",
           "writable": true
         },
         {
           "name": "mint",
           "relations": [
-            "bonding_curve"
+            "bondingCurve"
           ]
         },
         {
-          "name": "bonding_curve",
+          "name": "bondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1481,13 +1487,13 @@
           }
         },
         {
-          "name": "associated_bonding_curve",
+          "name": "associatedBondingCurve",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "bonding_curve"
+                "path": "bondingCurve"
               },
               {
                 "kind": "const",
@@ -1571,7 +1577,7 @@
           }
         },
         {
-          "name": "associated_user",
+          "name": "associatedUser",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1666,7 +1672,7 @@
           "signer": true
         },
         {
-          "name": "creator_vault",
+          "name": "creatorVault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1691,25 +1697,25 @@
               {
                 "kind": "account",
                 "path": "bonding_curve.creator",
-                "account": "BondingCurve"
+                "account": "bondingCurve"
               }
             ]
           }
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -1747,13 +1753,13 @@
           "type": "u64"
         },
         {
-          "name": "min_sol_output",
+          "name": "minSolOutput",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "set_params",
+      "name": "setParams",
       "discriminator": [
         27,
         234,
@@ -1792,7 +1798,7 @@
           }
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -1829,14 +1835,14 @@
           "name": "params",
           "type": {
             "defined": {
-              "name": "GlobalParams"
+              "name": "globalParams"
             }
           }
         }
       ]
     },
     {
-      "name": "update_authority",
+      "name": "updateAuthority",
       "discriminator": [
         32,
         46,
@@ -1875,7 +1881,7 @@
           }
         },
         {
-          "name": "event_authority",
+          "name": "eventAuthority",
           "pda": {
             "seeds": [
               {
@@ -1909,7 +1915,7 @@
       ],
       "args": [
         {
-          "name": "new_authority",
+          "name": "newAuthority",
           "type": "pubkey"
         }
       ]
@@ -1917,7 +1923,7 @@
   ],
   "accounts": [
     {
-      "name": "BondingCurve",
+      "name": "bondingCurve",
       "discriminator": [
         23,
         183,
@@ -1930,7 +1936,7 @@
       ]
     },
     {
-      "name": "Global",
+      "name": "global",
       "discriminator": [
         167,
         232,
@@ -1945,7 +1951,7 @@
   ],
   "events": [
     {
-      "name": "CollectCreatorFeeEvent",
+      "name": "collectCreatorFeeEvent",
       "discriminator": [
         122,
         2,
@@ -1958,7 +1964,7 @@
       ]
     },
     {
-      "name": "CompleteEvent",
+      "name": "completeEvent",
       "discriminator": [
         95,
         114,
@@ -1971,7 +1977,7 @@
       ]
     },
     {
-      "name": "CreateEvent",
+      "name": "createEvent",
       "discriminator": [
         27,
         114,
@@ -1984,7 +1990,7 @@
       ]
     },
     {
-      "name": "MigrateEvent",
+      "name": "migrateEvent",
       "discriminator": [
         216,
         175,
@@ -1997,7 +2003,7 @@
       ]
     },
     {
-      "name": "SetParamsEvent",
+      "name": "setParamsEvent",
       "discriminator": [
         223,
         195,
@@ -2010,7 +2016,7 @@
       ]
     },
     {
-      "name": "TradeEvent",
+      "name": "tradeEvent",
       "discriminator": [
         189,
         219,
@@ -2026,78 +2032,78 @@
   "errors": [
     {
       "code": 6000,
-      "name": "Unauthorized",
-      "msg": "Unauthorized"
+      "name": "unauthorized",
+      "msg": "unauthorized"
     },
     {
       "code": 6001,
-      "name": "Paused",
+      "name": "paused",
       "msg": "Launchpad is paused"
     },
     {
       "code": 6002,
-      "name": "ZeroAmount",
+      "name": "zeroAmount",
       "msg": "Amount must be greater than zero"
     },
     {
       "code": 6003,
-      "name": "FeeTooHigh",
+      "name": "feeTooHigh",
       "msg": "Fee exceeds the maximum allowed"
     },
     {
       "code": 6004,
-      "name": "InvalidParams",
+      "name": "invalidParams",
       "msg": "Invalid parameters"
     },
     {
       "code": 6005,
-      "name": "MetadataTooLong",
+      "name": "metadataTooLong",
       "msg": "Name, symbol or uri too long"
     },
     {
       "code": 6006,
-      "name": "CurveComplete",
+      "name": "curveComplete",
       "msg": "Bonding curve is complete; trade on the AMM"
     },
     {
       "code": 6007,
-      "name": "CurveNotComplete",
+      "name": "curveNotComplete",
       "msg": "Bonding curve is not complete yet"
     },
     {
       "code": 6008,
-      "name": "AlreadyMigrated",
+      "name": "alreadyMigrated",
       "msg": "Already migrated"
     },
     {
       "code": 6009,
-      "name": "ExceededSlippage",
+      "name": "exceededSlippage",
       "msg": "Slippage limit exceeded"
     },
     {
       "code": 6010,
-      "name": "InsufficientReserves",
+      "name": "insufficientReserves",
       "msg": "Insufficient reserves"
     },
     {
       "code": 6011,
-      "name": "AntiSnipeCap",
+      "name": "antiSnipeCap",
       "msg": "Buy exceeds the anti-snipe cap for this slot window"
     },
     {
       "code": 6012,
-      "name": "MathOverflow",
+      "name": "mathOverflow",
       "msg": "Math overflow"
     },
     {
       "code": 6013,
-      "name": "InvalidFeeRecipient",
+      "name": "invalidFeeRecipient",
       "msg": "Invalid protocol fee recipient"
     }
   ],
   "types": [
     {
-      "name": "BondingCurve",
+      "name": "bondingCurve",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2110,23 +2116,23 @@
             "type": "pubkey"
           },
           {
-            "name": "virtual_token_reserves",
+            "name": "virtualTokenReserves",
             "type": "u64"
           },
           {
-            "name": "virtual_sol_reserves",
+            "name": "virtualSolReserves",
             "type": "u64"
           },
           {
-            "name": "real_token_reserves",
+            "name": "realTokenReserves",
             "type": "u64"
           },
           {
-            "name": "real_sol_reserves",
+            "name": "realSolReserves",
             "type": "u64"
           },
           {
-            "name": "token_total_supply",
+            "name": "tokenTotalSupply",
             "type": "u64"
           },
           {
@@ -2138,15 +2144,15 @@
             "type": "bool"
           },
           {
-            "name": "created_slot",
+            "name": "createdSlot",
             "type": "u64"
           },
           {
-            "name": "creator_fees_total",
+            "name": "creatorFeesTotal",
             "type": "u64"
           },
           {
-            "name": "protocol_fees_total",
+            "name": "protocolFeesTotal",
             "type": "u64"
           },
           {
@@ -2157,7 +2163,7 @@
       }
     },
     {
-      "name": "CollectCreatorFeeEvent",
+      "name": "collectCreatorFeeEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2177,7 +2183,7 @@
       }
     },
     {
-      "name": "CompleteEvent",
+      "name": "completeEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2186,7 +2192,7 @@
             "type": "pubkey"
           },
           {
-            "name": "bonding_curve",
+            "name": "bondingCurve",
             "type": "pubkey"
           },
           {
@@ -2194,7 +2200,7 @@
             "type": "pubkey"
           },
           {
-            "name": "real_sol_reserves",
+            "name": "realSolReserves",
             "type": "u64"
           },
           {
@@ -2205,7 +2211,7 @@
       }
     },
     {
-      "name": "CreateEvent",
+      "name": "createEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2226,7 +2232,7 @@
             "type": "pubkey"
           },
           {
-            "name": "bonding_curve",
+            "name": "bondingCurve",
             "type": "pubkey"
           },
           {
@@ -2238,19 +2244,19 @@
             "type": "pubkey"
           },
           {
-            "name": "virtual_token_reserves",
+            "name": "virtualTokenReserves",
             "type": "u64"
           },
           {
-            "name": "virtual_sol_reserves",
+            "name": "virtualSolReserves",
             "type": "u64"
           },
           {
-            "name": "real_token_reserves",
+            "name": "realTokenReserves",
             "type": "u64"
           },
           {
-            "name": "token_total_supply",
+            "name": "tokenTotalSupply",
             "type": "u64"
           },
           {
@@ -2261,7 +2267,7 @@
       }
     },
     {
-      "name": "Global",
+      "name": "global",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2270,47 +2276,47 @@
             "type": "pubkey"
           },
           {
-            "name": "fee_recipient",
+            "name": "feeRecipient",
             "type": "pubkey"
           },
           {
-            "name": "amm_program",
+            "name": "ammProgram",
             "type": "pubkey"
           },
           {
-            "name": "initial_virtual_token_reserves",
+            "name": "initialVirtualTokenReserves",
             "type": "u64"
           },
           {
-            "name": "initial_virtual_sol_reserves",
+            "name": "initialVirtualSolReserves",
             "type": "u64"
           },
           {
-            "name": "initial_real_token_reserves",
+            "name": "initialRealTokenReserves",
             "type": "u64"
           },
           {
-            "name": "token_total_supply",
+            "name": "tokenTotalSupply",
             "type": "u64"
           },
           {
-            "name": "fee_basis_points",
+            "name": "feeBasisPoints",
             "type": "u64"
           },
           {
-            "name": "creator_fee_basis_points",
+            "name": "creatorFeeBasisPoints",
             "type": "u64"
           },
           {
-            "name": "migration_fee_lamports",
+            "name": "migrationFeeLamports",
             "type": "u64"
           },
           {
-            "name": "anti_snipe_slots",
+            "name": "antiSnipeSlots",
             "type": "u64"
           },
           {
-            "name": "anti_snipe_max_bps",
+            "name": "antiSnipeMaxBps",
             "type": "u64"
           },
           {
@@ -2325,60 +2331,60 @@
       }
     },
     {
-      "name": "GlobalParams",
+      "name": "globalParams",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "fee_recipient",
+            "name": "feeRecipient",
             "type": "pubkey"
           },
           {
-            "name": "initial_virtual_token_reserves",
+            "name": "initialVirtualTokenReserves",
             "type": "u64"
           },
           {
-            "name": "initial_virtual_sol_reserves",
+            "name": "initialVirtualSolReserves",
             "type": "u64"
           },
           {
-            "name": "initial_real_token_reserves",
+            "name": "initialRealTokenReserves",
             "type": "u64"
           },
           {
-            "name": "token_total_supply",
+            "name": "tokenTotalSupply",
             "type": "u64"
           },
           {
-            "name": "fee_basis_points",
+            "name": "feeBasisPoints",
             "docs": [
               "Protocol fee on every trade (bps of the SOL leg)."
             ],
             "type": "u64"
           },
           {
-            "name": "creator_fee_basis_points",
+            "name": "creatorFeeBasisPoints",
             "docs": [
               "Creator fee on every trade (bps of the SOL leg), paid to the coin creator's vault."
             ],
             "type": "u64"
           },
           {
-            "name": "migration_fee_lamports",
+            "name": "migrationFeeLamports",
             "docs": [
               "Flat SOL fee taken from the curve's reserves at migration."
             ],
             "type": "u64"
           },
           {
-            "name": "anti_snipe_slots",
+            "name": "antiSnipeSlots",
             "docs": [
               "Buys inside the first N slots after create are capped per transaction."
             ],
             "type": "u64"
           },
           {
-            "name": "anti_snipe_max_bps",
+            "name": "antiSnipeMaxBps",
             "docs": [
               "...to this share of `token_total_supply` (bps)."
             ],
@@ -2392,7 +2398,7 @@
       }
     },
     {
-      "name": "MigrateEvent",
+      "name": "migrateEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2401,7 +2407,7 @@
             "type": "pubkey"
           },
           {
-            "name": "bonding_curve",
+            "name": "bondingCurve",
             "type": "pubkey"
           },
           {
@@ -2413,19 +2419,19 @@
             "type": "pubkey"
           },
           {
-            "name": "base_amount",
+            "name": "baseAmount",
             "type": "u64"
           },
           {
-            "name": "quote_amount",
+            "name": "quoteAmount",
             "type": "u64"
           },
           {
-            "name": "migration_fee",
+            "name": "migrationFee",
             "type": "u64"
           },
           {
-            "name": "lp_burned",
+            "name": "lpBurned",
             "type": "u64"
           },
           {
@@ -2436,7 +2442,7 @@
       }
     },
     {
-      "name": "SetParamsEvent",
+      "name": "setParamsEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2448,7 +2454,7 @@
             "name": "params",
             "type": {
               "defined": {
-                "name": "GlobalParams"
+                "name": "globalParams"
               }
             }
           },
@@ -2460,7 +2466,7 @@
       }
     },
     {
-      "name": "TradeEvent",
+      "name": "tradeEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2469,15 +2475,15 @@
             "type": "pubkey"
           },
           {
-            "name": "sol_amount",
+            "name": "solAmount",
             "type": "u64"
           },
           {
-            "name": "token_amount",
+            "name": "tokenAmount",
             "type": "u64"
           },
           {
-            "name": "is_buy",
+            "name": "isBuy",
             "type": "bool"
           },
           {
@@ -2489,27 +2495,27 @@
             "type": "i64"
           },
           {
-            "name": "virtual_sol_reserves",
+            "name": "virtualSolReserves",
             "type": "u64"
           },
           {
-            "name": "virtual_token_reserves",
+            "name": "virtualTokenReserves",
             "type": "u64"
           },
           {
-            "name": "real_sol_reserves",
+            "name": "realSolReserves",
             "type": "u64"
           },
           {
-            "name": "real_token_reserves",
+            "name": "realTokenReserves",
             "type": "u64"
           },
           {
-            "name": "protocol_fee",
+            "name": "protocolFee",
             "type": "u64"
           },
           {
-            "name": "creator_fee",
+            "name": "creatorFee",
             "type": "u64"
           },
           {
@@ -2520,4 +2526,4 @@
       }
     }
   ]
-}
+};

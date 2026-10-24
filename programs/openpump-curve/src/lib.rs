@@ -1,4 +1,4 @@
-//! PEOPLE'S PAD — bonding-curve launchpad.
+//! OpenPump — bonding-curve launchpad.
 //!
 //! Clean-room implementation shaped like pump.fun's public IDL (create / buy / sell /
 //! migrate / collect_creator_fee / set_params) with our own seeds, authorities, fee
@@ -22,7 +22,7 @@ use anchor_spl::metadata::{
 };
 use anchor_spl::token::{self, Burn, CloseAccount, Mint, MintTo, SetAuthority, Token, TokenAccount, Transfer};
 use anchor_spl::token::spl_token::instruction::AuthorityType;
-use peoplepad_amm::program::PeoplepadAmm;
+use openpump_amm::program::OpenpumpAmm;
 
 pub mod math;
 use math::*;
@@ -63,7 +63,7 @@ pub struct GlobalParams {
 }
 
 #[program]
-pub mod peoplepad_curve {
+pub mod openpump_curve {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, params: GlobalParams) -> Result<()> {
@@ -71,7 +71,7 @@ pub mod peoplepad_curve {
         validate_params(&params)?;
         let g = &mut ctx.accounts.global;
         g.authority = ctx.accounts.authority.key();
-        g.amm_program = peoplepad_amm::ID;
+        g.amm_program = openpump_amm::ID;
         g.bump = ctx.bumps.global;
         g.apply(&params);
         emit_cpi!(SetParamsEvent { authority: g.authority, params, timestamp: Clock::get()?.unix_timestamp });
@@ -324,10 +324,10 @@ pub mod peoplepad_curve {
         }
 
         // 3. create the AMM pool, curve PDA = liquidity owner, user pays rent
-        peoplepad_amm::cpi::create_pool(
+        openpump_amm::cpi::create_pool(
             CpiContext::new_with_signer(
                 ctx.accounts.amm_program.to_account_info(),
-                peoplepad_amm::cpi::accounts::CreatePool {
+                openpump_amm::cpi::accounts::CreatePool {
                     pool: ctx.accounts.pool.to_account_info(),
                     global_config: ctx.accounts.amm_global_config.to_account_info(),
                     creator: bc_info.clone(),
@@ -648,7 +648,7 @@ pub struct Migrate<'info> {
 
     // --- AMM side (validated by the AMM program) ---
     #[account(address = global.amm_program)]
-    pub amm_program: Program<'info, PeoplepadAmm>,
+    pub amm_program: Program<'info, OpenpumpAmm>,
     /// CHECK: AMM global config PDA.
     pub amm_global_config: UncheckedAccount<'info>,
     /// CHECK: pool PDA, initialised by the AMM.

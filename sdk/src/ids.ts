@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
-import curveIdl from "../idl/peoplepad_curve.json";
-import ammIdl from "../idl/peoplepad_amm.json";
+import curveIdl from "../idl/openpump_curve.json";
+import ammIdl from "../idl/openpump_amm.json";
 
 export const CURVE_IDL = curveIdl as any;
 export const AMM_IDL = ammIdl as any;

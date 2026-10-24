@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { curve as curveMath } from "@peoplepad/sdk";
+import { curve as curveMath } from "@openpump/sdk";
 import { API, useConfig } from "../lib/api";
 import { useClient, useSendTx, useToast } from "../lib/solana";
 import { sol as fmtSol, tokens as fmtTokens } from "../lib/format";

@@ -1,6 +1,6 @@
 # PROMPT — Clone the pump.fun ecosystem (pump + PumpSwap + pump_fees) into a rebranded, better launchpad
 
-You are an autonomous engineering agent with a Linux x86-64 machine (Ubuntu 24.04), Docker, ~16 GB RAM, network access, and a funded Solana devnet wallet. Work in `~/Desktop/coding/peoplepad`. The folder already contains `evidence/`:
+You are an autonomous engineering agent with a Linux x86-64 machine (Ubuntu 24.04), Docker, ~16 GB RAM, network access, and a funded Solana devnet wallet. Work in `~/Desktop/coding/openpump`. The folder already contains `evidence/`:
 
 - `evidence/pump.so` — mainnet bytecode of `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P` (1,934,800 bytes, trimmed ELF, unverified on osec)
 - `evidence/pump_amm.so` — mainnet bytecode of `pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA` (1,268,504 bytes)
@@ -33,16 +33,16 @@ A6. Security review of the recovered source, Shaw-style (`audit/AUDIT.md`): miss
 
 ## Phase B — Clean-room product: the community launchpad
 
-Working brand (placeholder until the user confirms): **PEOPLE'S PAD** (`peoplepad`), ticker `$PEOPLE`. Positioning: "the launchpad the community asked for" — built in response to KOLs publicly asking for a new launchpad. Do **not** name the product or any token after a real person without their written consent; reference the community, not individuals.
+Working brand (placeholder until the user confirms): **OpenPump** (`openpump`), ticker `$PEOPLE`. Positioning: "the launchpad the community asked for" — built in response to KOLs publicly asking for a new launchpad. Do **not** name the product or any token after a real person without their written consent; reference the community, not individuals.
 
-B1. New Anchor 0.30.1 workspace `programs/{peoplepad,peoplepad_amm,peoplepad_fees}` with fresh program keypairs. Write the code from the Phase A behavior spec, in your own structure and naming, not by renaming Phase A files. Fix every A6 finding. Keep the IDL *shape* compatible with pump's where it costs nothing (so existing trading bots, Jupiter and screeners integrate with a one-line program-ID swap) but change: all seeds prefixes, all hardcoded keys, the fee recipients, the admin/authority keys (multisig via Squads), and the fee schedule.
+B1. New Anchor 0.30.1 workspace `programs/{openpump,openpump_amm,openpump_fees}` with fresh program keypairs. Write the code from the Phase A behavior spec, in your own structure and naming, not by renaming Phase A files. Fix every A6 finding. Keep the IDL *shape* compatible with pump's where it costs nothing (so existing trading bots, Jupiter and screeners integrate with a one-line program-ID swap) but change: all seeds prefixes, all hardcoded keys, the fee recipients, the admin/authority keys (multisig via Squads), and the fee schedule.
 
 B2. "Better" is concrete. Implement and default-on:
 - Creator fee 50 % of protocol fee from the first trade (pump's is lower and tiered), claimable with no minimum.
 - Holder rewards native in the curve (ported from `distribute_fee_to_holders`), snapshot cadence configurable per coin at create.
-- Graduation threshold configurable per coin from a fixed menu (equivalent to 60 / 85 / 120 SOL of real reserves), with migration into our own CP-AMM (`peoplepad_amm`) in the same transaction, LP burned by default.
+- Graduation threshold configurable per coin from a fixed menu (equivalent to 60 / 85 / 120 SOL of real reserves), with migration into our own CP-AMM (`openpump_amm`) in the same transaction, LP burned by default.
 - Anti-snipe: first N slots after create cap buys per wallet at a percentage of the virtual token reserves; configurable at create.
-- Custom quote mints (pump's `quote_control`) so coins can be paired with `$PEOPLE` instead of SOL; the flagship `$PEOPLE` coin receives a protocol-fee share routed through `peoplepad_fees`.
+- Custom quote mints (pump's `quote_control`) so coins can be paired with `$PEOPLE` instead of SOL; the flagship `$PEOPLE` coin receives a protocol-fee share routed through `openpump_fees`.
 - Fee program with public `get_fees` view and per-tier config, migrated from pump_fees' structure but with our tiers.
 
 B3. Tests: Anchor TS tests + the A4 replay harness pointed at the new programs (same inputs must produce the spec'd deltas). Fuzz the curve math with `proptest` (no overflow, monotonic price, fee never exceeds input, reserves never negative). Run `cargo audit` and Sec3 X-Ray / `soteria` if available.
@@ -51,7 +51,7 @@ B3. Tests: Anchor TS tests + the A4 replay harness pointed at the new programs (
 
 C1. Indexer: Rust or TypeScript (Helius or Yellowstone gRPC) that decodes our events into Postgres (coins, trades, candles 1s/1m/5m/1h, holders, creator earnings, graduation). Expose REST + WebSocket.
 C2. Frontend: Next.js app with create (image + metadata upload to IPFS via Pinata/Irys, Metaplex Token Metadata), trade (buy/sell with slippage, priority fee, Jito tip), coin page with live chart + trades + holders + comments, creator dashboard (claim fees), holder-rewards view, leaderboard, "graduated" tab, wallet-adapter (Phantom, Solflare, Backpack), mobile first. Reuse `~/Desktop/coding/pumpkit` (private, ciberneticatradingdev/pumpkit) for the Solana client helpers and `~/Desktop/coding/robinpump` for the bonding-curve frontend UX patterns.
-C3. SDK: `@peoplepad/sdk` (TypeScript) generated from the IDL with convenience `buy/sell/create/claim` builders, plus a pump-compatible shim so bots can swap `programId` only.
+C3. SDK: `@openpump/sdk` (TypeScript) generated from the IDL with convenience `buy/sell/create/claim` builders, plus a pump-compatible shim so bots can swap `programId` only.
 C4. Ops: Railway for indexer + API, Vercel for the frontend, Neon Postgres, Helius RPC, Squads multisig for upgrade authority, program upgrade runbook, `solana-verify` so our programs are **verified builds** on osec from day one (the thing pump never did).
 
 ## Phase D — Gates before mainnet

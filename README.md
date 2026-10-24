@@ -1,11 +1,11 @@
-# PEOPLE'S PAD (working name)
+# OpenPump (working name)
 
 Clean-room launchpad shaped like pump.fun + PumpSwap, on Solana. Two Anchor programs, a TypeScript SDK, an indexer/API server and a web app.
 
 | Piece | Where | What |
 |---|---|---|
-| Bonding curve | `programs/peoplepad-curve` | create / buy / buy_exact_sol_in / sell / migrate / collect_creator_fee / set_params |
-| AMM | `programs/peoplepad-amm` | create_config / create_pool / deposit / withdraw / buy / sell / collect_coin_creator_fee / disable |
+| Bonding curve | `programs/openpump-curve` | create / buy / buy_exact_sol_in / sell / migrate / collect_creator_fee / set_params |
+| AMM | `programs/openpump-amm` | create_config / create_pool / deposit / withdraw / buy / sell / collect_coin_creator_fee / disable |
 | SDK | `sdk/` | PDAs, exact on-chain math in BigInt, instruction builders, CPI-event decoding |
 | Server | `server/` | SQLite indexer (polls program signatures, decodes `emit_cpi!` events), REST + WebSocket, metadata uploads (Pinata or local) |
 | Web | `web/` | Vite + React: board, coin page (chart, trades, holders, trade panel), create, profile, how-it-works |
@@ -34,15 +34,15 @@ cargo test --lib              # curve + AMM math unit tests
 ```bash
 ./scripts/localnet.sh &                                   # validator with both programs + Metaplex
 cp server/.env.example server/.env                        # RPC_URL=http://127.0.0.1:8899
-pnpm --filter @peoplepad/server start &                   # API on :8787
-RPC_URL=http://127.0.0.1:8899 pnpm --filter @peoplepad/server exec tsx src/seed.ts   # init + 5 coins, one graduates
-pnpm --filter @peoplepad/web dev                          # http://localhost:5173 (proxies /api, /ws, /uploads)
+pnpm --filter @openpump/server start &                   # API on :8787
+RPC_URL=http://127.0.0.1:8899 pnpm --filter @openpump/server exec tsx src/seed.ts   # init + 5 coins, one graduates
+pnpm --filter @openpump/web dev                          # http://localhost:5173 (proxies /api, /ws, /uploads)
 ```
 
 ## Deploy
 
 1. `anchor deploy --provider.cluster devnet` (deployer `~/.config/solana/id.json` = `INITIAL_AUTHORITY` in both programs; ~7 SOL).
-2. `RPC_URL=https://api.devnet.solana.com pnpm --filter @peoplepad/server admin:init` → creates AMM config + curve Global with `DEFAULT_PARAMS`.
+2. `RPC_URL=https://api.devnet.solana.com pnpm --filter @openpump/server admin:init` → creates AMM config + curve Global with `DEFAULT_PARAMS`.
 3. Server → Railway (root `railway.json`, volume at `/data`, env from `server/.env.example`). Web → Vercel (`web/vercel.json`, env `VITE_API_URL`).
 
 Before mainnet: move upgrade authority + `INITIAL_AUTHORITY` to a Squads multisig, run `solana-verify`, external audit. See `PROMPT.md` for the full plan and `evidence/` for the pump.fun bytecode + IDLs this was shaped after.

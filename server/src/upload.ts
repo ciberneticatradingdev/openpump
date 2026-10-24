@@ -50,7 +50,7 @@ export function uploadRouter() {
         description,
         image,
         showName: true,
-        createdOn: "PEOPLE'S PAD",
+        createdOn: "OpenPump",
         website: website || undefined,
         twitter: twitter || undefined,
         telegram: telegram || undefined,

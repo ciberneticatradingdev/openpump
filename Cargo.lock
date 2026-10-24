@@ -1092,6 +1092,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
+name = "openpump-amm"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+]
+
+[[package]]
+name = "openpump-curve"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "openpump-amm",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1121,23 +1138,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.7",
-]
-
-[[package]]
-name = "peoplepad-amm"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
-]
-
-[[package]]
-name = "peoplepad-curve"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "peoplepad-amm",
 ]
 
 [[package]]

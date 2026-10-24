@@ -13,7 +13,7 @@ import { uploadRouter } from "./upload";
 const PORT = Number(process.env.PORT || 8787);
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
 
-const db = openDb(process.env.DB_PATH || "./data/peoplepad.sqlite");
+const db = openDb(process.env.DB_PATH || "./data/openpump.sqlite");
 const conn = new Connection(RPC_URL, { commitment: "confirmed", wsEndpoint: process.env.RPC_WS_URL || undefined });
 
 const app = express();
@@ -40,7 +40,7 @@ wss.on("connection", (ws) => ws.send(JSON.stringify({ type: "hello", ts: Date.no
 
 const indexer = new Indexer(conn, db, broadcast);
 server.listen(PORT, () => {
-  console.log(`[peoplepad] api http://localhost:${PORT}  rpc ${RPC_URL}`);
+  console.log(`[openpump] api http://localhost:${PORT}  rpc ${RPC_URL}`);
   indexer.start();
 });
 process.on("SIGTERM", () => {

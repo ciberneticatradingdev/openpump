@@ -1,16 +1,10 @@
-/**
- * Program IDL in camelCase format in order to be used in JS/TS.
- *
- * Note that this is only a type helper and is not the actual IDL. The original
- * IDL can be found at `target/idl/peoplepad_amm.json`.
- */
-export type PeoplepadAmm = {
+{
   "address": "BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb",
   "metadata": {
-    "name": "peoplepadAmm",
+    "name": "openpump_amm",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "PEOPLE'S PAD constant-product AMM: graduated coins trade here (clean-room, PumpSwap-shaped)"
+    "description": "OpenPump constant-product AMM: graduated coins trade here (clean-room, PumpSwap-shaped)"
   },
   "instructions": [
     {
@@ -46,22 +40,22 @@ export type PeoplepadAmm = {
               {
                 "kind": "account",
                 "path": "pool.index",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.creator",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.base_mint",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.quote_mint",
-                "account": "pool"
+                "account": "Pool"
               }
             ]
           }
@@ -72,7 +66,7 @@ export type PeoplepadAmm = {
           "signer": true
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "pda": {
             "seeds": [
               {
@@ -97,19 +91,19 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "baseMint",
+          "name": "base_mint",
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "quoteMint",
+          "name": "quote_mint",
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "userBaseTokenAccount",
+          "name": "user_base_token_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -119,11 +113,11 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "baseTokenProgram"
+                "path": "base_token_program"
               },
               {
                 "kind": "account",
-                "path": "baseMint"
+                "path": "base_mint"
               }
             ],
             "program": {
@@ -166,42 +160,42 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "userQuoteTokenAccount",
+          "name": "user_quote_token_account",
           "writable": true
         },
         {
-          "name": "poolBaseTokenAccount",
+          "name": "pool_base_token_account",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "poolQuoteTokenAccount",
+          "name": "pool_quote_token_account",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "protocolFeeRecipient"
+          "name": "protocol_fee_recipient"
         },
         {
-          "name": "protocolFeeRecipientTokenAccount",
+          "name": "protocol_fee_recipient_token_account",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "protocolFeeRecipient"
+                "path": "protocol_fee_recipient"
               },
               {
                 "kind": "account",
-                "path": "quoteTokenProgram"
+                "path": "quote_token_program"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ],
             "program": {
@@ -244,7 +238,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "coinCreatorVaultAuthority",
+          "name": "coin_creator_vault_authority",
           "pda": {
             "seeds": [
               {
@@ -268,27 +262,27 @@ export type PeoplepadAmm = {
               {
                 "kind": "account",
                 "path": "pool.coin_creator",
-                "account": "pool"
+                "account": "Pool"
               }
             ]
           }
         },
         {
-          "name": "coinCreatorVaultAta",
+          "name": "coin_creator_vault_ata",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "coinCreatorVaultAuthority"
+                "path": "coin_creator_vault_authority"
               },
               {
                 "kind": "account",
-                "path": "quoteTokenProgram"
+                "path": "quote_token_program"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ],
             "program": {
@@ -331,21 +325,21 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "baseTokenProgram"
+          "name": "base_token_program"
         },
         {
-          "name": "quoteTokenProgram"
+          "name": "quote_token_program"
         },
         {
-          "name": "associatedTokenProgram",
+          "name": "associated_token_program",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -379,17 +373,17 @@ export type PeoplepadAmm = {
       ],
       "args": [
         {
-          "name": "baseAmountOut",
+          "name": "base_amount_out",
           "type": "u64"
         },
         {
-          "name": "maxQuoteAmountIn",
+          "name": "max_quote_amount_in",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "collectCoinCreatorFee",
+      "name": "collect_coin_creator_fee",
       "docs": [
         "The coin creator sweeps everything in their vault for `quote_mint` into their own ATA."
       ],
@@ -405,15 +399,15 @@ export type PeoplepadAmm = {
       ],
       "accounts": [
         {
-          "name": "coinCreator",
+          "name": "coin_creator",
           "writable": true,
           "signer": true
         },
         {
-          "name": "quoteMint"
+          "name": "quote_mint"
         },
         {
-          "name": "coinCreatorVaultAuthority",
+          "name": "coin_creator_vault_authority",
           "pda": {
             "seeds": [
               {
@@ -436,27 +430,27 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "coinCreator"
+                "path": "coin_creator"
               }
             ]
           }
         },
         {
-          "name": "coinCreatorVaultAta",
+          "name": "coin_creator_vault_ata",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "coinCreatorVaultAuthority"
+                "path": "coin_creator_vault_authority"
               },
               {
                 "kind": "account",
-                "path": "quoteTokenProgram"
+                "path": "quote_token_program"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ],
             "program": {
@@ -499,21 +493,21 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "coinCreatorTokenAccount",
+          "name": "coin_creator_token_account",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "coinCreator"
+                "path": "coin_creator"
               },
               {
                 "kind": "account",
-                "path": "quoteTokenProgram"
+                "path": "quote_token_program"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ],
             "program": {
@@ -556,18 +550,18 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "quoteTokenProgram"
+          "name": "quote_token_program"
         },
         {
-          "name": "associatedTokenProgram",
+          "name": "associated_token_program",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -602,7 +596,7 @@ export type PeoplepadAmm = {
       "args": []
     },
     {
-      "name": "createConfig",
+      "name": "create_config",
       "discriminator": [
         201,
         207,
@@ -620,7 +614,7 @@ export type PeoplepadAmm = {
           "signer": true
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "writable": true,
           "pda": {
             "seeds": [
@@ -646,11 +640,11 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -684,25 +678,25 @@ export type PeoplepadAmm = {
       ],
       "args": [
         {
-          "name": "lpFeeBasisPoints",
+          "name": "lp_fee_basis_points",
           "type": "u64"
         },
         {
-          "name": "protocolFeeBasisPoints",
+          "name": "protocol_fee_basis_points",
           "type": "u64"
         },
         {
-          "name": "coinCreatorFeeBasisPoints",
+          "name": "coin_creator_fee_basis_points",
           "type": "u64"
         },
         {
-          "name": "protocolFeeRecipient",
+          "name": "protocol_fee_recipient",
           "type": "pubkey"
         }
       ]
     },
     {
-      "name": "createPool",
+      "name": "create_pool",
       "discriminator": [
         233,
         146,
@@ -738,17 +732,17 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "baseMint"
+                "path": "base_mint"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ]
           }
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "pda": {
             "seeds": [
               {
@@ -788,13 +782,13 @@ export type PeoplepadAmm = {
           "signer": true
         },
         {
-          "name": "baseMint"
+          "name": "base_mint"
         },
         {
-          "name": "quoteMint"
+          "name": "quote_mint"
         },
         {
-          "name": "lpMint",
+          "name": "lp_mint",
           "writable": true,
           "pda": {
             "seeds": [
@@ -823,15 +817,15 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "userBaseTokenAccount",
+          "name": "user_base_token_account",
           "writable": true
         },
         {
-          "name": "userQuoteTokenAccount",
+          "name": "user_quote_token_account",
           "writable": true
         },
         {
-          "name": "userPoolTokenAccount",
+          "name": "user_pool_token_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -841,11 +835,11 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "tokenProgram"
+                "path": "token_program"
               },
               {
                 "kind": "account",
-                "path": "lpMint"
+                "path": "lp_mint"
               }
             ],
             "program": {
@@ -888,7 +882,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "lockedLpTokenAccount",
+          "name": "locked_lp_token_account",
           "docs": [
             "Holds MINIMUM_LIQUIDITY LP forever (owned by the pool PDA, which never signs a burn/transfer of it)."
           ],
@@ -901,11 +895,11 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "tokenProgram"
+                "path": "token_program"
               },
               {
                 "kind": "account",
-                "path": "lpMint"
+                "path": "lp_mint"
               }
             ],
             "program": {
@@ -948,7 +942,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "poolBaseTokenAccount",
+          "name": "pool_base_token_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -958,11 +952,11 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "baseTokenProgram"
+                "path": "base_token_program"
               },
               {
                 "kind": "account",
-                "path": "baseMint"
+                "path": "base_mint"
               }
             ],
             "program": {
@@ -1005,7 +999,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "poolQuoteTokenAccount",
+          "name": "pool_quote_token_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1015,11 +1009,11 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "quoteTokenProgram"
+                "path": "quote_token_program"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ],
             "program": {
@@ -1062,7 +1056,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "coinCreatorVaultAuthority",
+          "name": "coin_creator_vault_authority",
           "pda": {
             "seeds": [
               {
@@ -1085,13 +1079,13 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "arg",
-                "path": "coinCreator"
+                "path": "coin_creator"
               }
             ]
           }
         },
         {
-          "name": "coinCreatorVaultAta",
+          "name": "coin_creator_vault_ata",
           "docs": [
             "Created here so buy/sell never need to init accounts."
           ],
@@ -1100,15 +1094,15 @@ export type PeoplepadAmm = {
             "seeds": [
               {
                 "kind": "account",
-                "path": "coinCreatorVaultAuthority"
+                "path": "coin_creator_vault_authority"
               },
               {
                 "kind": "account",
-                "path": "quoteTokenProgram"
+                "path": "quote_token_program"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ],
             "program": {
@@ -1151,27 +1145,27 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "tokenProgram",
+          "name": "token_program",
           "docs": [
             "Token program for the LP mint (classic SPL Token)."
           ]
         },
         {
-          "name": "baseTokenProgram"
+          "name": "base_token_program"
         },
         {
-          "name": "quoteTokenProgram"
+          "name": "quote_token_program"
         },
         {
-          "name": "associatedTokenProgram",
+          "name": "associated_token_program",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -1209,15 +1203,15 @@ export type PeoplepadAmm = {
           "type": "u16"
         },
         {
-          "name": "baseAmountIn",
+          "name": "base_amount_in",
           "type": "u64"
         },
         {
-          "name": "quoteAmountIn",
+          "name": "quote_amount_in",
           "type": "u64"
         },
         {
-          "name": "coinCreator",
+          "name": "coin_creator",
           "type": "pubkey"
         }
       ]
@@ -1252,28 +1246,28 @@ export type PeoplepadAmm = {
               {
                 "kind": "account",
                 "path": "pool.index",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.creator",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.base_mint",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.quote_mint",
-                "account": "pool"
+                "account": "Pool"
               }
             ]
           }
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "pda": {
             "seeds": [
               {
@@ -1303,34 +1297,34 @@ export type PeoplepadAmm = {
           "signer": true
         },
         {
-          "name": "baseMint",
+          "name": "base_mint",
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "quoteMint",
+          "name": "quote_mint",
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "lpMint",
+          "name": "lp_mint",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "userBaseTokenAccount",
+          "name": "user_base_token_account",
           "writable": true
         },
         {
-          "name": "userQuoteTokenAccount",
+          "name": "user_quote_token_account",
           "writable": true
         },
         {
-          "name": "userPoolTokenAccount",
+          "name": "user_pool_token_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1340,11 +1334,11 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "tokenProgram"
+                "path": "token_program"
               },
               {
                 "kind": "account",
-                "path": "lpMint"
+                "path": "lp_mint"
               }
             ],
             "program": {
@@ -1387,38 +1381,38 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "poolBaseTokenAccount",
+          "name": "pool_base_token_account",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "poolQuoteTokenAccount",
+          "name": "pool_quote_token_account",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "tokenProgram"
+          "name": "token_program"
         },
         {
-          "name": "baseTokenProgram"
+          "name": "base_token_program"
         },
         {
-          "name": "quoteTokenProgram"
+          "name": "quote_token_program"
         },
         {
-          "name": "associatedTokenProgram",
+          "name": "associated_token_program",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -1452,15 +1446,15 @@ export type PeoplepadAmm = {
       ],
       "args": [
         {
-          "name": "lpTokenAmountOut",
+          "name": "lp_token_amount_out",
           "type": "u64"
         },
         {
-          "name": "maxBaseAmountIn",
+          "name": "max_base_amount_in",
           "type": "u64"
         },
         {
-          "name": "maxQuoteAmountIn",
+          "name": "max_quote_amount_in",
           "type": "u64"
         }
       ]
@@ -1485,11 +1479,11 @@ export type PeoplepadAmm = {
           "name": "admin",
           "signer": true,
           "relations": [
-            "globalConfig"
+            "global_config"
           ]
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1515,7 +1509,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -1549,7 +1543,7 @@ export type PeoplepadAmm = {
       ],
       "args": [
         {
-          "name": "disableFlags",
+          "name": "disable_flags",
           "type": "u8"
         }
       ]
@@ -1587,22 +1581,22 @@ export type PeoplepadAmm = {
               {
                 "kind": "account",
                 "path": "pool.index",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.creator",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.base_mint",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.quote_mint",
-                "account": "pool"
+                "account": "Pool"
               }
             ]
           }
@@ -1613,7 +1607,7 @@ export type PeoplepadAmm = {
           "signer": true
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "pda": {
             "seeds": [
               {
@@ -1638,19 +1632,19 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "baseMint",
+          "name": "base_mint",
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "quoteMint",
+          "name": "quote_mint",
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "userBaseTokenAccount",
+          "name": "user_base_token_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1660,11 +1654,11 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "baseTokenProgram"
+                "path": "base_token_program"
               },
               {
                 "kind": "account",
-                "path": "baseMint"
+                "path": "base_mint"
               }
             ],
             "program": {
@@ -1707,42 +1701,42 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "userQuoteTokenAccount",
+          "name": "user_quote_token_account",
           "writable": true
         },
         {
-          "name": "poolBaseTokenAccount",
+          "name": "pool_base_token_account",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "poolQuoteTokenAccount",
+          "name": "pool_quote_token_account",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "protocolFeeRecipient"
+          "name": "protocol_fee_recipient"
         },
         {
-          "name": "protocolFeeRecipientTokenAccount",
+          "name": "protocol_fee_recipient_token_account",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "protocolFeeRecipient"
+                "path": "protocol_fee_recipient"
               },
               {
                 "kind": "account",
-                "path": "quoteTokenProgram"
+                "path": "quote_token_program"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ],
             "program": {
@@ -1785,7 +1779,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "coinCreatorVaultAuthority",
+          "name": "coin_creator_vault_authority",
           "pda": {
             "seeds": [
               {
@@ -1809,27 +1803,27 @@ export type PeoplepadAmm = {
               {
                 "kind": "account",
                 "path": "pool.coin_creator",
-                "account": "pool"
+                "account": "Pool"
               }
             ]
           }
         },
         {
-          "name": "coinCreatorVaultAta",
+          "name": "coin_creator_vault_ata",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "coinCreatorVaultAuthority"
+                "path": "coin_creator_vault_authority"
               },
               {
                 "kind": "account",
-                "path": "quoteTokenProgram"
+                "path": "quote_token_program"
               },
               {
                 "kind": "account",
-                "path": "quoteMint"
+                "path": "quote_mint"
               }
             ],
             "program": {
@@ -1872,21 +1866,21 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "baseTokenProgram"
+          "name": "base_token_program"
         },
         {
-          "name": "quoteTokenProgram"
+          "name": "quote_token_program"
         },
         {
-          "name": "associatedTokenProgram",
+          "name": "associated_token_program",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -1920,17 +1914,17 @@ export type PeoplepadAmm = {
       ],
       "args": [
         {
-          "name": "baseAmountIn",
+          "name": "base_amount_in",
           "type": "u64"
         },
         {
-          "name": "minQuoteAmountOut",
+          "name": "min_quote_amount_out",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "updateAdmin",
+      "name": "update_admin",
       "discriminator": [
         161,
         176,
@@ -1946,11 +1940,11 @@ export type PeoplepadAmm = {
           "name": "admin",
           "signer": true,
           "relations": [
-            "globalConfig"
+            "global_config"
           ]
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1976,7 +1970,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -2010,13 +2004,13 @@ export type PeoplepadAmm = {
       ],
       "args": [
         {
-          "name": "newAdmin",
+          "name": "new_admin",
           "type": "pubkey"
         }
       ]
     },
     {
-      "name": "updateFeeConfig",
+      "name": "update_fee_config",
       "discriminator": [
         104,
         184,
@@ -2032,11 +2026,11 @@ export type PeoplepadAmm = {
           "name": "admin",
           "signer": true,
           "relations": [
-            "globalConfig"
+            "global_config"
           ]
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2062,7 +2056,7 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -2096,19 +2090,19 @@ export type PeoplepadAmm = {
       ],
       "args": [
         {
-          "name": "lpFeeBasisPoints",
+          "name": "lp_fee_basis_points",
           "type": "u64"
         },
         {
-          "name": "protocolFeeBasisPoints",
+          "name": "protocol_fee_basis_points",
           "type": "u64"
         },
         {
-          "name": "coinCreatorFeeBasisPoints",
+          "name": "coin_creator_fee_basis_points",
           "type": "u64"
         },
         {
-          "name": "protocolFeeRecipient",
+          "name": "protocol_fee_recipient",
           "type": "pubkey"
         }
       ]
@@ -2143,28 +2137,28 @@ export type PeoplepadAmm = {
               {
                 "kind": "account",
                 "path": "pool.index",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.creator",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.base_mint",
-                "account": "pool"
+                "account": "Pool"
               },
               {
                 "kind": "account",
                 "path": "pool.quote_mint",
-                "account": "pool"
+                "account": "Pool"
               }
             ]
           }
         },
         {
-          "name": "globalConfig",
+          "name": "global_config",
           "pda": {
             "seeds": [
               {
@@ -2194,34 +2188,34 @@ export type PeoplepadAmm = {
           "signer": true
         },
         {
-          "name": "baseMint",
+          "name": "base_mint",
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "quoteMint",
+          "name": "quote_mint",
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "lpMint",
+          "name": "lp_mint",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "userBaseTokenAccount",
+          "name": "user_base_token_account",
           "writable": true
         },
         {
-          "name": "userQuoteTokenAccount",
+          "name": "user_quote_token_account",
           "writable": true
         },
         {
-          "name": "userPoolTokenAccount",
+          "name": "user_pool_token_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2231,11 +2225,11 @@ export type PeoplepadAmm = {
               },
               {
                 "kind": "account",
-                "path": "tokenProgram"
+                "path": "token_program"
               },
               {
                 "kind": "account",
-                "path": "lpMint"
+                "path": "lp_mint"
               }
             ],
             "program": {
@@ -2278,38 +2272,38 @@ export type PeoplepadAmm = {
           }
         },
         {
-          "name": "poolBaseTokenAccount",
+          "name": "pool_base_token_account",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "poolQuoteTokenAccount",
+          "name": "pool_quote_token_account",
           "writable": true,
           "relations": [
             "pool"
           ]
         },
         {
-          "name": "tokenProgram"
+          "name": "token_program"
         },
         {
-          "name": "baseTokenProgram"
+          "name": "base_token_program"
         },
         {
-          "name": "quoteTokenProgram"
+          "name": "quote_token_program"
         },
         {
-          "name": "associatedTokenProgram",
+          "name": "associated_token_program",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "eventAuthority",
+          "name": "event_authority",
           "pda": {
             "seeds": [
               {
@@ -2343,15 +2337,15 @@ export type PeoplepadAmm = {
       ],
       "args": [
         {
-          "name": "lpTokenAmountIn",
+          "name": "lp_token_amount_in",
           "type": "u64"
         },
         {
-          "name": "minBaseAmountOut",
+          "name": "min_base_amount_out",
           "type": "u64"
         },
         {
-          "name": "minQuoteAmountOut",
+          "name": "min_quote_amount_out",
           "type": "u64"
         }
       ]
@@ -2359,7 +2353,7 @@ export type PeoplepadAmm = {
   ],
   "accounts": [
     {
-      "name": "globalConfig",
+      "name": "GlobalConfig",
       "discriminator": [
         149,
         8,
@@ -2372,7 +2366,7 @@ export type PeoplepadAmm = {
       ]
     },
     {
-      "name": "pool",
+      "name": "Pool",
       "discriminator": [
         241,
         154,
@@ -2387,7 +2381,7 @@ export type PeoplepadAmm = {
   ],
   "events": [
     {
-      "name": "buyEvent",
+      "name": "BuyEvent",
       "discriminator": [
         103,
         244,
@@ -2400,7 +2394,7 @@ export type PeoplepadAmm = {
       ]
     },
     {
-      "name": "collectCoinCreatorFeeEvent",
+      "name": "CollectCoinCreatorFeeEvent",
       "discriminator": [
         232,
         245,
@@ -2413,7 +2407,7 @@ export type PeoplepadAmm = {
       ]
     },
     {
-      "name": "createPoolEvent",
+      "name": "CreatePoolEvent",
       "discriminator": [
         177,
         49,
@@ -2426,7 +2420,7 @@ export type PeoplepadAmm = {
       ]
     },
     {
-      "name": "depositEvent",
+      "name": "DepositEvent",
       "discriminator": [
         120,
         248,
@@ -2439,7 +2433,7 @@ export type PeoplepadAmm = {
       ]
     },
     {
-      "name": "sellEvent",
+      "name": "SellEvent",
       "discriminator": [
         62,
         47,
@@ -2452,7 +2446,7 @@ export type PeoplepadAmm = {
       ]
     },
     {
-      "name": "updateConfigEvent",
+      "name": "UpdateConfigEvent",
       "discriminator": [
         96,
         112,
@@ -2465,7 +2459,7 @@ export type PeoplepadAmm = {
       ]
     },
     {
-      "name": "withdrawEvent",
+      "name": "WithdrawEvent",
       "discriminator": [
         22,
         9,
@@ -2481,48 +2475,48 @@ export type PeoplepadAmm = {
   "errors": [
     {
       "code": 6000,
-      "name": "unauthorized",
-      "msg": "unauthorized"
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
     },
     {
       "code": 6001,
-      "name": "disabled",
+      "name": "Disabled",
       "msg": "This instruction is disabled"
     },
     {
       "code": 6002,
-      "name": "zeroAmount",
+      "name": "ZeroAmount",
       "msg": "Amount must be greater than zero"
     },
     {
       "code": 6003,
-      "name": "feeTooHigh",
+      "name": "FeeTooHigh",
       "msg": "Fee exceeds the maximum allowed"
     },
     {
       "code": 6004,
-      "name": "insufficientLiquidity",
+      "name": "InsufficientLiquidity",
       "msg": "Insufficient liquidity"
     },
     {
       "code": 6005,
-      "name": "exceededSlippage",
+      "name": "ExceededSlippage",
       "msg": "Slippage limit exceeded"
     },
     {
       "code": 6006,
-      "name": "mathOverflow",
+      "name": "MathOverflow",
       "msg": "Math overflow"
     },
     {
       "code": 6007,
-      "name": "invalidFeeRecipient",
+      "name": "InvalidFeeRecipient",
       "msg": "Invalid protocol fee recipient"
     }
   ],
   "types": [
     {
-      "name": "buyEvent",
+      "name": "BuyEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2535,39 +2529,39 @@ export type PeoplepadAmm = {
             "type": "pubkey"
           },
           {
-            "name": "baseAmountOut",
+            "name": "base_amount_out",
             "type": "u64"
           },
           {
-            "name": "quoteAmountIn",
+            "name": "quote_amount_in",
             "type": "u64"
           },
           {
-            "name": "lpFee",
+            "name": "lp_fee",
             "type": "u64"
           },
           {
-            "name": "protocolFee",
+            "name": "protocol_fee",
             "type": "u64"
           },
           {
-            "name": "coinCreatorFee",
+            "name": "coin_creator_fee",
             "type": "u64"
           },
           {
-            "name": "quoteAmountInWithFees",
+            "name": "quote_amount_in_with_fees",
             "type": "u64"
           },
           {
-            "name": "poolBaseReserves",
+            "name": "pool_base_reserves",
             "type": "u64"
           },
           {
-            "name": "poolQuoteReserves",
+            "name": "pool_quote_reserves",
             "type": "u64"
           },
           {
-            "name": "coinCreator",
+            "name": "coin_creator",
             "type": "pubkey"
           },
           {
@@ -2578,16 +2572,16 @@ export type PeoplepadAmm = {
       }
     },
     {
-      "name": "collectCoinCreatorFeeEvent",
+      "name": "CollectCoinCreatorFeeEvent",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "coinCreator",
+            "name": "coin_creator",
             "type": "pubkey"
           },
           {
-            "name": "quoteMint",
+            "name": "quote_mint",
             "type": "pubkey"
           },
           {
@@ -2602,7 +2596,7 @@ export type PeoplepadAmm = {
       }
     },
     {
-      "name": "createPoolEvent",
+      "name": "CreatePoolEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2615,19 +2609,19 @@ export type PeoplepadAmm = {
             "type": "pubkey"
           },
           {
-            "name": "coinCreator",
+            "name": "coin_creator",
             "type": "pubkey"
           },
           {
-            "name": "baseMint",
+            "name": "base_mint",
             "type": "pubkey"
           },
           {
-            "name": "quoteMint",
+            "name": "quote_mint",
             "type": "pubkey"
           },
           {
-            "name": "lpMint",
+            "name": "lp_mint",
             "type": "pubkey"
           },
           {
@@ -2635,15 +2629,15 @@ export type PeoplepadAmm = {
             "type": "u16"
           },
           {
-            "name": "baseAmountIn",
+            "name": "base_amount_in",
             "type": "u64"
           },
           {
-            "name": "quoteAmountIn",
+            "name": "quote_amount_in",
             "type": "u64"
           },
           {
-            "name": "lpMinted",
+            "name": "lp_minted",
             "type": "u64"
           },
           {
@@ -2654,7 +2648,7 @@ export type PeoplepadAmm = {
       }
     },
     {
-      "name": "depositEvent",
+      "name": "DepositEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2667,27 +2661,27 @@ export type PeoplepadAmm = {
             "type": "pubkey"
           },
           {
-            "name": "lpTokenAmountOut",
+            "name": "lp_token_amount_out",
             "type": "u64"
           },
           {
-            "name": "baseAmountIn",
+            "name": "base_amount_in",
             "type": "u64"
           },
           {
-            "name": "quoteAmountIn",
+            "name": "quote_amount_in",
             "type": "u64"
           },
           {
-            "name": "poolBaseReserves",
+            "name": "pool_base_reserves",
             "type": "u64"
           },
           {
-            "name": "poolQuoteReserves",
+            "name": "pool_quote_reserves",
             "type": "u64"
           },
           {
-            "name": "lpSupply",
+            "name": "lp_supply",
             "type": "u64"
           },
           {
@@ -2698,7 +2692,7 @@ export type PeoplepadAmm = {
       }
     },
     {
-      "name": "globalConfig",
+      "name": "GlobalConfig",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2707,23 +2701,23 @@ export type PeoplepadAmm = {
             "type": "pubkey"
           },
           {
-            "name": "lpFeeBasisPoints",
+            "name": "lp_fee_basis_points",
             "type": "u64"
           },
           {
-            "name": "protocolFeeBasisPoints",
+            "name": "protocol_fee_basis_points",
             "type": "u64"
           },
           {
-            "name": "coinCreatorFeeBasisPoints",
+            "name": "coin_creator_fee_basis_points",
             "type": "u64"
           },
           {
-            "name": "protocolFeeRecipient",
+            "name": "protocol_fee_recipient",
             "type": "pubkey"
           },
           {
-            "name": "disableFlags",
+            "name": "disable_flags",
             "type": "u8"
           },
           {
@@ -2734,7 +2728,7 @@ export type PeoplepadAmm = {
       }
     },
     {
-      "name": "pool",
+      "name": "Pool",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2751,49 +2745,49 @@ export type PeoplepadAmm = {
             "type": "pubkey"
           },
           {
-            "name": "baseMint",
+            "name": "base_mint",
             "type": "pubkey"
           },
           {
-            "name": "quoteMint",
+            "name": "quote_mint",
             "type": "pubkey"
           },
           {
-            "name": "lpMint",
+            "name": "lp_mint",
             "type": "pubkey"
           },
           {
-            "name": "poolBaseTokenAccount",
+            "name": "pool_base_token_account",
             "type": "pubkey"
           },
           {
-            "name": "poolQuoteTokenAccount",
+            "name": "pool_quote_token_account",
             "type": "pubkey"
           },
           {
-            "name": "lpSupply",
+            "name": "lp_supply",
             "type": "u64"
           },
           {
-            "name": "coinCreator",
+            "name": "coin_creator",
             "type": "pubkey"
           },
           {
-            "name": "protocolFees",
+            "name": "protocol_fees",
             "docs": [
               "Lifetime stats (informational)."
             ],
             "type": "u64"
           },
           {
-            "name": "creatorFees",
+            "name": "creator_fees",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "sellEvent",
+      "name": "SellEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2806,39 +2800,39 @@ export type PeoplepadAmm = {
             "type": "pubkey"
           },
           {
-            "name": "baseAmountIn",
+            "name": "base_amount_in",
             "type": "u64"
           },
           {
-            "name": "quoteAmountOut",
+            "name": "quote_amount_out",
             "type": "u64"
           },
           {
-            "name": "lpFee",
+            "name": "lp_fee",
             "type": "u64"
           },
           {
-            "name": "protocolFee",
+            "name": "protocol_fee",
             "type": "u64"
           },
           {
-            "name": "coinCreatorFee",
+            "name": "coin_creator_fee",
             "type": "u64"
           },
           {
-            "name": "userQuoteAmountOut",
+            "name": "user_quote_amount_out",
             "type": "u64"
           },
           {
-            "name": "poolBaseReserves",
+            "name": "pool_base_reserves",
             "type": "u64"
           },
           {
-            "name": "poolQuoteReserves",
+            "name": "pool_quote_reserves",
             "type": "u64"
           },
           {
-            "name": "coinCreator",
+            "name": "coin_creator",
             "type": "pubkey"
           },
           {
@@ -2849,7 +2843,7 @@ export type PeoplepadAmm = {
       }
     },
     {
-      "name": "updateConfigEvent",
+      "name": "UpdateConfigEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2858,23 +2852,23 @@ export type PeoplepadAmm = {
             "type": "pubkey"
           },
           {
-            "name": "lpFeeBasisPoints",
+            "name": "lp_fee_basis_points",
             "type": "u64"
           },
           {
-            "name": "protocolFeeBasisPoints",
+            "name": "protocol_fee_basis_points",
             "type": "u64"
           },
           {
-            "name": "coinCreatorFeeBasisPoints",
+            "name": "coin_creator_fee_basis_points",
             "type": "u64"
           },
           {
-            "name": "protocolFeeRecipient",
+            "name": "protocol_fee_recipient",
             "type": "pubkey"
           },
           {
-            "name": "disableFlags",
+            "name": "disable_flags",
             "type": "u8"
           },
           {
@@ -2885,7 +2879,7 @@ export type PeoplepadAmm = {
       }
     },
     {
-      "name": "withdrawEvent",
+      "name": "WithdrawEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2898,27 +2892,27 @@ export type PeoplepadAmm = {
             "type": "pubkey"
           },
           {
-            "name": "lpTokenAmountIn",
+            "name": "lp_token_amount_in",
             "type": "u64"
           },
           {
-            "name": "baseAmountOut",
+            "name": "base_amount_out",
             "type": "u64"
           },
           {
-            "name": "quoteAmountOut",
+            "name": "quote_amount_out",
             "type": "u64"
           },
           {
-            "name": "poolBaseReserves",
+            "name": "pool_base_reserves",
             "type": "u64"
           },
           {
-            "name": "poolQuoteReserves",
+            "name": "pool_quote_reserves",
             "type": "u64"
           },
           {
-            "name": "lpSupply",
+            "name": "lp_supply",
             "type": "u64"
           },
           {
@@ -2929,4 +2923,4 @@ export type PeoplepadAmm = {
       }
     }
   ]
-};
+}

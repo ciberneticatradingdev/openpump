@@ -19,8 +19,8 @@ import {
 } from "@solana/web3.js";
 import { AMM_IDL, AMM_PROGRAM_ID, CURVE_IDL, CURVE_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
 import { pda } from "./pda";
-import type { PeoplepadAmm } from "./peoplepad_amm";
-import type { PeoplepadCurve } from "./peoplepad_curve";
+import type { OpenpumpAmm } from "./openpump_amm";
+import type { OpenpumpCurve } from "./openpump_curve";
 import type { CurveState } from "./math";
 
 const bn = (v: bigint | number) => new BN(v.toString());
@@ -82,13 +82,13 @@ export function readOnlyProvider(connection: Connection) {
   return new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
 }
 
-export class PeoplepadClient {
-  readonly curve: Program<PeoplepadCurve>;
-  readonly amm: Program<PeoplepadAmm>;
+export class OpenpumpClient {
+  readonly curve: Program<OpenpumpCurve>;
+  readonly amm: Program<OpenpumpAmm>;
 
   constructor(readonly connection: Connection, provider: AnchorProvider = readOnlyProvider(connection)) {
-    this.curve = new Program<PeoplepadCurve>(CURVE_IDL, provider);
-    this.amm = new Program<PeoplepadAmm>(AMM_IDL, provider);
+    this.curve = new Program<OpenpumpCurve>(CURVE_IDL, provider);
+    this.amm = new Program<OpenpumpAmm>(AMM_IDL, provider);
   }
 
   // ------------------------------------------------------------- reads
