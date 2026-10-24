@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import BN from "bn.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -76,7 +76,10 @@ export interface AmmConfigState {
 
 /** Read-only provider: instruction building and account fetching never need a real signer. */
 export function readOnlyProvider(connection: Connection) {
-  return new AnchorProvider(connection, new Wallet(Keypair.generate()), { commitment: "confirmed" });
+  // Anchor's `Wallet` is Node-only; a throwaway keypair wallet keeps this browser-safe.
+  const kp = Keypair.generate();
+  const wallet = { publicKey: kp.publicKey, signTransaction: async (t: any) => t, signAllTransactions: async (t: any) => t };
+  return new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
 }
 
 export class PeoplepadClient {

@@ -40,7 +40,8 @@ export function uploadRouter() {
       if (String(name).length > 32 || String(symbol).length > 10) return res.status(400).json({ error: "name ≤ 32 chars, symbol ≤ 10" });
       let image: string | null = null;
       if (req.file) {
-        const ext = (req.file.mimetype.split("/")[1] || "png").replace("jpeg", "jpg");
+        const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "image/gif": "gif", "image/webp": "webp", "image/svg+xml": "svg" };
+        const ext = EXT[req.file.mimetype] || "png";
         image = await store(`image.${ext}`, req.file.buffer, req.file.mimetype);
       }
       const json = {
