@@ -1,6 +1,0 @@
-[phases.setup]
-nixPkgs = ["nodejs_22", "pnpm", "python3", "gcc", "gnumake"]
-[phases.install]
-cmds = ["pnpm install"]
-[start]
-cmd = "pnpm --filter @peoplepad/server start"

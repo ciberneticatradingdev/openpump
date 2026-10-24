@@ -11,3 +11,5 @@ test-ledger/
 !.env.example
 dist/
 *.log
+.vercel
+.env*

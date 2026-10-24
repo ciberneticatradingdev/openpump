@@ -1,0 +1,9 @@
+target
+evidence
+.anchor
+node_modules
+**/node_modules
+server/data
+server/uploads
+web/dist
+tests
