@@ -19,5 +19,12 @@
     "mocha": "^10.8.2",
     "ts-mocha": "^10.1.0",
     "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "bufferutil",
+      "utf-8-validate"
+    ]
   }
 }
