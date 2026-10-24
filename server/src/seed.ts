@@ -6,7 +6,7 @@
 import "dotenv/config";
 import fs from "node:fs";
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { DEFAULT_AMM_FEES, DEFAULT_PARAMS, PeoplepadClient, curve as curveMath, pda } from "@peoplepad/sdk";
 
 const RPC = process.env.RPC_URL || "http://127.0.0.1:8899";
@@ -62,17 +62,32 @@ async function main() {
   }
   const global = await client.fetchGlobal();
 
-  const traders = Array.from({ length: 6 }, () => Keypair.generate());
-  for (const t of traders) await conn.confirmTransaction(await conn.requestAirdrop(t.publicKey, 120 * LAMPORTS_PER_SOL));
+  const local = RPC.includes("127.0.0.1") || RPC.includes("localhost");
+  const traders = Array.from({ length: local ? 6 : 2 }, () => Keypair.generate());
+  for (const t of traders) {
+    if (local) await conn.confirmTransaction(await conn.requestAirdrop(t.publicKey, 120 * LAMPORTS_PER_SOL));
+    else await send([SystemProgram.transfer({ fromPubkey: admin.publicKey, toPubkey: t.publicKey, lamports: 0.9 * LAMPORTS_PER_SOL })]);
+  }
+  const coins = local ? COINS : COINS.slice(0, 3);
 
-  for (const [i, c] of COINS.entries()) {
-    const mint = Keypair.generate();
-    const { uri } = await uploadMeta(c);
-    await send([await client.createIx(admin.publicKey, mint.publicKey, c.name, c.symbol, uri)], [mint]);
-    console.log(`created ${c.symbol} ${mint.publicKey.toBase58()}`);
+  for (const [i, c] of coins.entries()) {
+    // reuse an existing coin with this symbol (re-runs on devnet shouldn't spam duplicates)
+    const existing: any[] = await fetch(`${API}/api/coins?q=${c.symbol}&limit=5`).then((r) => r.json()).catch(() => []);
+    const found = existing.find((e) => e.symbol === c.symbol && !e.complete);
+    let mint: { publicKey: PublicKey };
+    if (found) {
+      mint = { publicKey: new PublicKey(found.mint) };
+      console.log(`reusing ${c.symbol} ${found.mint}`);
+    } else {
+      const kp = Keypair.generate();
+      const { uri } = await uploadMeta(c);
+      await send([await client.createIx(admin.publicKey, kp.publicKey, c.name, c.symbol, uri)], [kp]);
+      mint = kp;
+      console.log(`created ${c.symbol} ${kp.publicKey.toBase58()}`);
+    }
 
     // random-ish trading; coin #0 graduates
-    const n = i === 0 ? 12 : 3 + i * 2;
+    const n = local ? (i === 0 ? 12 : 3 + i * 2) : 3;
     for (let k = 0; k < n; k++) {
       const t = traders[k % traders.length];
       const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });
@@ -81,7 +96,7 @@ async function main() {
       if (bc.complete) break;
       const sellTurn = i !== 0 && k % 4 === 3;
       if (!sellTurn) {
-        const sol = BigInt(Math.floor((i === 0 ? 9 : 0.3 + Math.random() * 2) * 1e9));
+        const sol = BigInt(Math.floor((local ? (i === 0 ? 9 : 0.3 + Math.random() * 2) : 0.02 + Math.random() * 0.05) * 1e9));
         const q = curveMath.quoteBuyExactSol(sol, bc, global);
         const ix = await tc.buyExactSolIx(t.publicKey, mint.publicKey, admin.publicKey, global.feeRecipient, sol, (q.tokensOut * 95n) / 100n);
         await tp.sendAndConfirm(new Transaction().add(ix), [t]);
