@@ -9,6 +9,9 @@ import {
   getAccount,
   getAssociatedTokenAddressSync,
   getMint,
+  createMint,
+  mintTo,
+  getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction } from "@solana/web3.js";
 import { assert } from "chai";
@@ -492,5 +495,153 @@ describe("OpenPump — curve + amm", () => {
     }
     await curve.methods.buy(new BN("5000000000000"), new BN(10 * LAMPORTS_PER_SOL)).accounts(accts).signers([trader]).rpc();
     await curve.methods.setParams({ feeRecipient: feeRecipient.publicKey, ...PARAMS }).accounts({ authority: admin.publicKey, global }).rpc();
+  });
+
+  // ------------------------------------------------------------------ custom pairs (v2)
+  describe("custom pairs (v2)", () => {
+    const quoteDec = 6;
+    let quoteMint: PublicKey;
+    const mint2 = Keypair.generate();
+    const Q = (n: number) => new BN(Math.round(n * 10 ** quoteDec));
+    const QPARAMS = {
+      enabled: true,
+      initialVirtualQuoteReserves: Q(1_000_000), // 1M QUOTE virtual
+      initialVirtualTokenReserves: PARAMS.initialVirtualTokenReserves,
+      initialRealTokenReserves: PARAMS.initialRealTokenReserves,
+      migrationFee: Q(10),
+    };
+    let bc2: PublicKey, meta2: PublicKey, abc2: PublicKey, bcQuote: PublicKey, creatorVaultQuote: PublicKey, feeQuote: PublicKey;
+    const [quoteCfg, quoteCfgSeed] = [null as any, null];
+    const qcfg = () => PublicKey.findProgramAddressSync([Buffer.from("quote-config"), quoteMint.toBuffer()], curve.programId)[0];
+
+    const tradeV2 = (user: PublicKey) => ({
+      global, feeRecipient: feeRecipient.publicKey, mint: mint2.publicKey, bondingCurve: bc2, associatedBondingCurve: abc2,
+      associatedUser: getAssociatedTokenAddressSync(mint2.publicKey, user), user, quoteMint,
+      userQuote: getAssociatedTokenAddressSync(quoteMint, user), bondingCurveQuote: bcQuote, feeRecipientQuote: feeQuote,
+      creatorVault, creatorVaultQuote, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID,
+      quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    });
+
+    before(async () => {
+      quoteMint = await createMint(conn, admin, admin.publicKey, null, quoteDec);
+      for (const who of [trader, creator]) {
+        const ata = await getOrCreateAssociatedTokenAccount(conn, admin, quoteMint, who.publicKey);
+        await mintTo(conn, admin, quoteMint, ata.address, admin, 10_000_000 * 10 ** quoteDec);
+      }
+      [bc2] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), mint2.publicKey.toBuffer()], curve.programId);
+      [meta2] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), mint2.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      abc2 = getAssociatedTokenAddressSync(mint2.publicKey, bc2, true);
+      bcQuote = getAssociatedTokenAddressSync(quoteMint, bc2, true);
+      creatorVaultQuote = getAssociatedTokenAddressSync(quoteMint, creatorVault, true);
+      feeQuote = getAssociatedTokenAddressSync(quoteMint, feeRecipient.publicKey, true);
+    });
+
+    it("authority enables a quote mint with its own virtual reserves", async () => {
+      await curve.methods.setQuoteConfig(QPARAMS).accounts({ authority: admin.publicKey, global, quoteMint, quoteConfig: qcfg(), systemProgram: SystemProgram.programId }).rpc();
+      const q = await curve.account.quoteConfig.fetch(qcfg());
+      assert.isTrue(q.enabled);
+      assert.equal(q.decimals, quoteDec);
+      assert.equal(q.initialVirtualQuoteReserves.toString(), QPARAMS.initialVirtualQuoteReserves.toString());
+    });
+
+    it("create_v2 launches a coin paired with the quote mint", async () => {
+      await curve.methods
+        .createV2("Quote Coin", "QC", "https://example.com/qc.json")
+        .accounts({
+          mint: mint2.publicKey, mintAuthority, bondingCurve: bc2, associatedBondingCurve: abc2, quoteMint, quoteConfig: qcfg(), bondingCurveQuote: bcQuote,
+          global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta2, user: creator.publicKey, systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY,
+        })
+        .signers([creator, mint2])
+        .rpc();
+      const bc = await curve.account.bondingCurve.fetch(bc2);
+      assert.equal(bc.quoteMint.toBase58(), quoteMint.toBase58());
+      assert.equal(bc.virtualSolReserves.toString(), QPARAMS.initialVirtualQuoteReserves.toString());
+    });
+
+    it("v1 buy on a v2 curve is rejected", async () => {
+      try {
+        await curve.methods.buyExactSolIn(new BN(1e9), new BN(0)).accounts({ ...tradeAccounts(trader.publicKey), mint: mint2.publicKey, bondingCurve: bc2, associatedBondingCurve: abc2, associatedUser: getAssociatedTokenAddressSync(mint2.publicKey, trader.publicKey) }).signers([trader]).rpc();
+        assert.fail("should reject");
+      } catch (e) {
+        assert.include(String(e), "WrongQuoteMint");
+      }
+    });
+
+    it("buy_exact_quote_in pays in quote tokens; fees land in quote ATAs", async () => {
+      const qin = Q(1000);
+      const expected = qin.mul(QPARAMS.initialVirtualTokenReserves).div(QPARAMS.initialVirtualQuoteReserves.add(qin));
+      await curve.methods.buyExactQuoteIn(qin, expected.sub(new BN(1000))).accounts(tradeV2(trader.publicKey)).signers([trader]).rpc();
+      assert.equal((await tokenBal(getAssociatedTokenAddressSync(mint2.publicKey, trader.publicKey))).toString(), expected.toString());
+      assert.equal((await tokenBal(bcQuote)).toString(), qin.toString());
+      assert.equal((await tokenBal(feeQuote)).toString(), qin.muln(50).divn(10000).toString());
+      assert.equal((await tokenBal(creatorVaultQuote)).toString(), qin.muln(50).divn(10000).toString());
+    });
+
+    it("buy_v2 + sell_v2 round trip never profits", async () => {
+      const amount = new BN("5000000000000");
+      const before = await tokenBal(getAssociatedTokenAddressSync(quoteMint, trader.publicKey));
+      await curve.methods.buyV2(amount, Q(100000)).accounts(tradeV2(trader.publicKey)).signers([trader]).rpc();
+      await curve.methods.sellV2(amount, new BN(0)).accounts(tradeV2(trader.publicKey)).signers([trader]).rpc();
+      const after = await tokenBal(getAssociatedTokenAddressSync(quoteMint, trader.publicKey));
+      assert.isBelow(Number(after), Number(before));
+    });
+
+    it("collect_creator_fee_v2 sweeps the quote vault", async () => {
+      const vault = await tokenBal(creatorVaultQuote);
+      assert.isAbove(Number(vault), 0);
+      const before = await tokenBal(getAssociatedTokenAddressSync(quoteMint, creator.publicKey));
+      await curve.methods
+        .collectCreatorFeeV2()
+        .accounts({ creator: creator.publicKey, quoteMint, creatorVault, creatorVaultQuote, creatorQuote: getAssociatedTokenAddressSync(quoteMint, creator.publicKey), quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId })
+        .signers([creator])
+        .rpc();
+      assert.equal(((await tokenBal(getAssociatedTokenAddressSync(quoteMint, creator.publicKey))) - before).toString(), vault.toString());
+    });
+
+    it("completes and migrate_v2 funds an AMM pool quoted in the custom token (fee taken, LP burned)", async () => {
+      await curve.methods.buyV2(new BN("900000000000000"), Q(9_000_000)).accounts(tradeV2(trader.publicKey)).signers([trader]).rpc();
+      const bcBefore = await curve.account.bondingCurve.fetch(bc2);
+      assert.isTrue(bcBefore.complete);
+      const [pool2] = PublicKey.findProgramAddressSync([Buffer.from("pool"), Buffer.from([0, 0]), bc2.toBuffer(), mint2.publicKey.toBuffer(), quoteMint.toBuffer()], amm.programId);
+      const [lp2] = PublicKey.findProgramAddressSync([Buffer.from("pool-lp-mint"), pool2.toBuffer()], amm.programId);
+      const feeBefore = await tokenBal(feeQuote);
+      await curve.methods
+        .migrateV2()
+        .accounts({
+          global, feeRecipient: feeRecipient.publicKey, feeRecipientQuote: feeQuote, mint: mint2.publicKey, bondingCurve: bc2, associatedBondingCurve: abc2, bondingCurveQuote: bcQuote,
+          bondingCurveLp: getAssociatedTokenAddressSync(lp2, bc2, true), user: trader.publicKey, quoteMint, quoteConfig: qcfg(),
+          ammProgram: amm.programId, ammGlobalConfig, pool: pool2, lpMint: lp2, lockedLpTokenAccount: getAssociatedTokenAddressSync(lp2, pool2, true),
+          poolBaseTokenAccount: getAssociatedTokenAddressSync(mint2.publicKey, pool2, true), poolQuoteTokenAccount: getAssociatedTokenAddressSync(quoteMint, pool2, true),
+          coinCreatorVaultAuthority, coinCreatorVaultAta: getAssociatedTokenAddressSync(quoteMint, coinCreatorVaultAuthority, true), ammEventAuthority,
+          systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        })
+        .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 })])
+        .signers([trader])
+        .rpc();
+      const bc = await curve.account.bondingCurve.fetch(bc2);
+      assert.isTrue(bc.migrated);
+      assert.equal(((await tokenBal(feeQuote)) - feeBefore).toString(), QPARAMS.migrationFee.toString());
+      const poolQuoteBal = await tokenBal(getAssociatedTokenAddressSync(quoteMint, pool2, true));
+      assert.equal(poolQuoteBal.toString(), bcBefore.realSolReserves.sub(QPARAMS.migrationFee).toString());
+      assert.equal((await getMint(conn, lp2)).supply.toString(), "1000");
+      assert.isNull(await conn.getAccountInfo(bcQuote), "curve quote ATA closed");
+
+      // trade on the AMM in the custom quote
+      const p = await amm.account.pool.fetch(pool2);
+      await amm.methods
+        .buy(new BN("1000000000000"), Q(1_000_000))
+        .accounts({
+          pool: pool2, user: trader.publicKey, globalConfig: ammGlobalConfig, baseMint: mint2.publicKey, quoteMint,
+          userBaseTokenAccount: getAssociatedTokenAddressSync(mint2.publicKey, trader.publicKey), userQuoteTokenAccount: getAssociatedTokenAddressSync(quoteMint, trader.publicKey),
+          poolBaseTokenAccount: p.poolBaseTokenAccount, poolQuoteTokenAccount: p.poolQuoteTokenAccount,
+          protocolFeeRecipient: feeRecipient.publicKey, protocolFeeRecipientTokenAccount: feeQuote,
+          coinCreatorVaultAuthority, coinCreatorVaultAta: getAssociatedTokenAddressSync(quoteMint, coinCreatorVaultAuthority, true),
+          baseTokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+        })
+        .signers([trader])
+        .rpc();
+      assert.isAbove(Number(await tokenBal(getAssociatedTokenAddressSync(quoteMint, pool2, true))), Number(poolQuoteBal));
+    });
   });
 });

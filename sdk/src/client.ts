@@ -356,6 +356,136 @@ export class OpenpumpClient {
     return [ix, this.unwrapSolIx(creator)];
   }
 
+  // ------------------------------------------------------------- custom pairs (v2)
+
+  async fetchQuoteConfig(quoteMint: PublicKey) {
+    const info = await this.connection.getAccountInfo(pda.quoteConfig(quoteMint), "confirmed");
+    if (!info) return null;
+    const q = this.curve.coder.accounts.decode("quoteConfig", info.data);
+    return {
+      quoteMint: q.quoteMint as PublicKey,
+      enabled: q.enabled as boolean,
+      initialVirtualQuoteReserves: big(q.initialVirtualQuoteReserves),
+      initialVirtualTokenReserves: big(q.initialVirtualTokenReserves),
+      initialRealTokenReserves: big(q.initialRealTokenReserves),
+      migrationFee: big(q.migrationFee),
+      decimals: q.decimals as number,
+    };
+  }
+
+  async setQuoteConfigIx(authority: PublicKey, quoteMint: PublicKey, params: Record<string, any>) {
+    const p: any = {};
+    for (const [k, v] of Object.entries(params)) p[k] = typeof v === "bigint" ? bn(v) : v;
+    return this.curve.methods.setQuoteConfig(p).accounts({ authority, global: pda.global(), quoteMint, quoteConfig: pda.quoteConfig(quoteMint), systemProgram: SystemProgram.programId } as any).instruction();
+  }
+
+  async createV2Ix(user: PublicKey, mint: PublicKey, quoteMint: PublicKey, name: string, symbol: string, uri: string, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+    return this.curve.methods
+      .createV2(name, symbol, uri)
+      .accounts({
+        mint,
+        mintAuthority: pda.mintAuthority(),
+        bondingCurve: pda.bondingCurve(mint),
+        associatedBondingCurve: pda.associatedBondingCurve(mint),
+        quoteMint,
+        quoteConfig: pda.quoteConfig(quoteMint),
+        bondingCurveQuote: pda.bondingCurveQuote(mint, quoteMint, quoteTokenProgram),
+        global: pda.global(),
+        mplTokenMetadata: MPL_TOKEN_METADATA_PROGRAM_ID,
+        metadata: pda.metadata(mint),
+        user,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        quoteTokenProgram,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        rent: SYSVAR_RENT_PUBKEY,
+      } as any)
+      .instruction();
+  }
+
+  private tradeV2Accounts(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, quoteTokenProgram: PublicKey) {
+    return {
+      global: pda.global(),
+      feeRecipient,
+      mint,
+      bondingCurve: pda.bondingCurve(mint),
+      associatedBondingCurve: pda.associatedBondingCurve(mint),
+      associatedUser: getAssociatedTokenAddressSync(mint, user),
+      user,
+      quoteMint,
+      userQuote: getAssociatedTokenAddressSync(quoteMint, user, false, quoteTokenProgram),
+      bondingCurveQuote: pda.bondingCurveQuote(mint, quoteMint, quoteTokenProgram),
+      feeRecipientQuote: getAssociatedTokenAddressSync(quoteMint, feeRecipient, true, quoteTokenProgram),
+      creatorVault: pda.creatorVault(creator),
+      creatorVaultQuote: pda.creatorVaultQuote(creator, quoteMint, quoteTokenProgram),
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      quoteTokenProgram,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    } as any;
+  }
+
+  async buyV2Ix(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, tokensOut: bigint, maxQuoteCost: bigint, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+    return this.curve.methods.buyV2(bn(tokensOut), bn(maxQuoteCost)).accounts(this.tradeV2Accounts(user, mint, creator, feeRecipient, quoteMint, quoteTokenProgram)).instruction();
+  }
+  async buyExactQuoteInIx(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, quoteIn: bigint, minTokensOut: bigint, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+    return this.curve.methods.buyExactQuoteIn(bn(quoteIn), bn(minTokensOut)).accounts(this.tradeV2Accounts(user, mint, creator, feeRecipient, quoteMint, quoteTokenProgram)).instruction();
+  }
+  async sellV2Ix(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, tokensIn: bigint, minQuoteOut: bigint, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+    return this.curve.methods.sellV2(bn(tokensIn), bn(minQuoteOut)).accounts(this.tradeV2Accounts(user, mint, creator, feeRecipient, quoteMint, quoteTokenProgram)).instruction();
+  }
+  async collectCreatorFeeV2Ix(creator: PublicKey, quoteMint: PublicKey, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+    return this.curve.methods
+      .collectCreatorFeeV2()
+      .accounts({
+        creator,
+        quoteMint,
+        creatorVault: pda.creatorVault(creator),
+        creatorVaultQuote: pda.creatorVaultQuote(creator, quoteMint, quoteTokenProgram),
+        creatorQuote: getAssociatedTokenAddressSync(quoteMint, creator, false, quoteTokenProgram),
+        quoteTokenProgram,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      } as any)
+      .instruction();
+  }
+  async migrateV2Ixs(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, quoteTokenProgram = TOKEN_PROGRAM_ID): Promise<TransactionInstruction[]> {
+    const bondingCurve = pda.bondingCurve(mint);
+    const pool = pda.migrationPoolV2(mint, quoteMint);
+    const lpMint = pda.lpMint(pool);
+    const ix = await this.curve.methods
+      .migrateV2()
+      .accounts({
+        global: pda.global(),
+        feeRecipient,
+        feeRecipientQuote: getAssociatedTokenAddressSync(quoteMint, feeRecipient, true, quoteTokenProgram),
+        mint,
+        bondingCurve,
+        associatedBondingCurve: pda.associatedBondingCurve(mint),
+        bondingCurveQuote: pda.bondingCurveQuote(mint, quoteMint, quoteTokenProgram),
+        bondingCurveLp: getAssociatedTokenAddressSync(lpMint, bondingCurve, true),
+        user,
+        quoteMint,
+        quoteConfig: pda.quoteConfig(quoteMint),
+        ammProgram: AMM_PROGRAM_ID,
+        ammGlobalConfig: pda.ammGlobalConfig(),
+        pool,
+        lpMint,
+        lockedLpTokenAccount: pda.lockedLp(pool),
+        poolBaseTokenAccount: pda.poolBase(pool, mint),
+        poolQuoteTokenAccount: getAssociatedTokenAddressSync(quoteMint, pool, true, quoteTokenProgram),
+        coinCreatorVaultAuthority: pda.ammCreatorVaultAuthority(creator),
+        coinCreatorVaultAta: pda.ammCreatorVaultAta(creator, quoteMint),
+        ammEventAuthority: pda.ammEventAuthority(),
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        quoteTokenProgram,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      } as any)
+      .instruction();
+    return [ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }), ix];
+  }
+
   // ------------------------------------------------------------- admin
 
   async initializeIx(authority: PublicKey, params: Record<string, any>) {

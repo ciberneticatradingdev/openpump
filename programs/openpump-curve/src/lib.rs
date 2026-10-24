@@ -26,6 +26,8 @@ use openpump_amm::program::OpenpumpAmm;
 
 pub mod math;
 use math::*;
+pub mod quote;
+use quote::*;
 
 declare_id!("AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB");
 
@@ -172,6 +174,7 @@ pub mod openpump_curve {
             real_token_reserves: bc.real_token_reserves,
             token_total_supply: bc.token_total_supply,
             timestamp: clock.unix_timestamp,
+            quote_mint: bc.quote_mint,
         });
         Ok(())
     }
@@ -262,6 +265,7 @@ pub mod openpump_curve {
             protocol_fee,
             creator_fee,
             creator: bc.creator,
+            quote_mint: bc.quote_mint,
         });
         Ok(())
     }
@@ -404,8 +408,33 @@ pub mod openpump_curve {
             migration_fee: g.migration_fee_lamports,
             lp_burned: lp_amount,
             timestamp: Clock::get()?.unix_timestamp,
+            quote_mint: bc.quote_mint,
         });
         Ok(())
+    }
+
+    // ----- custom pairs (v2 family, see quote.rs)
+
+    pub fn set_quote_config(ctx: Context<SetQuoteConfig>, params: QuoteParams) -> Result<()> {
+        quote::set_quote_config(ctx, params)
+    }
+    pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String) -> Result<()> {
+        quote::create_v2(ctx, name, symbol, uri)
+    }
+    pub fn buy_v2(ctx: Context<TradeV2>, amount: u64, max_quote_cost: u64) -> Result<()> {
+        quote::buy_v2(ctx, amount, max_quote_cost)
+    }
+    pub fn buy_exact_quote_in(ctx: Context<TradeV2>, quote_in: u64, min_tokens_out: u64) -> Result<()> {
+        quote::buy_exact_quote_in(ctx, quote_in, min_tokens_out)
+    }
+    pub fn sell_v2(ctx: Context<TradeV2>, amount: u64, min_quote_output: u64) -> Result<()> {
+        quote::sell_v2(ctx, amount, min_quote_output)
+    }
+    pub fn collect_creator_fee_v2(ctx: Context<CollectCreatorFeeV2>) -> Result<()> {
+        quote::collect_creator_fee_v2(ctx)
+    }
+    pub fn migrate_v2(ctx: Context<MigrateV2>) -> Result<()> {
+        quote::migrate_v2(ctx)
     }
 
     /// The creator sweeps their vault (all SOL above rent-exemption) to their wallet.
@@ -501,6 +530,7 @@ fn execute_buy(ctx: Context<Trade>, tokens_out: u64, sol_in: u64, max_sol_cost: 
         protocol_fee,
         creator_fee,
         creator: bc.creator,
+        quote_mint: bc.quote_mint,
     });
     if bc.complete {
         emit_cpi!(CompleteEvent {
@@ -606,7 +636,7 @@ pub struct Trade<'info> {
     #[account(mut, address = global.fee_recipient @ CurveError::InvalidFeeRecipient)]
     pub fee_recipient: UncheckedAccount<'info>,
     pub mint: Box<Account<'info, Mint>>,
-    #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint)]
+    #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, constraint = bonding_curve.quote_mint == Pubkey::default() @ CurveError::WrongQuoteMint)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
     #[account(mut, associated_token::mint = mint, associated_token::authority = bonding_curve)]
     pub associated_bonding_curve: Box<Account<'info, TokenAccount>>,
@@ -631,7 +661,7 @@ pub struct Migrate<'info> {
     #[account(mut, address = global.fee_recipient @ CurveError::InvalidFeeRecipient)]
     pub fee_recipient: UncheckedAccount<'info>,
     pub mint: Box<Account<'info, Mint>>,
-    #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint)]
+    #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, constraint = bonding_curve.quote_mint == Pubkey::default() @ CurveError::WrongQuoteMint)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
     #[account(mut, associated_token::mint = mint, associated_token::authority = bonding_curve)]
     pub associated_bonding_curve: Box<Account<'info, TokenAccount>>,
@@ -743,6 +773,8 @@ pub struct BondingCurve {
     pub creator_fees_total: u64,
     pub protocol_fees_total: u64,
     pub bump: u8,
+    /// Pubkey::default() = native SOL curve; otherwise the SPL/Token-2022 quote mint (v2 family).
+    pub quote_mint: Pubkey,
 }
 
 // ---------------------------------------------------------------- events
@@ -768,6 +800,7 @@ pub struct CreateEvent {
     pub real_token_reserves: u64,
     pub token_total_supply: u64,
     pub timestamp: i64,
+    pub quote_mint: Pubkey,
 }
 
 #[event]
@@ -785,6 +818,7 @@ pub struct TradeEvent {
     pub protocol_fee: u64,
     pub creator_fee: u64,
     pub creator: Pubkey,
+    pub quote_mint: Pubkey,
 }
 
 #[event]
@@ -807,6 +841,7 @@ pub struct MigrateEvent {
     pub migration_fee: u64,
     pub lp_burned: u64,
     pub timestamp: i64,
+    pub quote_mint: Pubkey,
 }
 
 #[event]
@@ -848,4 +883,8 @@ pub enum CurveError {
     MathOverflow,
     #[msg("Invalid protocol fee recipient")]
     InvalidFeeRecipient,
+    #[msg("Quote mint is not enabled")]
+    QuoteMintDisabled,
+    #[msg("Wrong quote mint for this bonding curve")]
+    WrongQuoteMint,
 }

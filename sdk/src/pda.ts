@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
 
 const u16le = (n: number) => Buffer.from([n & 0xff, (n >> 8) & 0xff]);
@@ -18,6 +18,15 @@ export const pda = {
       MPL_TOKEN_METADATA_PROGRAM_ID
     )[0],
   associatedBondingCurve: (mint: PublicKey) => getAssociatedTokenAddressSync(mint, pda.bondingCurve(mint), true),
+  /** v2 (custom pairs) */
+  quoteConfig: (quoteMint: PublicKey) =>
+    PublicKey.findProgramAddressSync([Buffer.from("quote-config"), quoteMint.toBuffer()], CURVE_PROGRAM_ID)[0],
+  bondingCurveQuote: (mint: PublicKey, quoteMint: PublicKey, tokenProgram = TOKEN_PROGRAM_ID) =>
+    getAssociatedTokenAddressSync(quoteMint, pda.bondingCurve(mint), true, tokenProgram),
+  creatorVaultQuote: (creator: PublicKey, quoteMint: PublicKey, tokenProgram = TOKEN_PROGRAM_ID) =>
+    getAssociatedTokenAddressSync(quoteMint, pda.creatorVault(creator), true, tokenProgram),
+  /** Pool created by v2 migration: index 0, creator = bonding curve PDA, quote = the coin's quote mint. */
+  migrationPoolV2: (mint: PublicKey, quoteMint: PublicKey) => pda.pool(0, pda.bondingCurve(mint), mint, quoteMint),
 
   ammGlobalConfig: () => PublicKey.findProgramAddressSync([Buffer.from("global-config")], AMM_PROGRAM_ID)[0],
   ammEventAuthority: () => PublicKey.findProgramAddressSync([Buffer.from("__event_authority")], AMM_PROGRAM_ID)[0],
