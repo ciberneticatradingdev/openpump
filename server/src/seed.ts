@@ -63,17 +63,20 @@ async function main() {
   const global = await client.fetchGlobal();
 
   const local = RPC.includes("127.0.0.1") || RPC.includes("localhost");
-  const traders = Array.from({ length: local ? 6 : 2 }, () => Keypair.generate());
-  for (const t of traders) {
-    if (local) await conn.confirmTransaction(await conn.requestAirdrop(t.publicKey, 120 * LAMPORTS_PER_SOL));
-    else await send([SystemProgram.transfer({ fromPubkey: admin.publicKey, toPubkey: t.publicKey, lamports: 0.9 * LAMPORTS_PER_SOL })]);
-  }
+  // ADMIN_ONLY=1: no trader wallets, admin buys (cheap on devnet). FORCE_NEW=1: never reuse coins.
+  const adminOnly = !!process.env.ADMIN_ONLY;
+  const traders = adminOnly ? [admin] : Array.from({ length: local ? 6 : 2 }, () => Keypair.generate());
+  if (!adminOnly)
+    for (const t of traders) {
+      if (local) await conn.confirmTransaction(await conn.requestAirdrop(t.publicKey, 120 * LAMPORTS_PER_SOL));
+      else await send([SystemProgram.transfer({ fromPubkey: admin.publicKey, toPubkey: t.publicKey, lamports: 0.9 * LAMPORTS_PER_SOL })]);
+    }
   const coins = local ? COINS : COINS.slice(0, 3);
 
   for (const [i, c] of coins.entries()) {
     // reuse an existing coin with this symbol (re-runs on devnet shouldn't spam duplicates)
     const existing: any[] = await fetch(`${API}/api/coins?q=${c.symbol}&limit=5`).then((r) => r.json()).catch(() => []);
-    const found = existing.find((e) => e.symbol === c.symbol && !e.complete);
+    const found = process.env.FORCE_NEW ? null : existing.find((e) => e.symbol === c.symbol && !e.complete);
     let mint: { publicKey: PublicKey };
     if (found) {
       mint = { publicKey: new PublicKey(found.mint) };
@@ -96,7 +99,7 @@ async function main() {
       if (bc.complete) break;
       const sellTurn = i !== 0 && k % 4 === 3;
       if (!sellTurn) {
-        const sol = BigInt(Math.floor((local ? (i === 0 ? 9 : 0.3 + Math.random() * 2) : 0.02 + Math.random() * 0.05) * 1e9));
+        const sol = BigInt(Math.floor((local ? (i === 0 ? 9 : 0.3 + Math.random() * 2) : (adminOnly ? 0.01 + Math.random() * 0.02 : 0.02 + Math.random() * 0.05)) * 1e9));
         const q = curveMath.quoteBuyExactSol(sol, bc, global);
         const ix = await tc.buyExactSolIx(t.publicKey, mint.publicKey, admin.publicKey, global.feeRecipient, sol, (q.tokensOut * 95n) / 100n);
         await tp.sendAndConfirm(new Transaction().add(ix), [t]);
