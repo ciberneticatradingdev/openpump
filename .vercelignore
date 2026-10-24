@@ -1,0 +1,6 @@
+target
+evidence
+.anchor
+server/data
+server/uploads
+tests/fixtures
