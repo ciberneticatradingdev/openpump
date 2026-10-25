@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OpenPump — pump.fun, open and better</title>
+<meta name="description" content="OpenPump is an open-source launchpad for Solana: bonding curve, AMM, fee engine and market-making vault, built from scratch to match pump.fun and go further. Community token: $OPENPUMP." />
+<meta property="og:title" content="OpenPump — pump.fun, open and better" />
+<meta property="og:description" content="The full pump.fun + PumpSwap stack, open source, owned by the people using it. $OPENPUMP funds the build." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #050806; --bg2: #090e0a; --panel: rgba(255,255,255,0.035); --panel2: rgba(255,255,255,0.06);
+    --line: rgba(255,255,255,0.07); --line2: rgba(255,255,255,0.13);
+    --ink: #ecf2ed; --mute: rgba(236,242,237,0.58); --dim: rgba(236,242,237,0.34);
+    --acc: #79ff77; --acc2: #4cd964; --red: #ff5c7a; --gold: #ffd166;
+    --head: "Poppins", "Inter", system-ui, sans-serif; --sans: "Inter", system-ui, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --max: 1120px; --gutter: 16px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3 { font-family: var(--head); letter-spacing: -0.02em; margin: 0; }
+  p { margin: 0; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter); }
+  .mono { font-family: var(--mono); font-size: 0.86em; }
+  .acc { color: var(--acc); }
+  .mute { color: var(--mute); }
+
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); background: rgba(5,8,6,0.72); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-family: var(--head); font-weight: 700; font-size: 17px; }
+  .logo svg { width: 28px; height: 28px; }
+  nav .links { display: none; gap: 22px; font-size: 14px; color: var(--mute); margin-left: 8px; }
+  nav .links a:hover { color: var(--ink); }
+  nav .spacer { flex: 1; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 12px; font-weight: 600; font-size: 14px; border: 1px solid var(--line2); background: var(--panel2); transition: transform .12s ease, background .12s ease; white-space: nowrap; }
+  .btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+  .btn.acc { background: var(--acc); color: #06110a; border-color: transparent; box-shadow: 0 0 0 1px rgba(121,255,119,0.25), 0 8px 32px rgba(121,255,119,0.14); }
+  .btn.acc:hover { background: #8dff8b; }
+  .btn.sm { height: 34px; padding: 0 12px; font-size: 13px; }
+
+  /* hero */
+  .hero { position: relative; padding: 72px 0 56px; overflow: hidden; }
+  .hero::before { content: ""; position: absolute; inset: -40% -20% auto; height: 120%; background: radial-gradient(60% 50% at 70% 30%, rgba(121,255,119,0.13), transparent 60%), radial-gradient(40% 40% at 20% 80%, rgba(76,217,100,0.08), transparent 60%); pointer-events: none; }
+  .hero .wrap { position: relative; display: grid; gap: 40px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--acc); border: 1px solid rgba(121,255,119,0.3); background: rgba(121,255,119,0.08); border-radius: 999px; padding: 6px 12px; }
+  .eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 10px var(--acc); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+  h1 { font-size: clamp(40px, 7vw, 68px); line-height: 1.02; font-weight: 800; margin-top: 20px; }
+  h1 span { color: var(--acc); }
+  .lead { font-size: clamp(16px, 2vw, 19px); color: var(--mute); max-width: 560px; margin-top: 20px; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+  .chip { font-size: 12.5px; font-weight: 500; color: var(--mute); border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 11px; }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  /* curve card */
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; }
+  .curvecard { padding: 18px; position: relative; }
+  .curvecard .top { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--mute); margin-bottom: 10px; }
+  .curvecard .top b { color: var(--ink); font-weight: 600; }
+  .curvecard svg { width: 100%; height: auto; display: block; }
+  .curvecard .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--mute); margin-top: 12px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .dot { animation: ride 6s linear infinite; }
+  @keyframes ride { from { offset-distance: 0% } to { offset-distance: 100% } }
+
+  /* stats */
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; }
+  .stat { padding: 18px; }
+  .stat .n { font-family: var(--head); font-weight: 700; font-size: 30px; line-height: 1; }
+  .stat .l { font-size: 13px; color: var(--mute); margin-top: 6px; }
+
+  section { padding: 64px 0; }
+  section + section { border-top: 1px solid var(--line); }
+  .sec-head { max-width: 640px; margin-bottom: 32px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--acc); }
+  h2 { font-size: clamp(28px, 4vw, 40px); margin-top: 10px; font-weight: 700; }
+  .sec-head p { color: var(--mute); margin-top: 12px; font-size: 16.5px; }
+
+  .grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+  .feat { padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+  .feat .ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: rgba(121,255,119,0.1); border: 1px solid rgba(121,255,119,0.25); color: var(--acc); font-family: var(--head); font-weight: 700; font-size: 14px; }
+  .feat h3 { font-size: 18px; }
+  .feat p { color: var(--mute); font-size: 14.5px; }
+  .feat .id { font-size: 11px; color: var(--dim); word-break: break-all; }
+
+  .taglist { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .tag { font-size: 13px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); }
+  .tag.off { color: var(--dim); text-decoration: line-through; }
+
+  /* token */
+  .token { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  .token .big { padding: 26px; background: linear-gradient(160deg, rgba(121,255,119,0.12), rgba(121,255,119,0.02)); border-color: rgba(121,255,119,0.25); }
+  .token .big .t { font-family: var(--head); font-weight: 800; font-size: clamp(32px, 5vw, 46px); color: var(--acc); }
+  .ca { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .ca code { font-family: var(--mono); font-size: 13px; padding: 9px 12px; border-radius: 10px; background: rgba(0,0,0,0.35); border: 1px solid var(--line2); color: var(--mute); }
+  .hooks { display: grid; gap: 12px; }
+  .hook { padding: 18px 20px; display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: start; }
+  .hook .k { font-family: var(--head); font-weight: 700; color: var(--acc); font-size: 20px; line-height: 1; margin-top: 2px; }
+  .hook h3 { font-size: 16px; }
+  .hook p { color: var(--mute); font-size: 14px; margin-top: 4px; }
+
+  /* roadmap */
+  .phases { display: grid; gap: 0; position: relative; }
+  .phase { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 20px 0; border-top: 1px solid var(--line); }
+  .phase:first-child { border-top: 0; }
+  .ph-n { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font-family: var(--head); font-weight: 700; font-size: 14px; border: 1px solid var(--line2); background: var(--panel2); color: var(--mute); }
+  .phase.done .ph-n { background: var(--acc); color: #06110a; border-color: transparent; }
+  .phase.now .ph-n { border-color: var(--acc); color: var(--acc); box-shadow: 0 0 0 4px rgba(121,255,119,0.12); }
+  .ph-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .ph-head h3 { font-size: 18px; }
+  .status { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line2); color: var(--mute); }
+  .phase.done .status { color: #06110a; background: var(--acc); border-color: transparent; }
+  .phase.now .status { color: var(--acc); border-color: rgba(121,255,119,0.45); background: rgba(121,255,119,0.08); }
+  .phase p { color: var(--mute); font-size: 14.5px; margin-top: 6px; max-width: 680px; }
+  .phase ul { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .phase li { font-size: 12.5px; color: var(--mute); padding: 4px 9px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); }
+  .phase.done li { color: var(--ink); }
+  .phase.done li::before { content: "✓ "; color: var(--acc); }
+  .dod { margin-top: 10px; font-size: 13px; color: var(--dim); }
+  .dod b { color: var(--mute); font-weight: 600; }
+
+  /* open by design */
+  .pillars { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  .pillar { padding: 20px; }
+  .pillar h3 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .pillar h3::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--acc); }
+  .pillar p { color: var(--mute); font-size: 14px; margin-top: 8px; }
+
+  /* faq */
+  details { border-top: 1px solid var(--line); padding: 16px 0; }
+  details:last-child { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; font-weight: 600; font-size: 16px; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--acc); font-family: var(--head); font-size: 20px; }
+  details[open] summary::after { content: "–"; }
+  details p { color: var(--mute); font-size: 14.5px; margin-top: 10px; max-width: 720px; }
+
+  /* cta + footer */
+  .final { text-align: center; padding: 72px 0; }
+  .final h2 { font-size: clamp(30px, 5vw, 48px); }
+  .final p { color: var(--mute); margin: 14px auto 0; max-width: 520px; }
+  .final .ctas { justify-content: center; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; font-size: 13px; color: var(--dim); }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
+  footer a:hover { color: var(--ink); }
+  footer .spacer { flex: 1; }
+
+  @media (max-width: 519px) {
+    nav .btn:not(.acc) { display: none; }
+    nav .wrap { gap: 12px; }
+  }
+  .curvecard .top .mono { white-space: nowrap; margin-left: 10px; }
+  @media (min-width: 720px) {
+    nav .links { display: flex; }
+    .stats { grid-template-columns: repeat(4, 1fr); }
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .pillars { grid-template-columns: repeat(2, 1fr); }
+    .token { grid-template-columns: 1.1fr 1fr; align-items: start; }
+  }
+  @media (min-width: 960px) {
+    .hero { padding: 96px 0 72px; }
+    .hero .wrap { grid-template-columns: 1.05fr 0.95fr; align-items: center; }
+    .grid { grid-template-columns: repeat(4, 1fr); }
+    .pillars { grid-template-columns: repeat(4, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { .dot, .eyebrow i { animation: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="OpenPump">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0b120d"/><path d="M14 46V18h14a9 9 0 0 1 0 18h-7v10z" fill="#79ff77"/><circle cx="46" cy="40" r="6" fill="#79ff77"/></svg>
+      OpenPump
+    </a>
+    <div class="links">
+      <a href="#what">What it is</a>
+      <a href="#token">$OPENPUMP</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#open">Open by design</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="spacer"></div>
+    <a class="btn sm" href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">GitHub</a>
+    <a class="btn sm acc" href="https://peoplespad.vercel.app" target="_blank" rel="noopener">Devnet playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow"><i></i> Open-source launchpad on Solana</span>
+      <h1>pump.fun,<br/><span>open</span> and better.</h1>
+      <p class="lead">The whole stack, rebuilt from scratch and published: bonding curve, AMM, fee engine, market-making vault. Same mechanics traders already know, with the keys in a multisig and the fees flowing back to the people who use it.</p>
+      <div class="ctas">
+        <a class="btn acc" href="#roadmap">Read the roadmap</a>
+        <a class="btn" href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">View the code</a>
+      </div>
+      <div class="chips">
+        <span class="chip"><b>4</b> programs</span>
+        <span class="chip"><b>104</b> instructions</span>
+        <span class="chip"><b>54</b> integration tests</span>
+        <span class="chip"><b>0</b> lines copied</span>
+        <span class="chip">pre-mainnet</span>
+      </div>
+    </div>
+
+    <div class="card curvecard" aria-label="How a coin moves through OpenPump">
+      <div class="top"><span><b>Bonding curve</b> → graduation → <b>OpenSwap AMM</b></span><span class="mono">85 SOL</span></div>
+      <svg viewBox="0 0 520 260" role="img" aria-label="Price curve rising along the bonding curve, graduating into the AMM at 85 SOL">
+        <defs>
+          <linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#79ff77" stop-opacity=".28"/><stop offset="1" stop-color="#79ff77" stop-opacity="0"/></linearGradient>
+          <linearGradient id="g2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffd166" stop-opacity=".22"/><stop offset="1" stop-color="#ffd166" stop-opacity="0"/></linearGradient>
+        </defs>
+        <g stroke="rgba(255,255,255,0.06)" stroke-width="1">
+          <line x1="0" y1="60" x2="520" y2="60"/><line x1="0" y1="120" x2="520" y2="120"/><line x1="0" y1="180" x2="520" y2="180"/>
+        </g>
+        <path d="M20 230 C 120 226, 220 200, 330 110 L330 240 L20 240 Z" fill="url(#g)"/>
+        <path d="M330 110 C 370 90, 400 120, 430 95 C 460 72, 480 80, 500 60 L500 240 L330 240 Z" fill="url(#g2)"/>
+        <path id="curve" d="M20 230 C 120 226, 220 200, 330 110 C 370 90, 400 120, 430 95 C 460 72, 480 80, 500 60" fill="none" stroke="#79ff77" stroke-width="3" stroke-linecap="round"/>
+        <line x1="330" y1="40" x2="330" y2="240" stroke="rgba(255,209,102,0.5)" stroke-dasharray="4 5"/>
+        <rect x="262" y="26" width="136" height="24" rx="12" fill="rgba(255,209,102,0.12)" stroke="rgba(255,209,102,0.4)"/>
+        <text x="330" y="42" text-anchor="middle" font-family="Inter, system-ui" font-size="11.5" font-weight="600" fill="#ffd166">graduation · LP burned</text>
+        <text x="30" y="214" font-family="Inter, system-ui" font-size="11" fill="rgba(236,242,237,0.5)">30 SOL virtual reserves</text>
+        <text x="496" y="52" text-anchor="end" font-family="Inter, system-ui" font-size="11" fill="rgba(236,242,237,0.5)">constant product</text>
+        <circle class="dot" r="6" fill="#79ff77" style="offset-path: path('M20 230 C 120 226, 220 200, 330 110 C 370 90, 400 120, 430 95 C 460 72, 480 80, 500 60')"><animate attributeName="opacity" values="1;1" dur="1s"/></circle>
+      </svg>
+      <div class="legend">
+        <span><i style="background:#79ff77"></i>curve: 0.5 % protocol + 0.5 % creator</span>
+        <span><i style="background:#ffd166"></i>AMM: 0.20 % LP · 0.05 % protocol · 0.05 % creator</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="what">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">What it is</div>
+      <h2>Four programs. Everything pump.fun does, in the open.</h2>
+      <p>Written clean-room from the public behaviour of pump.fun and PumpSwap. Same IDs on every cluster, public IDLs, a typed SDK, an indexer anyone can run.</p>
+    </div>
+    <div class="grid">
+      <div class="card feat">
+        <div class="ic">BC</div>
+        <h3>Bonding curve</h3>
+        <p>Create, buy, sell, graduate. Creator fees from trade #1, anti-snipe window, custom pairs, holder rewards, Token-2022 launches, mayhem launches.</p>
+        <div class="id mono">AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB</div>
+      </div>
+      <div class="card feat">
+        <div class="ic">AMM</div>
+        <h3>OpenSwap</h3>
+        <p>Constant-product pools with burned LP at graduation, exact-quote-in buys, multi-hop swaps, buyback share, boost buy-and-burn, kill switch.</p>
+        <div class="id mono">BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb</div>
+      </div>
+      <div class="card feat">
+        <div class="ic">FEE</div>
+        <h3>Fee engine</h3>
+        <p>Fee tiers by market cap, creator fee sharing, social fees for an X handle, charity launches, buyback vaults, community takeovers.</p>
+        <div class="id mono">goxedqtEDBUXsuMxYDpgfivPGZuQD4ifzfcFkhVCUe5</div>
+      </div>
+      <div class="card feat">
+        <div class="ic">MM</div>
+        <h3>Mayhem vault</h3>
+        <p>A protocol market-maker that trades mayhem-mode coins inside a price band with a per-sweep cap, then burns what it holds when the window closes.</p>
+        <div class="id mono">Bh6Tz6WwwQbxEAMB2FjkrLWjAXbAxDn3t445jU1pZMAP</div>
+      </div>
+    </div>
+    <div class="taglist" aria-label="Feature list">
+      <span class="tag">Custom pairs</span><span class="tag">Holder rewards</span><span class="tag">Trade-to-earn</span><span class="tag">Fee tiers</span><span class="tag">Fee sharing</span><span class="tag">Social fees</span><span class="tag">Donations</span><span class="tag">Token-2022</span><span class="tag">Multi-hop</span><span class="tag">Mayhem mode</span><span class="tag">Boost buy-and-burn</span><span class="tag">Admin CTO</span><span class="tag">Account extension</span><span class="tag off" title="pump.fun deprecated it">Cashback</span>
+    </div>
+  </div>
+</section>
+
+<section id="token">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">The community token</div>
+      <h2>$OPENPUMP funds the build and sits inside the protocol.</h2>
+      <p>It launches first, on pump.fun itself, because that is where the audience is. Creator fees go to a public treasury that pays for mainnet deployment, audits and the rest of the roadmap.</p>
+    </div>
+    <div class="token">
+      <div class="card big">
+        <div class="t">$OPENPUMP</div>
+        <p class="mute" style="margin-top:8px">Launching on pump.fun. The contract address will be posted here and on X at launch. Anything else claiming to be $OPENPUMP is not.</p>
+        <div class="ca"><code id="ca">CA: not launched yet</code><a class="btn sm" href="#" id="xlink">Follow on X</a></div>
+        <p class="mute" style="margin-top:18px;font-size:13.5px">Treasury wallet, every outflow and the multisig signers get published in the repo before mainnet.</p>
+      </div>
+      <div class="hooks">
+        <div class="card hook"><div class="k">1</div><div><h3>Buyback share</h3><p>The curve and the AMM route a configurable share of the protocol fee into buyback vaults. The vault authority spends it on $OPENPUMP. The hook is already in the code; the parameter is set on-chain.</p></div></div>
+        <div class="card hook"><div class="k">2</div><div><h3>Quote mint</h3><p>Custom pairs let coins trade against any enabled mint. With $OPENPUMP enabled, every coin launched that way is bought and sold with $OPENPUMP.</p></div></div>
+        <div class="card hook"><div class="k">3</div><div><h3>Trade-to-earn</h3><p>30-day volume campaigns pay traders in a configured mint, across curve and AMM volume with one claim. $OPENPUMP is the natural reward.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Roadmap</div>
+      <h2>From a token on pump.fun to an open launchpad.</h2>
+      <p>Phases ship when their definition of done is met, not on a date. Progress is tracked in the repo with checkboxes and issues tagged by phase.</p>
+    </div>
+    <div class="phases">
+      <div class="phase done">
+        <div class="ph-n">0</div>
+        <div>
+          <div class="ph-head"><h3>Build</h3><span class="status">Done</span></div>
+          <p>A clean-room implementation of everything pump.fun and PumpSwap do today, tested end to end.</p>
+          <ul><li>4 programs</li><li>custom pairs</li><li>holder rewards</li><li>trade-to-earn</li><li>fee engine</li><li>Token-2022</li><li>multi-hop</li><li>mayhem</li><li>boost</li><li>SDK + indexer + web</li><li>54 tests</li></ul>
+        </div>
+      </div>
+      <div class="phase now">
+        <div class="ph-n">1</div>
+        <div>
+          <div class="ph-head"><h3>$OPENPUMP on pump.fun</h3><span class="status">Next</span></div>
+          <p>Validate that people want an open launchpad, build the community, and fund the treasury that pays for everything after.</p>
+          <ul><li>launch $OPENPUMP</li><li>public treasury</li><li>repo public + license</li><li>X and Telegram</li><li>devnet playground with faucet</li><li>bug reports → issues</li></ul>
+          <div class="dod"><b>Done when:</b> the treasury can fund the AMM deploy (~12 SOL) and 100+ people have used the playground.</div>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="ph-n">2</div>
+        <div>
+          <div class="ph-head"><h3>OpenSwap on mainnet</h3></div>
+          <p>The AMM goes live under a multisig from day one, with a verified build and a swap UI.</p>
+          <ul><li>deploy AMM (~5.6 SOL rent)</li><li>Squads multisig</li><li>solana-verify</li><li>swap + pools UI</li><li>public API</li><li>$OPENPUMP/SOL pool</li><li>first buyback</li></ul>
+          <div class="dod"><b>Done when:</b> a third party has created a pool and traded on it, and the first buyback is on-chain.</div>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="ph-n">3</div>
+        <div>
+          <div class="ph-head"><h3>First launch on OpenPump</h3></div>
+          <p>The bonding curve and fee engine on mainnet. The first coin created, traded and graduated entirely on OpenPump.</p>
+          <ul><li>deploy curve + fees</li><li>launch page</li><li>creator claims</li><li>community launch event</li><li>cranks live</li></ul>
+          <div class="dod"><b>Done when:</b> a coin launched by someone outside the team has graduated into OpenSwap.</div>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="ph-n">4</div>
+        <div>
+          <div class="ph-head"><h3>The full launchpad</h3></div>
+          <p>Every feature already in the code, switched on, with $OPENPUMP at the center.</p>
+          <ul><li>pairs quoted in $OPENPUMP</li><li>holder rewards</li><li>trade-to-earn in $OPENPUMP</li><li>fee tiers</li><li>fee sharing</li><li>social fees (X)</li><li>donations</li><li>Token-2022</li><li>coin → coin swaps</li><li>mayhem</li><li>boost</li></ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="ph-n">5</div>
+        <div>
+          <div class="ph-head"><h3>Harden and decentralize</h3></div>
+          <p>Make it safe to hold size on OpenPump.</p>
+          <ul><li>external audit</li><li>bug bounty</li><li>community signers</li><li>timelocked parameters</li><li>incident runbook</li><li>upgrade policy</li></ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="ph-n">6</div>
+        <div>
+          <div class="ph-head"><h3>Ecosystem</h3></div>
+          <p>Let other people build on it.</p>
+          <ul><li>SDK on npm</li><li>public API + streams</li><li>bots and terminals</li><li>livestream per coin</li><li>mobile</li><li>grants</li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="open">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Open by design</div>
+      <h2>Not "trust us". Verifiable.</h2>
+    </div>
+    <div class="pillars">
+      <div class="card pillar"><h3>Multisig from day one</h3><p>Upgrade authority of every program goes to a Squads multisig before mainnet. Signers are published. No single key can change the code.</p></div>
+      <div class="card pillar"><h3>Verified builds</h3><p>Reproducible builds checked with solana-verify. The hash on-chain matches the commit in the repo, and you can check it yourself.</p></div>
+      <div class="card pillar"><h3>Nothing to drain</h3><p>Protocol, creator and buyback fees leave the pool on every trade. There is no pile of fees sitting inside the contracts waiting for a sweep.</p></div>
+      <div class="card pillar"><h3>Audit before size</h3><p>Not audited yet, and we say so. An external audit and a bug bounty are Phase 5, funded by the treasury, before anyone is asked to hold size here.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">FAQ</div>
+      <h2>Straight answers.</h2>
+    </div>
+    <details open>
+      <summary>Why launch $OPENPUMP on pump.fun instead of your own curve?</summary>
+      <p>Because the audience is there, and because a launchpad that nobody has used yet should not ask people to trust its contracts with their first purchase. The token validates demand and funds the mainnet deployment; the curve goes live in Phase 3 once the AMM has been running in public.</p>
+    </details>
+    <details>
+      <summary>Is it a copy of pump.fun's code?</summary>
+      <p>No. The programs were written from pump.fun's public behaviour: IDLs, on-chain events, and the community's bytecode analysis. No code was copied; seeds, authorities, account layouts and fee math are our own. The repo keeps a feature-by-feature parity matrix so you can see exactly what matches, what differs and what we left out on purpose.</p>
+    </details>
+    <details>
+      <summary>Is it audited?</summary>
+      <p>Not yet. It has 54 integration tests and math unit tests, which is not the same thing. An external audit and a bug bounty are on the roadmap and funded by the treasury. Until then, treat every deployment as experimental.</p>
+    </details>
+    <details>
+      <summary>Who controls the programs?</summary>
+      <p>Right now, the developer wallet on devnet. Before any mainnet deployment the upgrade authority moves to a Squads multisig with published signers, and every upgrade is a verified build announced in advance.</p>
+    </details>
+    <details>
+      <summary>Where do the fees go?</summary>
+      <p>On the curve: 0.5 % to the protocol and 0.5 % to the coin's creator, from the very first trade. On the AMM: 0.20 % to liquidity providers, 0.05 % protocol, 0.05 % creator. A configurable share of the protocol fee goes to buyback vaults that buy $OPENPUMP. All of it is set on-chain and readable by anyone.</p>
+    </details>
+    <details>
+      <summary>Can I run my own frontend or indexer?</summary>
+      <p>Yes. The SDK, the indexer and the web app are in the repo. Point them at the program IDs and an RPC. That is the point.</p>
+    </details>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2>Build it with us.</h2>
+    <p>Read the code, run the devnet playground, break things and file issues. The launch of $OPENPUMP is where it starts.</p>
+    <div class="ctas">
+      <a class="btn acc" href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn" href="https://peoplespad.vercel.app" target="_blank" rel="noopener">Devnet playground</a>
+      <a class="btn" href="#" id="xlink2">X</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© OpenPump · open source, pre-mainnet, not audited</span>
+    <span class="spacer"></span>
+    <a href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/ciberneticatradingdev/openpump/blob/main/ROADMAP.md" target="_blank" rel="noopener">Roadmap</a>
+    <a href="https://github.com/ciberneticatradingdev/openpump/blob/main/docs/PARITY.md" target="_blank" rel="noopener">Parity matrix</a>
+    <a href="https://github.com/ciberneticatradingdev/openpump/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
+  </div>
+</footer>
+
+<script>
+  // Single place to flip once the token is live: set CA and the X handle here.
+  const LAUNCH = { ca: "", x: "" };
+  if (LAUNCH.ca) {
+    const el = document.getElementById("ca"); el.textContent = LAUNCH.ca; el.style.color = "#ecf2ed";
+    el.style.cursor = "pointer"; el.title = "Copy";
+    el.onclick = () => navigator.clipboard?.writeText(LAUNCH.ca).then(() => { el.textContent = "copied"; setTimeout(() => (el.textContent = LAUNCH.ca), 900); });
+  }
+  for (const id of ["xlink", "xlink2"]) { const a = document.getElementById(id); if (LAUNCH.x) { a.href = LAUNCH.x; a.target = "_blank"; a.rel = "noopener"; } else { a.textContent = a.id === "xlink" ? "X: announced at launch" : "X (soon)"; a.style.opacity = ".6"; a.onclick = (e) => e.preventDefault(); } }
+</script>
+</body>
+</html>
