@@ -138,7 +138,7 @@ describe("OpenPump — curve + amm", () => {
 
   it("creates a coin: metadata, full supply on the curve, mint authority revoked", async () => {
     await curve.methods
-      .create("People Coin", "PEOPLE", "https://example.com/people.json")
+      .create("People Coin", "PEOPLE", "https://example.com/people.json", false)
       .accounts({
         mint,
         mintAuthority,
@@ -462,7 +462,7 @@ describe("OpenPump — curve + amm", () => {
       MPL_TOKEN_METADATA
     );
     await curve.methods
-      .create("Snipe Test", "SNIPE", "https://example.com/s.json")
+      .create("Snipe Test", "SNIPE", "https://example.com/s.json", false)
       .accounts({
         mint: mint2.publicKey,
         mintAuthority,
@@ -546,7 +546,7 @@ describe("OpenPump — curve + amm", () => {
 
     it("create_v2 launches a coin paired with the quote mint", async () => {
       await curve.methods
-        .createV2("Quote Coin", "QC", "https://example.com/qc.json")
+        .createV2("Quote Coin", "QC", "https://example.com/qc.json", false)
         .accounts({
           mint: mint2.publicKey, mintAuthority, bondingCurve: bc2, associatedBondingCurve: abc2, quoteMint, quoteConfig: qcfg(), bondingCurveQuote: bcQuote,
           global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta2, user: creator.publicKey, systemProgram: SystemProgram.programId,
@@ -642,6 +642,117 @@ describe("OpenPump — curve + amm", () => {
         .signers([trader])
         .rpc();
       assert.isAbove(Number(await tokenBal(getAssociatedTokenAddressSync(quoteMint, pool2, true))), Number(poolQuoteBal));
+    });
+  });
+
+  // ------------------------------------------------------------------ holder rewards
+  describe("holder rewards", () => {
+    const mintH = Keypair.generate();
+    const holderA = Keypair.generate();
+    const holderB = Keypair.generate();
+    let bcH: PublicKey, holderPda: PublicKey, holderVault: PublicKey;
+
+    before(async () => {
+      [bcH] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), mintH.publicKey.toBuffer()], curve.programId);
+      [holderPda] = PublicKey.findProgramAddressSync([Buffer.from("holder-rewards"), mintH.publicKey.toBuffer()], curve.programId);
+      [holderVault] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), holderPda.toBuffer()], curve.programId);
+      await Promise.all([airdrop(holderA.publicKey, 5), airdrop(holderB.publicKey, 5)]);
+    });
+
+    const accts = (user: PublicKey) => ({
+      ...tradeAccounts(user),
+      mint: mintH.publicKey,
+      bondingCurve: bcH,
+      associatedBondingCurve: getAssociatedTokenAddressSync(mintH.publicKey, bcH, true),
+      associatedUser: getAssociatedTokenAddressSync(mintH.publicKey, user),
+      creatorVault: holderVault,
+    });
+
+    it("a holder-reward coin's creator is the holder-rewards PDA and fees accrue in its vault", async () => {
+      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), mintH.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      await curve.methods
+        .create("Holders Coin", "HODL", "https://example.com/h.json", true)
+        .accounts({
+          mint: mintH.publicKey, mintAuthority, bondingCurve: bcH, associatedBondingCurve: getAssociatedTokenAddressSync(mintH.publicKey, bcH, true), global,
+          mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY,
+        })
+        .signers([creator, mintH])
+        .rpc();
+      const bc = await curve.account.bondingCurve.fetch(bcH);
+      assert.isTrue(bc.isHolderReward);
+      assert.equal(bc.creator.toBase58(), holderPda.toBase58());
+      for (const h of [holderA, holderB]) {
+        await curve.methods.buyExactSolIn(new BN(2 * LAMPORTS_PER_SOL), new BN(0)).accounts(accts(h.publicKey)).signers([h]).rpc();
+      }
+      const vault = await lamports(holderVault);
+      assert.equal(vault, 2 * 2 * LAMPORTS_PER_SOL * 0.005, "0.5 % of 4 SOL in the holder vault");
+    });
+
+    it("only the configured authority can distribute", async () => {
+      try {
+        await curve.methods
+          .distributeFeeToHolders([new BN(1000)])
+          .accounts({ global, holderRewardAuthority: trader.publicKey, mint: mintH.publicKey, bondingCurve: bcH, holderRewards: holderPda, creatorVault: holderVault, systemProgram: SystemProgram.programId })
+          .remainingAccounts([{ pubkey: holderA.publicKey, isSigner: false, isWritable: true }])
+          .signers([trader])
+          .rpc();
+        assert.fail("should reject");
+      } catch (e) {
+        assert.include(String(e), "Unauthorized");
+      }
+    });
+
+    it("authority pays holders pro-rata from the vault; rent floor stays", async () => {
+      const vault = await lamports(holderVault);
+      const rentMin = await conn.getMinimumBalanceForRentExemption(0);
+      const available = vault - rentMin;
+      const a = Math.floor(available * 0.6), b = available - a;
+      const beforeA = await lamports(holderA.publicKey), beforeB = await lamports(holderB.publicKey);
+      await curve.methods
+        .distributeFeeToHolders([new BN(a), new BN(b)])
+        .accounts({ global, holderRewardAuthority: admin.publicKey, mint: mintH.publicKey, bondingCurve: bcH, holderRewards: holderPda, creatorVault: holderVault, systemProgram: SystemProgram.programId })
+        .remainingAccounts([
+          { pubkey: holderA.publicKey, isSigner: false, isWritable: true },
+          { pubkey: holderB.publicKey, isSigner: false, isWritable: true },
+        ])
+        .rpc();
+      assert.equal((await lamports(holderA.publicKey)) - beforeA, a);
+      assert.equal((await lamports(holderB.publicKey)) - beforeB, b);
+      assert.equal(await lamports(holderVault), rentMin);
+      try {
+        await curve.methods
+          .distributeFeeToHolders([new BN(1)])
+          .accounts({ global, holderRewardAuthority: admin.publicKey, mint: mintH.publicKey, bondingCurve: bcH, holderRewards: holderPda, creatorVault: holderVault, systemProgram: SystemProgram.programId })
+          .remainingAccounts([{ pubkey: holderA.publicKey, isSigner: false, isWritable: true }])
+          .rpc();
+        assert.fail("cannot dip below rent");
+      } catch (e) {
+        assert.ok(String(e).length > 0);
+      }
+    });
+
+    it("a normal coin rejects holder distribution", async () => {
+      try {
+        const [hp] = PublicKey.findProgramAddressSync([Buffer.from("holder-rewards"), mint.toBuffer()], curve.programId);
+        const [hv] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), hp.toBuffer()], curve.programId);
+        await curve.methods
+          .distributeFeeToHolders([new BN(1)])
+          .accounts({ global, holderRewardAuthority: admin.publicKey, mint, bondingCurve, holderRewards: hp, creatorVault: hv, systemProgram: SystemProgram.programId })
+          .remainingAccounts([{ pubkey: holderA.publicKey, isSigner: false, isWritable: true }])
+          .rpc();
+        assert.fail("should reject");
+      } catch (e) {
+        assert.include(String(e), "NotHolderRewardCoin");
+      }
+    });
+
+    it("admin can rotate the distribution authority", async () => {
+      const newAuth = Keypair.generate();
+      await curve.methods.updateHolderRewardConfig(true, newAuth.publicKey).accounts({ authority: admin.publicKey, global }).rpc();
+      const g = await curve.account.global.fetch(global);
+      assert.equal(g.holderRewardAuthority.toBase58(), newAuth.publicKey.toBase58());
+      await curve.methods.updateHolderRewardConfig(true, admin.publicKey).accounts({ authority: admin.publicKey, global }).rpc();
     });
   });
 });

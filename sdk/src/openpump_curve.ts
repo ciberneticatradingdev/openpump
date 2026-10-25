@@ -2317,6 +2317,10 @@ export type OpenpumpCurve = {
         {
           "name": "uri",
           "type": "string"
+        },
+        {
+          "name": "isHolderReward",
+          "type": "bool"
         }
       ]
     },
@@ -2667,6 +2671,446 @@ export type OpenpumpCurve = {
         {
           "name": "uri",
           "type": "string"
+        },
+        {
+          "name": "isHolderReward",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "distributeFeeToHolders",
+      "discriminator": [
+        98,
+        54,
+        145,
+        97,
+        2,
+        70,
+        173,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "global",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "holderRewardAuthority",
+          "docs": [
+            "The configured distribution authority (signs and pays tx fees)."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "bondingCurve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holderRewards",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  101,
+                  114,
+                  45,
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creatorVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "holderRewards"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amounts",
+          "type": {
+            "vec": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "distributeFeeToHoldersV2",
+      "discriminator": [
+        82,
+        218,
+        15,
+        94,
+        44,
+        110,
+        7,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "global",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "holderRewardAuthority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "authority",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "bondingCurve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holderRewards",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  101,
+                  114,
+                  45,
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creatorVault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "holderRewards"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creatorVaultQuote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "creatorVault"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "quoteMint",
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "quoteTokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amounts",
+          "type": {
+            "vec": "u64"
+          }
         }
       ]
     },
@@ -4577,6 +5021,89 @@ export type OpenpumpCurve = {
           "type": "pubkey"
         }
       ]
+    },
+    {
+      "name": "updateHolderRewardConfig",
+      "discriminator": [
+        225,
+        252,
+        66,
+        4,
+        199,
+        35,
+        236,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "authority",
+          "type": "pubkey"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -4658,6 +5185,32 @@ export type OpenpumpCurve = {
         235,
         99,
         118
+      ]
+    },
+    {
+      "name": "distributeFeeToHoldersEvent",
+      "discriminator": [
+        227,
+        190,
+        215,
+        206,
+        176,
+        180,
+        165,
+        132
+      ]
+    },
+    {
+      "name": "holderRewardConfigEvent",
+      "discriminator": [
+        144,
+        22,
+        14,
+        77,
+        229,
+        169,
+        2,
+        235
       ]
     },
     {
@@ -4793,6 +5346,21 @@ export type OpenpumpCurve = {
       "code": 6015,
       "name": "wrongQuoteMint",
       "msg": "Wrong quote mint for this bonding curve"
+    },
+    {
+      "code": 6016,
+      "name": "holderRewardDisabled",
+      "msg": "Holder-reward coins are disabled"
+    },
+    {
+      "code": 6017,
+      "name": "notHolderRewardCoin",
+      "msg": "This coin does not route rewards to holders"
+    },
+    {
+      "code": 6018,
+      "name": "holderRecipientsMismatch",
+      "msg": "Amounts and recipient accounts do not match"
     }
   ],
   "types": [
@@ -4859,6 +5427,13 @@ export type OpenpumpCurve = {
               "Pubkey::default() = native SOL curve; otherwise the SPL/Token-2022 quote mint (v2 family)."
             ],
             "type": "pubkey"
+          },
+          {
+            "name": "isHolderReward",
+            "docs": [
+              "If set, `creator` is the [\"holder-rewards\", mint] PDA and the creator fee is paid out to holders."
+            ],
+            "type": "bool"
           }
         ]
       }
@@ -4967,6 +5542,38 @@ export type OpenpumpCurve = {
           {
             "name": "quoteMint",
             "type": "pubkey"
+          },
+          {
+            "name": "isHolderReward",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "distributeFeeToHoldersEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipients",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -5031,6 +5638,17 @@ export type OpenpumpCurve = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "holderRewardEnabled",
+            "docs": [
+              "Holder rewards: coins may route the creator fee to holders (distributed by this authority)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "holderRewardAuthority",
+            "type": "pubkey"
           }
         ]
       }
@@ -5098,6 +5716,26 @@ export type OpenpumpCurve = {
           {
             "name": "paused",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "holderRewardConfigEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

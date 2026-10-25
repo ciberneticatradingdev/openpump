@@ -28,6 +28,8 @@ pub mod math;
 use math::*;
 pub mod quote;
 use quote::*;
+pub mod holders;
+use holders::*;
 
 declare_id!("AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB");
 
@@ -75,6 +77,8 @@ pub mod openpump_curve {
         g.authority = ctx.accounts.authority.key();
         g.amm_program = openpump_amm::ID;
         g.bump = ctx.bumps.global;
+        g.holder_reward_enabled = true;
+        g.holder_reward_authority = ctx.accounts.authority.key();
         g.apply(&params);
         emit_cpi!(SetParamsEvent { authority: g.authority, params, timestamp: Clock::get()?.unix_timestamp });
         Ok(())
@@ -95,9 +99,10 @@ pub mod openpump_curve {
 
     /// Launch a coin: new mint (6 decimals), Metaplex metadata, full supply into the curve,
     /// mint authority revoked. Anyone can call; `user` becomes the creator.
-    pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -> Result<()> {
+    pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String, is_holder_reward: bool) -> Result<()> {
         let g = &ctx.accounts.global;
         require!(!g.paused, CurveError::Paused);
+        require!(!is_holder_reward || g.holder_reward_enabled, CurveError::HolderRewardDisabled);
         require!(name.len() <= 32 && symbol.len() <= 10 && uri.len() <= 200, CurveError::MetadataTooLong);
 
         let mint_auth_seeds: &[&[u8]] = &[MINT_AUTHORITY_SEED, &[ctx.bumps.mint_authority]];
@@ -148,7 +153,8 @@ pub mod openpump_curve {
         let clock = Clock::get()?;
         let bc = &mut ctx.accounts.bonding_curve;
         bc.mint = ctx.accounts.mint.key();
-        bc.creator = ctx.accounts.user.key();
+        bc.creator = if is_holder_reward { holder_rewards_pda(&bc.mint) } else { ctx.accounts.user.key() };
+        bc.is_holder_reward = is_holder_reward;
         bc.virtual_token_reserves = g.initial_virtual_token_reserves;
         bc.virtual_sol_reserves = g.initial_virtual_sol_reserves;
         bc.real_token_reserves = g.initial_real_token_reserves;
@@ -175,6 +181,7 @@ pub mod openpump_curve {
             token_total_supply: bc.token_total_supply,
             timestamp: clock.unix_timestamp,
             quote_mint: bc.quote_mint,
+            is_holder_reward: bc.is_holder_reward,
         });
         Ok(())
     }
@@ -413,13 +420,25 @@ pub mod openpump_curve {
         Ok(())
     }
 
+    // ----- holder rewards (see holders.rs)
+
+    pub fn update_holder_reward_config(ctx: Context<AuthorityOnly>, enabled: bool, authority: Pubkey) -> Result<()> {
+        holders::update_holder_reward_config(ctx, enabled, authority)
+    }
+    pub fn distribute_fee_to_holders<'info>(ctx: Context<'_, '_, 'info, 'info, DistributeFeeToHolders<'info>>, amounts: Vec<u64>) -> Result<()> {
+        holders::distribute_fee_to_holders(ctx, amounts)
+    }
+    pub fn distribute_fee_to_holders_v2<'info>(ctx: Context<'_, '_, 'info, 'info, DistributeFeeToHoldersV2<'info>>, amounts: Vec<u64>) -> Result<()> {
+        holders::distribute_fee_to_holders_v2(ctx, amounts)
+    }
+
     // ----- custom pairs (v2 family, see quote.rs)
 
     pub fn set_quote_config(ctx: Context<SetQuoteConfig>, params: QuoteParams) -> Result<()> {
         quote::set_quote_config(ctx, params)
     }
-    pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String) -> Result<()> {
-        quote::create_v2(ctx, name, symbol, uri)
+    pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String, is_holder_reward: bool) -> Result<()> {
+        quote::create_v2(ctx, name, symbol, uri, is_holder_reward)
     }
     pub fn buy_v2(ctx: Context<TradeV2>, amount: u64, max_quote_cost: u64) -> Result<()> {
         quote::buy_v2(ctx, amount, max_quote_cost)
@@ -739,6 +758,9 @@ pub struct Global {
     pub anti_snipe_max_bps: u64,
     pub paused: bool,
     pub bump: u8,
+    /// Holder rewards: coins may route the creator fee to holders (distributed by this authority).
+    pub holder_reward_enabled: bool,
+    pub holder_reward_authority: Pubkey,
 }
 
 impl Global {
@@ -775,6 +797,8 @@ pub struct BondingCurve {
     pub bump: u8,
     /// Pubkey::default() = native SOL curve; otherwise the SPL/Token-2022 quote mint (v2 family).
     pub quote_mint: Pubkey,
+    /// If set, `creator` is the ["holder-rewards", mint] PDA and the creator fee is paid out to holders.
+    pub is_holder_reward: bool,
 }
 
 // ---------------------------------------------------------------- events
@@ -801,6 +825,7 @@ pub struct CreateEvent {
     pub token_total_supply: u64,
     pub timestamp: i64,
     pub quote_mint: Pubkey,
+    pub is_holder_reward: bool,
 }
 
 #[event]
@@ -887,4 +912,10 @@ pub enum CurveError {
     QuoteMintDisabled,
     #[msg("Wrong quote mint for this bonding curve")]
     WrongQuoteMint,
+    #[msg("Holder-reward coins are disabled")]
+    HolderRewardDisabled,
+    #[msg("This coin does not route rewards to holders")]
+    NotHolderRewardCoin,
+    #[msg("Amounts and recipient accounts do not match")]
+    HolderRecipientsMismatch,
 }

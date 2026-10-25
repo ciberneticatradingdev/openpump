@@ -2311,6 +2311,10 @@
         {
           "name": "uri",
           "type": "string"
+        },
+        {
+          "name": "is_holder_reward",
+          "type": "bool"
         }
       ]
     },
@@ -2661,6 +2665,446 @@
         {
           "name": "uri",
           "type": "string"
+        },
+        {
+          "name": "is_holder_reward",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "distribute_fee_to_holders",
+      "discriminator": [
+        98,
+        54,
+        145,
+        97,
+        2,
+        70,
+        173,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "global",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_reward_authority",
+          "docs": [
+            "The configured distribution authority (signs and pays tx fees)."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "bonding_curve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_rewards",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  101,
+                  114,
+                  45,
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "holder_rewards"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amounts",
+          "type": {
+            "vec": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "distribute_fee_to_holders_v2",
+      "discriminator": [
+        82,
+        218,
+        15,
+        94,
+        44,
+        110,
+        7,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "global",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_reward_authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "authority",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "bonding_curve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_rewards",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  101,
+                  114,
+                  45,
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "holder_rewards"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_vault_quote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "creator_vault"
+              },
+              {
+                "kind": "account",
+                "path": "quote_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "quote_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "quote_mint",
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "quote_token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amounts",
+          "type": {
+            "vec": "u64"
+          }
         }
       ]
     },
@@ -4571,6 +5015,89 @@
           "type": "pubkey"
         }
       ]
+    },
+    {
+      "name": "update_holder_reward_config",
+      "discriminator": [
+        225,
+        252,
+        66,
+        4,
+        199,
+        35,
+        236,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "authority",
+          "type": "pubkey"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -4652,6 +5179,32 @@
         235,
         99,
         118
+      ]
+    },
+    {
+      "name": "DistributeFeeToHoldersEvent",
+      "discriminator": [
+        227,
+        190,
+        215,
+        206,
+        176,
+        180,
+        165,
+        132
+      ]
+    },
+    {
+      "name": "HolderRewardConfigEvent",
+      "discriminator": [
+        144,
+        22,
+        14,
+        77,
+        229,
+        169,
+        2,
+        235
       ]
     },
     {
@@ -4787,6 +5340,21 @@
       "code": 6015,
       "name": "WrongQuoteMint",
       "msg": "Wrong quote mint for this bonding curve"
+    },
+    {
+      "code": 6016,
+      "name": "HolderRewardDisabled",
+      "msg": "Holder-reward coins are disabled"
+    },
+    {
+      "code": 6017,
+      "name": "NotHolderRewardCoin",
+      "msg": "This coin does not route rewards to holders"
+    },
+    {
+      "code": 6018,
+      "name": "HolderRecipientsMismatch",
+      "msg": "Amounts and recipient accounts do not match"
     }
   ],
   "types": [
@@ -4853,6 +5421,13 @@
               "Pubkey::default() = native SOL curve; otherwise the SPL/Token-2022 quote mint (v2 family)."
             ],
             "type": "pubkey"
+          },
+          {
+            "name": "is_holder_reward",
+            "docs": [
+              "If set, `creator` is the [\"holder-rewards\", mint] PDA and the creator fee is paid out to holders."
+            ],
+            "type": "bool"
           }
         ]
       }
@@ -4961,6 +5536,38 @@
           {
             "name": "quote_mint",
             "type": "pubkey"
+          },
+          {
+            "name": "is_holder_reward",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DistributeFeeToHoldersEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipients",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -5025,6 +5632,17 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "holder_reward_enabled",
+            "docs": [
+              "Holder rewards: coins may route the creator fee to holders (distributed by this authority)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "holder_reward_authority",
+            "type": "pubkey"
           }
         ]
       }
@@ -5092,6 +5710,26 @@
           {
             "name": "paused",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HolderRewardConfigEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

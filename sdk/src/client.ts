@@ -202,9 +202,9 @@ export class OpenpumpClient {
 
   // ------------------------------------------------------------- curve instructions
 
-  async createIx(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string) {
+  async createIx(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false) {
     return this.curve.methods
-      .create(name, symbol, uri)
+      .create(name, symbol, uri, isHolderReward)
       .accounts({
         mint,
         mintAuthority: pda.mintAuthority(),
@@ -391,9 +391,9 @@ export class OpenpumpClient {
     return this.curve.methods.setQuoteConfig(p).accounts({ authority, global: pda.global(), quoteMint, quoteConfig: pda.quoteConfig(quoteMint), systemProgram: SystemProgram.programId } as any).instruction();
   }
 
-  async createV2Ix(user: PublicKey, mint: PublicKey, quoteMint: PublicKey, name: string, symbol: string, uri: string, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+  async createV2Ix(user: PublicKey, mint: PublicKey, quoteMint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, quoteTokenProgram = TOKEN_PROGRAM_ID) {
     return this.curve.methods
-      .createV2(name, symbol, uri)
+      .createV2(name, symbol, uri, isHolderReward)
       .accounts({
         mint,
         mintAuthority: pda.mintAuthority(),
@@ -496,6 +496,43 @@ export class OpenpumpClient {
       } as any)
       .instruction();
     return [ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }), ix];
+  }
+
+  // ------------------------------------------------------------- holder rewards
+
+  /** Undistributed holder rewards (lamports above rent for SOL curves; quote units for pairs). */
+  async holderPot(mint: PublicKey, quoteMint: PublicKey = WSOL_MINT) {
+    if (quoteMint.equals(WSOL_MINT)) {
+      const [bal, rent] = await Promise.all([this.connection.getBalance(pda.holderVault(mint), "confirmed"), this.connection.getMinimumBalanceForRentExemption(0)]);
+      return BigInt(Math.max(0, bal - rent));
+    }
+    const info = await this.connection.getAccountInfo(pda.creatorVaultQuote(pda.holderRewards(mint), quoteMint), "confirmed");
+    return info ? info.data.readBigUInt64LE(64) : 0n;
+  }
+
+  /** Authority-only: pay `amounts[i]` to `recipients[i]` from the coin's holder vault. */
+  async distributeToHoldersIx(authority: PublicKey, mint: PublicKey, recipients: PublicKey[], amounts: bigint[], quoteMint: PublicKey = WSOL_MINT, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+    const holderRewards = pda.holderRewards(mint);
+    if (quoteMint.equals(WSOL_MINT)) {
+      return this.curve.methods
+        .distributeFeeToHolders(amounts.map(bn))
+        .accounts({ global: pda.global(), holderRewardAuthority: authority, mint, bondingCurve: pda.bondingCurve(mint), holderRewards, creatorVault: pda.creatorVault(holderRewards), systemProgram: SystemProgram.programId } as any)
+        .remainingAccounts(recipients.map((r) => ({ pubkey: r, isSigner: false, isWritable: true })))
+        .instruction();
+    }
+    const remaining = recipients.flatMap((r) => [
+      { pubkey: r, isSigner: false, isWritable: false },
+      { pubkey: getAssociatedTokenAddressSync(quoteMint, r, true, quoteTokenProgram), isSigner: false, isWritable: true },
+    ]);
+    return this.curve.methods
+      .distributeFeeToHoldersV2(amounts.map(bn))
+      .accounts({
+        global: pda.global(), holderRewardAuthority: authority, authority, mint, bondingCurve: pda.bondingCurve(mint), holderRewards,
+        creatorVault: pda.creatorVault(holderRewards), creatorVaultQuote: pda.creatorVaultQuote(holderRewards, quoteMint, quoteTokenProgram), quoteMint,
+        quoteTokenProgram, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+      } as any)
+      .remainingAccounts(remaining)
+      .instruction();
   }
 
   // ------------------------------------------------------------- admin

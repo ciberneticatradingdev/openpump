@@ -18,6 +18,9 @@ export const pda = {
       MPL_TOKEN_METADATA_PROGRAM_ID
     )[0],
   associatedBondingCurve: (mint: PublicKey) => getAssociatedTokenAddressSync(mint, pda.bondingCurve(mint), true),
+  /** Holder rewards: the "creator" of a holder-reward coin, and the vault its fees accrue in. */
+  holderRewards: (mint: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("holder-rewards"), mint.toBuffer()], CURVE_PROGRAM_ID)[0],
+  holderVault: (mint: PublicKey) => pda.creatorVault(pda.holderRewards(mint)),
   /** v2 (custom pairs) */
   quoteConfig: (quoteMint: PublicKey) =>
     PublicKey.findProgramAddressSync([Buffer.from("quote-config"), quoteMint.toBuffer()], CURVE_PROGRAM_ID)[0],

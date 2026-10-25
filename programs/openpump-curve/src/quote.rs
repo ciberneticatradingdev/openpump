@@ -65,9 +65,10 @@ pub fn set_quote_config(ctx: Context<SetQuoteConfig>, params: QuoteParams) -> Re
     Ok(())
 }
 
-pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String) -> Result<()> {
+pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String, is_holder_reward: bool) -> Result<()> {
     let g = &ctx.accounts.global;
     require!(!g.paused, CurveError::Paused);
+    require!(!is_holder_reward || g.holder_reward_enabled, CurveError::HolderRewardDisabled);
     require!(ctx.accounts.quote_config.enabled, CurveError::QuoteMintDisabled);
     require!(name.len() <= 32 && symbol.len() <= 10 && uri.len() <= 200, CurveError::MetadataTooLong);
 
@@ -114,7 +115,8 @@ pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: Stri
     let clock = Clock::get()?;
     let bc = &mut ctx.accounts.bonding_curve;
     bc.mint = ctx.accounts.mint.key();
-    bc.creator = ctx.accounts.user.key();
+    bc.creator = if is_holder_reward { holder_rewards_pda(&bc.mint) } else { ctx.accounts.user.key() };
+    bc.is_holder_reward = is_holder_reward;
     bc.virtual_token_reserves = q.initial_virtual_token_reserves;
     bc.virtual_sol_reserves = q.initial_virtual_quote_reserves;
     bc.real_token_reserves = q.initial_real_token_reserves;
@@ -140,6 +142,7 @@ pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: Stri
         token_total_supply: bc.token_total_supply,
         timestamp: clock.unix_timestamp,
         quote_mint: bc.quote_mint,
+        is_holder_reward: bc.is_holder_reward,
     });
     Ok(())
 }
