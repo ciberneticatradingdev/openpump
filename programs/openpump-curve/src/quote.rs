@@ -65,7 +65,7 @@ pub fn set_quote_config(ctx: Context<SetQuoteConfig>, params: QuoteParams) -> Re
     Ok(())
 }
 
-pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String, is_holder_reward: bool) -> Result<()> {
+pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey) -> Result<()> {
     let g = &ctx.accounts.global;
     require!(!g.paused, CurveError::Paused);
     require!(!is_holder_reward || g.holder_reward_enabled, CurveError::HolderRewardDisabled);
@@ -115,7 +115,7 @@ pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: Stri
     let clock = Clock::get()?;
     let bc = &mut ctx.accounts.bonding_curve;
     bc.mint = ctx.accounts.mint.key();
-    bc.creator = if is_holder_reward { holder_rewards_pda(&bc.mint) } else { ctx.accounts.user.key() };
+    bc.creator = if is_holder_reward { holder_rewards_pda(&bc.mint) } else if creator == Pubkey::default() { ctx.accounts.user.key() } else { creator };
     bc.is_holder_reward = is_holder_reward;
     bc.virtual_token_reserves = q.initial_virtual_token_reserves;
     bc.virtual_sol_reserves = q.initial_virtual_quote_reserves;
@@ -166,7 +166,8 @@ pub fn buy_exact_quote_in(ctx: Context<TradeV2>, quote_in: u64, min_tokens_out: 
         spend = sol_in_for_tokens_out(tokens_out, bc.virtual_sol_reserves, bc.virtual_token_reserves)?;
     }
     require!(tokens_out >= min_tokens_out, CurveError::ExceededSlippage);
-    let fees = fee_ceil(spend, g.fee_basis_points)?.checked_add(fee_ceil(spend, g.creator_fee_basis_points)?).ok_or(CurveError::MathOverflow)?;
+    let (p_bps, c_bps) = trade_fee_bps(g, &ctx.accounts.fee_config, bc);
+    let fees = fee_ceil(spend, p_bps)?.checked_add(fee_ceil(spend, c_bps)?).ok_or(CurveError::MathOverflow)?;
     execute_buy_v2(ctx, tokens_out, spend, spend.checked_add(fees).ok_or(CurveError::MathOverflow)?)
 }
 
@@ -182,8 +183,9 @@ fn execute_buy_v2(ctx: Context<TradeV2>, tokens_out: u64, quote_in: u64, max_quo
         let cap = mul_div_floor(bc.token_total_supply, g.anti_snipe_max_bps, BPS_DENOMINATOR)?;
         require!(tokens_out <= cap, CurveError::AntiSnipeCap);
     }
-    let protocol_fee = fee_ceil(quote_in, g.fee_basis_points)?;
-    let creator_fee = fee_ceil(quote_in, g.creator_fee_basis_points)?;
+    let (p_bps, c_bps) = trade_fee_bps(g, &ctx.accounts.fee_config, bc);
+    let protocol_fee = fee_ceil(quote_in, p_bps)?;
+    let creator_fee = fee_ceil(quote_in, c_bps)?;
     let total = quote_in.checked_add(protocol_fee).and_then(|v| v.checked_add(creator_fee)).ok_or(CurveError::MathOverflow)?;
     require!(total <= max_quote_cost, CurveError::ExceededSlippage);
 
@@ -229,7 +231,7 @@ fn execute_buy_v2(ctx: Context<TradeV2>, tokens_out: u64, quote_in: u64, max_quo
         mint: bc.mint, sol_amount: quote_in, token_amount: tokens_out, is_buy: true, user: ctx.accounts.user.key(), timestamp: clock.unix_timestamp,
         virtual_sol_reserves: bc.virtual_sol_reserves, virtual_token_reserves: bc.virtual_token_reserves,
         real_sol_reserves: bc.real_sol_reserves, real_token_reserves: bc.real_token_reserves,
-        protocol_fee, creator_fee, creator: bc.creator, quote_mint: bc.quote_mint,
+        protocol_fee, creator_fee, creator: bc.creator, quote_mint: bc.quote_mint, buyback_fee: 0,
     });
     if bc.complete {
         emit_cpi!(CompleteEvent { mint: bc.mint, bonding_curve: bc.key(), user: ctx.accounts.user.key(), real_sol_reserves: bc.real_sol_reserves, timestamp: clock.unix_timestamp });
@@ -246,8 +248,9 @@ pub fn sell_v2(ctx: Context<TradeV2>, amount: u64, min_quote_output: u64) -> Res
 
     let quote_out = sol_out_for_tokens_in(amount, bc.virtual_sol_reserves, bc.virtual_token_reserves)?;
     require!(quote_out <= bc.real_sol_reserves, CurveError::InsufficientReserves);
-    let protocol_fee = fee_ceil(quote_out, g.fee_basis_points)?;
-    let creator_fee = fee_ceil(quote_out, g.creator_fee_basis_points)?;
+    let (p_bps, c_bps) = trade_fee_bps(g, &ctx.accounts.fee_config, bc);
+    let protocol_fee = fee_ceil(quote_out, p_bps)?;
+    let creator_fee = fee_ceil(quote_out, c_bps)?;
     let user_out = quote_out.checked_sub(protocol_fee).and_then(|v| v.checked_sub(creator_fee)).ok_or(CurveError::MathOverflow)?;
     require!(user_out >= min_quote_output, CurveError::ExceededSlippage);
 
@@ -288,7 +291,7 @@ pub fn sell_v2(ctx: Context<TradeV2>, amount: u64, min_quote_output: u64) -> Res
         mint: bc.mint, sol_amount: quote_out, token_amount: amount, is_buy: false, user: ctx.accounts.user.key(), timestamp: Clock::get()?.unix_timestamp,
         virtual_sol_reserves: bc.virtual_sol_reserves, virtual_token_reserves: bc.virtual_token_reserves,
         real_sol_reserves: bc.real_sol_reserves, real_token_reserves: bc.real_token_reserves,
-        protocol_fee, creator_fee, creator: bc.creator, quote_mint: bc.quote_mint,
+        protocol_fee, creator_fee, creator: bc.creator, quote_mint: bc.quote_mint, buyback_fee: 0,
     });
     Ok(())
 }
@@ -497,20 +500,27 @@ pub struct TradeV2<'info> {
     pub token_program: Program<'info, Token>,
     pub quote_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    /// Optional: the fees program's tiered schedule.
+    #[account(seeds = [openpump_fee_types::FEE_CONFIG_SEED], bump = fee_config.bump, seeds::program = openpump_fee_types::FEES_PROGRAM_ID)]
+    pub fee_config: Option<Box<Account<'info, openpump_fee_types::FeeConfig>>>,
 }
 
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CollectCreatorFeeV2<'info> {
+    /// Pays for the creator's ATA if missing.
     #[account(mut)]
-    pub creator: Signer<'info>,
+    pub payer: Signer<'info>,
+    /// CHECK: receives its own vault; permissionless.
+    #[account(mut)]
+    pub creator: UncheckedAccount<'info>,
     pub quote_mint: Box<InterfaceAccount<'info, MintI>>,
     /// CHECK: creator vault PDA.
     #[account(seeds = [CREATOR_VAULT_SEED, creator.key().as_ref()], bump)]
     pub creator_vault: UncheckedAccount<'info>,
     #[account(mut, associated_token::mint = quote_mint, associated_token::authority = creator_vault, associated_token::token_program = quote_token_program)]
     pub creator_vault_quote: Box<InterfaceAccount<'info, TokenAccountI>>,
-    #[account(init_if_needed, payer = creator, associated_token::mint = quote_mint, associated_token::authority = creator, associated_token::token_program = quote_token_program)]
+    #[account(init_if_needed, payer = payer, associated_token::mint = quote_mint, associated_token::authority = creator, associated_token::token_program = quote_token_program)]
     pub creator_quote: Box<InterfaceAccount<'info, TokenAccountI>>,
     pub quote_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,

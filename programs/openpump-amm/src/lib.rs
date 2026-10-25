@@ -19,6 +19,7 @@ use anchor_spl::token_interface::{
 
 pub mod math;
 use math::*;
+use openpump_fee_types::{ConfigStatus, FeeConfig, SharingConfig, FEES_PROGRAM_ID, FEE_CONFIG_SEED, SHARING_CONFIG_SEED};
 
 declare_id!("BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb");
 
@@ -343,7 +344,8 @@ pub mod openpump_amm {
 
         let quote_in = quote_in_for_base_out(base_amount_out, base_reserve, quote_reserve)?;
         let has_creator = ctx.accounts.pool.coin_creator != Pubkey::default();
-        let fees = compute_fees(quote_in, cfg, has_creator)?;
+        let sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
+        let fees = compute_fees(quote_in, &sched, has_creator)?;
         let total_in = quote_in
             .checked_add(fees.lp)
             .and_then(|v| v.checked_add(fees.protocol))
@@ -422,7 +424,8 @@ pub mod openpump_amm {
 
         let quote_out = quote_out_for_base_in(base_amount_in, base_reserve, quote_reserve)?;
         let has_creator = ctx.accounts.pool.coin_creator != Pubkey::default();
-        let fees = compute_fees(quote_out, cfg, has_creator)?;
+        let sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
+        let fees = compute_fees(quote_out, &sched, has_creator)?;
         let total_fees = fees
             .lp
             .checked_add(fees.protocol)
@@ -494,6 +497,64 @@ pub mod openpump_amm {
         Ok(())
     }
 
+    /// The current coin creator hands the fee stream to another address (e.g. a fees-program sharing PDA).
+    pub fn set_coin_creator(ctx: Context<SetCoinCreator>, new_coin_creator: Pubkey) -> Result<()> {
+        require!(new_coin_creator != Pubkey::default(), AmmError::ZeroAmount);
+        let pool = &mut ctx.accounts.pool;
+        let old = pool.coin_creator;
+        pool.coin_creator = new_coin_creator;
+        emit_cpi!(SetCoinCreatorEvent { pool: pool.key(), old_coin_creator: old, new_coin_creator, timestamp: Clock::get()?.unix_timestamp });
+        Ok(())
+    }
+
+    /// Permissionless: split a sharing-config coin creator's vault among its shareholders
+    /// (remaining accounts: wallets..., then their quote ATAs...).
+    pub fn distribute_coin_creator_fees<'info>(ctx: Context<'_, '_, 'info, 'info, DistributeCoinCreatorFees<'info>>, initialize_ata: bool) -> Result<()> {
+        let cfg = &ctx.accounts.sharing_config;
+        require!(cfg.status == ConfigStatus::Active, AmmError::SharingNotActive);
+        let n = cfg.shareholders.len();
+        require!(ctx.remaining_accounts.len() >= n * 2, AmmError::RecipientsMismatch);
+        let available = ctx.accounts.coin_creator_vault_ata.amount;
+        if available == 0 {
+            return Ok(());
+        }
+        let sharing_key = cfg.key();
+        let seeds: &[&[u8]] = &[CREATOR_VAULT_SEED, sharing_key.as_ref(), &[ctx.bumps.coin_creator_vault_authority]];
+        let quote_mint = ctx.accounts.quote_mint.key();
+        let tp = ctx.accounts.quote_token_program.key();
+        let dec = ctx.accounts.quote_mint.decimals;
+        let mut distributed = 0u64;
+        for (i, sh) in cfg.shareholders.iter().enumerate() {
+            let wallet = &ctx.remaining_accounts[i];
+            let ata = &ctx.remaining_accounts[n + i];
+            require_keys_eq!(wallet.key(), sh.address, AmmError::RecipientsMismatch);
+            require_keys_eq!(ata.key(), anchor_spl::associated_token::get_associated_token_address_with_program_id(wallet.key, &quote_mint, &tp), AmmError::RecipientsMismatch);
+            let amount = ((available as u128) * (sh.share_bps as u128) / 10_000) as u64;
+            if amount == 0 {
+                continue;
+            }
+            if ata.data_is_empty() {
+                require!(initialize_ata, AmmError::RecipientsMismatch);
+                anchor_lang::solana_program::program::invoke(
+                    &anchor_spl::associated_token::spl_associated_token_account::instruction::create_associated_token_account_idempotent(ctx.accounts.payer.key, wallet.key, &quote_mint, &tp),
+                    &[ctx.accounts.payer.to_account_info(), ata.clone(), wallet.clone(), ctx.accounts.quote_mint.to_account_info(), ctx.accounts.system_program.to_account_info(), ctx.accounts.quote_token_program.to_account_info(), ctx.accounts.associated_token_program.to_account_info()],
+                )?;
+            }
+            token_interface::transfer_checked(
+                CpiContext::new_with_signer(
+                    ctx.accounts.quote_token_program.to_account_info(),
+                    TransferChecked { from: ctx.accounts.coin_creator_vault_ata.to_account_info(), mint: ctx.accounts.quote_mint.to_account_info(), to: ata.clone(), authority: ctx.accounts.coin_creator_vault_authority.to_account_info() },
+                    &[seeds],
+                ),
+                amount,
+                dec,
+            )?;
+            distributed = distributed.checked_add(amount).ok_or(AmmError::MathOverflow)?;
+        }
+        emit_cpi!(DistributeCoinCreatorFeesEvent { pool: ctx.accounts.pool.key(), sharing_config: sharing_key, quote_mint, distributed, recipients: n as u64, timestamp: Clock::get()?.unix_timestamp });
+        Ok(())
+    }
+
     /// The coin creator sweeps everything in their vault for `quote_mint` into their own ATA.
     pub fn collect_coin_creator_fee(ctx: Context<CollectCoinCreatorFee>) -> Result<()> {
         let amount = ctx.accounts.coin_creator_vault_ata.amount;
@@ -553,11 +614,24 @@ pub struct Fees {
     pub creator: u64,
 }
 
-pub fn compute_fees(amount: u64, cfg: &GlobalConfig, has_creator: bool) -> Result<Fees> {
+/// bps schedule for a swap: the fees program's market-cap tier when a FeeConfig is passed,
+/// otherwise the AMM's flat config. Market cap = spot price × mint supply, in quote units.
+pub struct Schedule { pub lp: u64, pub protocol: u64, pub creator: u64 }
+pub fn schedule(cfg: &GlobalConfig, fee_config: &Option<Box<Account<FeeConfig>>>, base_reserve: u64, quote_reserve: u64, supply: u64, quote_mint: Pubkey) -> Schedule {
+    if let Some(fc) = fee_config {
+        let mcap = openpump_fee_types::market_cap(quote_reserve, base_reserve, supply);
+        let f = openpump_fee_types::fees_for(fc, true, mcap, quote_mint);
+        Schedule { lp: f.lp_fee_bps, protocol: f.protocol_fee_bps, creator: f.creator_fee_bps }
+    } else {
+        Schedule { lp: cfg.lp_fee_basis_points, protocol: cfg.protocol_fee_basis_points, creator: cfg.coin_creator_fee_basis_points }
+    }
+}
+
+pub fn compute_fees(amount: u64, s: &Schedule, has_creator: bool) -> Result<Fees> {
     Ok(Fees {
-        lp: fee_ceil(amount, cfg.lp_fee_basis_points)?,
-        protocol: fee_ceil(amount, cfg.protocol_fee_basis_points)?,
-        creator: if has_creator { fee_ceil(amount, cfg.coin_creator_fee_basis_points)? } else { 0 },
+        lp: fee_ceil(amount, s.lp)?,
+        protocol: fee_ceil(amount, s.protocol)?,
+        creator: if has_creator { fee_ceil(amount, s.creator)? } else { 0 },
     })
 }
 
@@ -821,6 +895,37 @@ pub struct Swap<'info> {
     pub quote_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
+    /// Optional: the fees program's tiered schedule (market-cap based).
+    #[account(seeds = [FEE_CONFIG_SEED], bump = fee_config.bump, seeds::program = FEES_PROGRAM_ID)]
+    pub fee_config: Option<Box<Account<'info, FeeConfig>>>,
+}
+
+#[event_cpi]
+#[derive(Accounts)]
+pub struct SetCoinCreator<'info> {
+    pub coin_creator: Signer<'info>,
+    #[account(mut, seeds = [POOL_SEED, &pool.index.to_le_bytes(), pool.creator.as_ref(), pool.base_mint.as_ref(), pool.quote_mint.as_ref()], bump = pool.bump, has_one = coin_creator @ AmmError::Unauthorized)]
+    pub pool: Box<Account<'info, Pool>>,
+}
+
+#[event_cpi]
+#[derive(Accounts)]
+pub struct DistributeCoinCreatorFees<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(seeds = [POOL_SEED, &pool.index.to_le_bytes(), pool.creator.as_ref(), pool.base_mint.as_ref(), pool.quote_mint.as_ref()], bump = pool.bump, has_one = quote_mint, constraint = pool.coin_creator == sharing_config.key() @ AmmError::SharingMismatch)]
+    pub pool: Box<Account<'info, Pool>>,
+    #[account(seeds = [SHARING_CONFIG_SEED, pool.base_mint.as_ref()], bump = sharing_config.bump, seeds::program = FEES_PROGRAM_ID, constraint = sharing_config.mint == pool.base_mint @ AmmError::SharingMismatch)]
+    pub sharing_config: Box<Account<'info, SharingConfig>>,
+    pub quote_mint: Box<InterfaceAccount<'info, Mint>>,
+    /// CHECK: PDA owning the sharing config's AMM fee vault.
+    #[account(seeds = [CREATOR_VAULT_SEED, sharing_config.key().as_ref()], bump)]
+    pub coin_creator_vault_authority: UncheckedAccount<'info>,
+    #[account(mut, associated_token::mint = quote_mint, associated_token::authority = coin_creator_vault_authority, associated_token::token_program = quote_token_program)]
+    pub coin_creator_vault_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub quote_token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
 
 #[event_cpi]
@@ -971,6 +1076,11 @@ pub struct SellEvent {
 }
 
 #[event]
+pub struct SetCoinCreatorEvent { pub pool: Pubkey, pub old_coin_creator: Pubkey, pub new_coin_creator: Pubkey, pub timestamp: i64 }
+#[event]
+pub struct DistributeCoinCreatorFeesEvent { pub pool: Pubkey, pub sharing_config: Pubkey, pub quote_mint: Pubkey, pub distributed: u64, pub recipients: u64, pub timestamp: i64 }
+
+#[event]
 pub struct CollectCoinCreatorFeeEvent {
     pub coin_creator: Pubkey,
     pub quote_mint: Pubkey,
@@ -998,4 +1108,10 @@ pub enum AmmError {
     MathOverflow,
     #[msg("Invalid protocol fee recipient")]
     InvalidFeeRecipient,
+    #[msg("Sharing config is not active")]
+    SharingNotActive,
+    #[msg("Sharing config does not match this pool")]
+    SharingMismatch,
+    #[msg("Shareholders and remaining accounts do not match")]
+    RecipientsMismatch,
 }

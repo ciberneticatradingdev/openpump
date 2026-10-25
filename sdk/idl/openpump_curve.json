@@ -598,6 +598,74 @@
           }
         },
         {
+          "name": "fee_config",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based). Flat Global fees otherwise."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "buyback_fee_recipient",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "event_authority",
           "pda": {
             "seeds": [
@@ -1123,6 +1191,69 @@
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "fee_config",
+          "docs": [
+            "Optional: the fees program's tiered schedule."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
           "name": "event_authority",
           "pda": {
             "seeds": [
@@ -1551,6 +1682,74 @@
               }
             ]
           }
+        },
+        {
+          "name": "fee_config",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based). Flat Global fees otherwise."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "buyback_fee_recipient",
+          "writable": true,
+          "optional": true
         },
         {
           "name": "event_authority",
@@ -2078,6 +2277,69 @@
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "fee_config",
+          "docs": [
+            "Optional: the fees program's tiered schedule."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
           "name": "event_authority",
           "pda": {
             "seeds": [
@@ -2496,8 +2758,7 @@
       "accounts": [
         {
           "name": "creator",
-          "writable": true,
-          "signer": true
+          "writable": true
         },
         {
           "name": "creator_vault",
@@ -2582,9 +2843,16 @@
       ],
       "accounts": [
         {
-          "name": "creator",
+          "name": "payer",
+          "docs": [
+            "Pays for the creator's ATA if missing."
+          ],
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "creator",
+          "writable": true
         },
         {
           "name": "quote_mint"
@@ -2782,7 +3050,9 @@
       "name": "create",
       "docs": [
         "Launch a coin: new mint (6 decimals), Metaplex metadata, full supply into the curve,",
-        "mint authority revoked. Anyone can call; `user` becomes the creator."
+        "mint authority revoked. Anyone can call; `user` becomes the creator.",
+        "`creator`: who earns the creator fee (Pubkey::default() = the launching wallet). May be a",
+        "fees-program PDA (social / donation / sharing) so fees accrue there from trade one."
       ],
       "discriminator": [
         24,
@@ -3042,6 +3312,10 @@
         {
           "name": "is_holder_reward",
           "type": "bool"
+        },
+        {
+          "name": "creator",
+          "type": "pubkey"
         }
       ]
     },
@@ -3395,6 +3669,459 @@
         },
         {
           "name": "is_holder_reward",
+          "type": "bool"
+        },
+        {
+          "name": "creator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "distribute_creator_fees",
+      "discriminator": [
+        165,
+        114,
+        103,
+        0,
+        121,
+        206,
+        247,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "mint",
+          "relations": [
+            "bonding_curve",
+            "sharing_config"
+          ]
+        },
+        {
+          "name": "bonding_curve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sharing_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "creator_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sharing_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "distribute_creator_fees_v2",
+      "discriminator": [
+        255,
+        203,
+        19,
+        79,
+        244,
+        68,
+        8,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bonding_curve",
+            "sharing_config"
+          ]
+        },
+        {
+          "name": "bonding_curve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sharing_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "creator_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sharing_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_vault_quote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "creator_vault"
+              },
+              {
+                "kind": "account",
+                "path": "quote_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "quote_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "quote_mint",
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "quote_token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "initialize_ata",
           "type": "bool"
         }
       ]
@@ -5077,6 +5804,74 @@
           }
         },
         {
+          "name": "fee_config",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based). Flat Global fees otherwise."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "buyback_fee_recipient",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "event_authority",
           "pda": {
             "seeds": [
@@ -5602,6 +6397,69 @@
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "fee_config",
+          "docs": [
+            "Optional: the fees program's tiered schedule."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
           "name": "event_authority",
           "pda": {
             "seeds": [
@@ -5642,6 +6500,105 @@
         {
           "name": "min_quote_output",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_creator",
+      "discriminator": [
+        254,
+        148,
+        255,
+        112,
+        207,
+        142,
+        170,
+        165
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "docs": [
+            "The coin's current creator."
+          ],
+          "signer": true,
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "bonding_curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_creator",
+          "type": "pubkey"
         }
       ]
     },
@@ -6153,6 +7110,19 @@
       ]
     },
     {
+      "name": "FeeConfig",
+      "discriminator": [
+        143,
+        52,
+        146,
+        187,
+        219,
+        123,
+        76,
+        155
+      ]
+    },
+    {
       "name": "Global",
       "discriminator": [
         167,
@@ -6189,6 +7159,19 @@
         28,
         182,
         112
+      ]
+    },
+    {
+      "name": "SharingConfig",
+      "discriminator": [
+        216,
+        74,
+        9,
+        0,
+        56,
+        140,
+        93,
+        75
       ]
     },
     {
@@ -6285,6 +7268,19 @@
       ]
     },
     {
+      "name": "DistributeCreatorFeesEvent",
+      "discriminator": [
+        165,
+        55,
+        129,
+        112,
+        4,
+        179,
+        202,
+        40
+      ]
+    },
+    {
       "name": "DistributeFeeToHoldersEvent",
       "discriminator": [
         227,
@@ -6334,6 +7330,19 @@
         98,
         108,
         21
+      ]
+    },
+    {
+      "name": "SetCreatorEvent",
+      "discriminator": [
+        237,
+        52,
+        123,
+        37,
+        245,
+        251,
+        72,
+        210
       ]
     },
     {
@@ -6489,6 +7498,16 @@
       "code": 6019,
       "name": "IncentiveTime",
       "msg": "Invalid incentive schedule time or day"
+    },
+    {
+      "code": 6020,
+      "name": "SharingNotActive",
+      "msg": "Sharing config is not active"
+    },
+    {
+      "code": 6021,
+      "name": "SharingMismatch",
+      "msg": "Sharing config does not match this coin"
     }
   ],
   "types": [
@@ -6711,6 +7730,20 @@
       }
     },
     {
+      "name": "ConfigStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Paused"
+          },
+          {
+            "name": "Active"
+          }
+        ]
+      }
+    },
+    {
       "name": "CreateEvent",
       "type": {
         "kind": "struct",
@@ -6775,6 +7808,38 @@
       }
     },
     {
+      "name": "DistributeCreatorFeesEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "sharing_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "distributed",
+            "type": "u64"
+          },
+          {
+            "name": "recipients",
+            "type": "u64"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "DistributeFeeToHoldersEvent",
       "type": {
         "kind": "struct",
@@ -6798,6 +7863,119 @@
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "flat_fees",
+            "docs": [
+              "Used when no tier applies / for foreign pools."
+            ],
+            "type": {
+              "defined": {
+                "name": "Fees"
+              }
+            }
+          },
+          {
+            "name": "fee_tiers",
+            "docs": [
+              "SOL-quoted coins (sorted ascending by threshold)."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FeeTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "stable_fee_tiers",
+            "docs": [
+              "Coins quoted in a stable mint listed in `stable_mints`."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FeeTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "exotic_flat_fees",
+            "docs": [
+              "Any other quote mint (custom pairs)."
+            ],
+            "type": {
+              "defined": {
+                "name": "Fees"
+              }
+            }
+          },
+          {
+            "name": "stable_mints",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeTier",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_cap_lamports_threshold",
+            "docs": [
+              "Market cap (in quote base units, i.e. lamports for SOL) from which this tier applies."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "fees",
+            "type": {
+              "defined": {
+                "name": "Fees"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Fees",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lp_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "protocol_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "creator_fee_bps",
+            "type": "u64"
           }
         ]
       }
@@ -6873,6 +8051,14 @@
           {
             "name": "holder_reward_authority",
             "type": "pubkey"
+          },
+          {
+            "name": "buyback_basis_points",
+            "type": "u64"
+          },
+          {
+            "name": "buyback_fee_recipient",
+            "type": "pubkey"
           }
         ]
       }
@@ -6940,6 +8126,17 @@
           {
             "name": "paused",
             "type": "bool"
+          },
+          {
+            "name": "buyback_basis_points",
+            "docs": [
+              "Share of the protocol fee (bps) routed to `buyback_fee_recipient` (the fees program's buyback vault)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buyback_fee_recipient",
+            "type": "pubkey"
           }
         ]
       }
@@ -7150,6 +8347,30 @@
       }
     },
     {
+      "name": "SetCreatorEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "SetParamsEvent",
       "type": {
         "kind": "struct",
@@ -7193,6 +8414,72 @@
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Shareholder",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "pubkey"
+          },
+          {
+            "name": "share_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SharingConfig",
+      "docs": [
+        "Per-coin creator fee split. When a coin's `creator` is this PDA, its creator fees accrue in the",
+        "PDA's creator vault and `distribute_creator_fees` (curve / AMM) pays the shareholders."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "ConfigStatus"
+              }
+            }
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin_revoked",
+            "type": "bool"
+          },
+          {
+            "name": "shareholders",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Shareholder"
+                }
+              }
+            }
           }
         ]
       }
@@ -7281,6 +8568,10 @@
           {
             "name": "quote_mint",
             "type": "pubkey"
+          },
+          {
+            "name": "buyback_fee",
+            "type": "u64"
           }
         ]
       }

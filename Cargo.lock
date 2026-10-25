@@ -1097,6 +1097,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "openpump-fee-types",
 ]
 
 [[package]]
@@ -1106,6 +1107,25 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "openpump-amm",
+ "openpump-fee-types",
+]
+
+[[package]]
+name = "openpump-fee-types"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
+name = "openpump-fees"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "openpump-amm",
+ "openpump-curve",
+ "openpump-fee-types",
 ]
 
 [[package]]

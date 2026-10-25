@@ -8,10 +8,12 @@ skip-lint = false
 [programs.localnet]
 openpump_curve = "AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB"
 openpump_amm = "BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb"
+openpump_fees = "goxedqtEDBUXsuMxYDpgfivPGZuQD4ifzfcFkhVCUe5"
 
 [programs.devnet]
 openpump_curve = "AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB"
 openpump_amm = "BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb"
+openpump_fees = "goxedqtEDBUXsuMxYDpgfivPGZuQD4ifzfcFkhVCUe5"
 
 [registry]
 url = "https://api.apr.dev"

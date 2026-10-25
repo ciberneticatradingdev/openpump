@@ -32,6 +32,9 @@ pub mod holders;
 use holders::*;
 pub mod incentives;
 use incentives::*;
+pub mod sharing;
+use sharing::*;
+use openpump_fee_types::{FeeConfig, FEES_PROGRAM_ID, FEE_CONFIG_SEED};
 
 declare_id!("AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB");
 
@@ -66,6 +69,9 @@ pub struct GlobalParams {
     /// ...to this share of `token_total_supply` (bps).
     pub anti_snipe_max_bps: u64,
     pub paused: bool,
+    /// Share of the protocol fee (bps) routed to `buyback_fee_recipient` (the fees program's buyback vault).
+    pub buyback_basis_points: u64,
+    pub buyback_fee_recipient: Pubkey,
 }
 
 #[program]
@@ -101,7 +107,9 @@ pub mod openpump_curve {
 
     /// Launch a coin: new mint (6 decimals), Metaplex metadata, full supply into the curve,
     /// mint authority revoked. Anyone can call; `user` becomes the creator.
-    pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String, is_holder_reward: bool) -> Result<()> {
+    /// `creator`: who earns the creator fee (Pubkey::default() = the launching wallet). May be a
+    /// fees-program PDA (social / donation / sharing) so fees accrue there from trade one.
+    pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey) -> Result<()> {
         let g = &ctx.accounts.global;
         require!(!g.paused, CurveError::Paused);
         require!(!is_holder_reward || g.holder_reward_enabled, CurveError::HolderRewardDisabled);
@@ -155,7 +163,7 @@ pub mod openpump_curve {
         let clock = Clock::get()?;
         let bc = &mut ctx.accounts.bonding_curve;
         bc.mint = ctx.accounts.mint.key();
-        bc.creator = if is_holder_reward { holder_rewards_pda(&bc.mint) } else { ctx.accounts.user.key() };
+        bc.creator = if is_holder_reward { holder_rewards_pda(&bc.mint) } else if creator == Pubkey::default() { ctx.accounts.user.key() } else { creator };
         bc.is_holder_reward = is_holder_reward;
         bc.virtual_token_reserves = g.initial_virtual_token_reserves;
         bc.virtual_sol_reserves = g.initial_virtual_sol_reserves;
@@ -211,7 +219,7 @@ pub mod openpump_curve {
             spend = sol_in_for_tokens_out(tokens_out, bc.virtual_sol_reserves, bc.virtual_token_reserves)?;
         }
         require!(tokens_out >= min_tokens_out, CurveError::ExceededSlippage);
-        let fees = total_fee(spend, g)?;
+        let fees = total_fee(spend, g, &ctx.accounts.fee_config, bc)?;
         execute_buy(ctx, tokens_out, spend, spend.checked_add(fees).ok_or(CurveError::MathOverflow)?)
     }
 
@@ -225,8 +233,10 @@ pub mod openpump_curve {
 
         let sol_out = sol_out_for_tokens_in(amount, bc.virtual_sol_reserves, bc.virtual_token_reserves)?;
         require!(sol_out <= bc.real_sol_reserves, CurveError::InsufficientReserves);
-        let protocol_fee = fee_ceil(sol_out, g.fee_basis_points)?;
-        let creator_fee = fee_ceil(sol_out, g.creator_fee_basis_points)?;
+        let (p_bps, c_bps) = trade_fee_bps(g, &ctx.accounts.fee_config, bc);
+        let protocol_fee = fee_ceil(sol_out, p_bps)?;
+        let creator_fee = fee_ceil(sol_out, c_bps)?;
+        let buyback_fee = buyback_split(g, &ctx.accounts.buyback_fee_recipient, protocol_fee)?;
         let user_out = sol_out
             .checked_sub(protocol_fee)
             .and_then(|v| v.checked_sub(creator_fee))
@@ -249,7 +259,10 @@ pub mod openpump_curve {
         // lamports: curve -> user / fee recipient / creator vault (curve is program-owned, debit directly)
         let bc_info = ctx.accounts.bonding_curve.to_account_info();
         debit(&bc_info, &ctx.accounts.user.to_account_info(), user_out)?;
-        debit(&bc_info, &ctx.accounts.fee_recipient.to_account_info(), protocol_fee)?;
+        debit(&bc_info, &ctx.accounts.fee_recipient.to_account_info(), protocol_fee - buyback_fee)?;
+        if let Some(bb) = &ctx.accounts.buyback_fee_recipient {
+            debit(&bc_info, &bb.to_account_info(), buyback_fee)?;
+        }
         debit(&bc_info, &ctx.accounts.creator_vault.to_account_info(), creator_fee)?;
 
         let bc = &mut ctx.accounts.bonding_curve;
@@ -275,6 +288,7 @@ pub mod openpump_curve {
             creator_fee,
             creator: bc.creator,
             quote_mint: bc.quote_mint,
+            buyback_fee,
         });
         Ok(())
     }
@@ -434,6 +448,18 @@ pub mod openpump_curve {
         holders::distribute_fee_to_holders_v2(ctx, amounts)
     }
 
+    // ----- creator reassignment + fee sharing payouts (see sharing.rs)
+
+    pub fn set_creator(ctx: Context<SetCreator>, new_creator: Pubkey) -> Result<()> {
+        sharing::set_creator(ctx, new_creator)
+    }
+    pub fn distribute_creator_fees<'info>(ctx: Context<'_, '_, 'info, 'info, DistributeCreatorFees<'info>>) -> Result<()> {
+        sharing::distribute_creator_fees(ctx)
+    }
+    pub fn distribute_creator_fees_v2<'info>(ctx: Context<'_, '_, 'info, 'info, DistributeCreatorFeesV2<'info>>, initialize_ata: bool) -> Result<()> {
+        sharing::distribute_creator_fees_v2(ctx, initialize_ata)
+    }
+
     // ----- volume incentives (see incentives.rs)
 
     pub fn init_user_volume_accumulator(ctx: Context<InitUserVolumeAccumulator>) -> Result<()> {
@@ -457,8 +483,8 @@ pub mod openpump_curve {
     pub fn set_quote_config(ctx: Context<SetQuoteConfig>, params: QuoteParams) -> Result<()> {
         quote::set_quote_config(ctx, params)
     }
-    pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String, is_holder_reward: bool) -> Result<()> {
-        quote::create_v2(ctx, name, symbol, uri, is_holder_reward)
+    pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey) -> Result<()> {
+        quote::create_v2(ctx, name, symbol, uri, is_holder_reward, creator)
     }
     pub fn buy_v2(ctx: Context<TradeV2>, amount: u64, max_quote_cost: u64) -> Result<()> {
         quote::buy_v2(ctx, amount, max_quote_cost)
@@ -513,19 +539,24 @@ fn execute_buy(ctx: Context<Trade>, tokens_out: u64, sol_in: u64, max_sol_cost: 
         require!(tokens_out <= cap, CurveError::AntiSnipeCap);
     }
 
-    let protocol_fee = fee_ceil(sol_in, g.fee_basis_points)?;
-    let creator_fee = fee_ceil(sol_in, g.creator_fee_basis_points)?;
+    let (p_bps, c_bps) = trade_fee_bps(g, &ctx.accounts.fee_config, bc);
+    let protocol_fee = fee_ceil(sol_in, p_bps)?;
+    let creator_fee = fee_ceil(sol_in, c_bps)?;
     let total_cost = sol_in
         .checked_add(protocol_fee)
         .and_then(|v| v.checked_add(creator_fee))
         .ok_or(CurveError::MathOverflow)?;
     require!(total_cost <= max_sol_cost, CurveError::ExceededSlippage);
+    let buyback_fee = buyback_split(g, &ctx.accounts.buyback_fee_recipient, protocol_fee)?;
 
-    // lamports: user -> curve / fee recipient / creator vault
+    // lamports: user -> curve / fee recipient (+ buyback vault) / creator vault
     let user = ctx.accounts.user.to_account_info();
     let sys = ctx.accounts.system_program.to_account_info();
     sys_transfer(&sys, &user, &ctx.accounts.bonding_curve.to_account_info(), sol_in)?;
-    sys_transfer(&sys, &user, &ctx.accounts.fee_recipient.to_account_info(), protocol_fee)?;
+    sys_transfer(&sys, &user, &ctx.accounts.fee_recipient.to_account_info(), protocol_fee - buyback_fee)?;
+    if let Some(bb) = &ctx.accounts.buyback_fee_recipient {
+        sys_transfer(&sys, &user, &bb.to_account_info(), buyback_fee)?;
+    }
     sys_transfer(&sys, &user, &ctx.accounts.creator_vault.to_account_info(), creator_fee)?;
 
     // tokens: curve -> user
@@ -575,7 +606,8 @@ fn execute_buy(ctx: Context<Trade>, tokens_out: u64, sol_in: u64, max_sol_cost: 
         creator_fee,
         creator: bc.creator,
         quote_mint: bc.quote_mint,
-    });
+        buyback_fee,
+        });
     if bc.complete {
         emit_cpi!(CompleteEvent {
             mint: bc.mint,
@@ -588,10 +620,21 @@ fn execute_buy(ctx: Context<Trade>, tokens_out: u64, sol_in: u64, max_sol_cost: 
     Ok(())
 }
 
-fn total_fee(sol: u64, g: &Global) -> Result<u64> {
-    fee_ceil(sol, g.fee_basis_points)?
-        .checked_add(fee_ceil(sol, g.creator_fee_basis_points)?)
-        .ok_or(CurveError::MathOverflow.into())
+/// (protocol_bps, creator_bps) for a trade: the fees program's market-cap tiers when a FeeConfig
+/// is passed, otherwise Global's flat schedule.
+pub fn trade_fee_bps(g: &Global, fee_config: &Option<Box<Account<FeeConfig>>>, bc: &BondingCurve) -> (u64, u64) {
+    if let Some(fc) = fee_config {
+        let mcap = openpump_fee_types::market_cap(bc.virtual_sol_reserves, bc.virtual_token_reserves, bc.token_total_supply);
+        let f = openpump_fee_types::fees_for(fc, true, mcap, bc.quote_mint);
+        (f.protocol_fee_bps, f.creator_fee_bps)
+    } else {
+        (g.fee_basis_points, g.creator_fee_basis_points)
+    }
+}
+
+fn total_fee(sol: u64, g: &Global, fee_config: &Option<Box<Account<FeeConfig>>>, bc: &BondingCurve) -> Result<u64> {
+    let (p, c) = trade_fee_bps(g, fee_config, bc);
+    fee_ceil(sol, p)?.checked_add(fee_ceil(sol, c)?).ok_or(CurveError::MathOverflow.into())
 }
 
 fn validate_params(p: &GlobalParams) -> Result<()> {
@@ -601,8 +644,16 @@ fn validate_params(p: &GlobalParams) -> Result<()> {
     require!(p.initial_real_token_reserves > 0 && p.initial_real_token_reserves < p.token_total_supply, CurveError::InvalidParams);
     require!(p.initial_real_token_reserves < p.initial_virtual_token_reserves, CurveError::InvalidParams);
     require!(p.anti_snipe_max_bps <= BPS_DENOMINATOR, CurveError::InvalidParams);
+    require!(p.buyback_basis_points <= BPS_DENOMINATOR, CurveError::InvalidParams);
     require!(p.fee_recipient != Pubkey::default(), CurveError::InvalidParams);
     Ok(())
+}
+
+fn buyback_split(g: &Global, recipient: &Option<UncheckedAccount>, protocol_fee: u64) -> Result<u64> {
+    match recipient {
+        Some(_) if g.buyback_basis_points > 0 => mul_div_floor(protocol_fee, g.buyback_basis_points, BPS_DENOMINATOR),
+        _ => Ok(0),
+    }
 }
 
 fn sys_transfer<'info>(sys: &AccountInfo<'info>, from: &AccountInfo<'info>, to: &AccountInfo<'info>, lamports: u64) -> Result<()> {
@@ -699,6 +750,12 @@ pub struct Trade<'info> {
     pub global_volume_accumulator: Option<Box<Account<'info, GlobalVolumeAccumulator>>>,
     #[account(mut, seeds = [USER_VOLUME_SEED, user.key().as_ref()], bump = user_volume_accumulator.bump)]
     pub user_volume_accumulator: Option<Box<Account<'info, UserVolumeAccumulator>>>,
+    /// Optional: the fees program's tiered schedule (market-cap based). Flat Global fees otherwise.
+    #[account(seeds = [FEE_CONFIG_SEED], bump = fee_config.bump, seeds::program = FEES_PROGRAM_ID)]
+    pub fee_config: Option<Box<Account<'info, FeeConfig>>>,
+    /// CHECK: optional buyback vault; must match Global.buyback_fee_recipient.
+    #[account(mut, address = global.buyback_fee_recipient @ CurveError::InvalidFeeRecipient)]
+    pub buyback_fee_recipient: Option<UncheckedAccount<'info>>,
 }
 
 #[event_cpi]
@@ -761,8 +818,9 @@ pub struct Migrate<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CollectCreatorFee<'info> {
+    /// CHECK: receives its own vault; permissionless so PDA creators (social / donation) get swept.
     #[account(mut)]
-    pub creator: Signer<'info>,
+    pub creator: UncheckedAccount<'info>,
     /// CHECK: system-owned PDA that accrues the creator's fees.
     #[account(mut, seeds = [CREATOR_VAULT_SEED, creator.key().as_ref()], bump)]
     pub creator_vault: UncheckedAccount<'info>,
@@ -791,6 +849,8 @@ pub struct Global {
     /// Holder rewards: coins may route the creator fee to holders (distributed by this authority).
     pub holder_reward_enabled: bool,
     pub holder_reward_authority: Pubkey,
+    pub buyback_basis_points: u64,
+    pub buyback_fee_recipient: Pubkey,
 }
 
 impl Global {
@@ -806,6 +866,8 @@ impl Global {
         self.anti_snipe_slots = p.anti_snipe_slots;
         self.anti_snipe_max_bps = p.anti_snipe_max_bps;
         self.paused = p.paused;
+        self.buyback_basis_points = p.buyback_basis_points;
+        self.buyback_fee_recipient = p.buyback_fee_recipient;
     }
 }
 
@@ -874,6 +936,7 @@ pub struct TradeEvent {
     pub creator_fee: u64,
     pub creator: Pubkey,
     pub quote_mint: Pubkey,
+    pub buyback_fee: u64,
 }
 
 #[event]
@@ -950,4 +1013,8 @@ pub enum CurveError {
     HolderRecipientsMismatch,
     #[msg("Invalid incentive schedule time or day")]
     IncentiveTime,
+    #[msg("Sharing config is not active")]
+    SharingNotActive,
+    #[msg("Sharing config does not match this coin")]
+    SharingMismatch,
 }

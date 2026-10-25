@@ -1,0 +1,27 @@
+[package]
+name = "openpump-fees"
+version = "0.1.0"
+description = "OpenPump fees program: tiered fee schedule, creator fee sharing, social/donation fee PDAs, buyback vaults"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "openpump_fees"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "openpump-fee-types/idl-build", "openpump-curve/idl-build", "openpump-amm/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed", "event-cpi"] }
+anchor-spl = { version = "0.31.1" }
+openpump-fee-types = { path = "../../crates/openpump-fee-types" }
+openpump-curve = { path = "../openpump-curve", features = ["cpi"] }
+openpump-amm = { path = "../openpump-amm", features = ["cpi"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("anchor-debug", "custom-heap", "custom-panic"))'] }

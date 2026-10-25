@@ -345,6 +345,69 @@ export type OpenpumpAmm = {
           "address": "11111111111111111111111111111111"
         },
         {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based)."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -1555,6 +1618,275 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "distributeCoinCreatorFees",
+      "docs": [
+        "Permissionless: split a sharing-config coin creator's vault among its shareholders",
+        "(remaining accounts: wallets..., then their quote ATAs...)."
+      ],
+      "discriminator": [
+        104,
+        33,
+        9,
+        101,
+        144,
+        231,
+        147,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.index",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.creator",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.base_mint",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.quote_mint",
+                "account": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sharingConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.base_mint",
+                "account": "pool"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "quoteMint",
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "coinCreatorVaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sharingConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "coinCreatorVaultAta",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "coinCreatorVaultAuthority"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "quoteTokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "initializeAta",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "sell",
       "docs": [
         "Sell an exact amount of base tokens, receiving at least `min_quote_amount_out` (after fees)."
@@ -1886,6 +2218,69 @@ export type OpenpumpAmm = {
           "address": "11111111111111111111111111111111"
         },
         {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based)."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -1926,6 +2321,106 @@ export type OpenpumpAmm = {
         {
           "name": "minQuoteAmountOut",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "setCoinCreator",
+      "docs": [
+        "The current coin creator hands the fee stream to another address (e.g. a fees-program sharing PDA)."
+      ],
+      "discriminator": [
+        210,
+        149,
+        128,
+        45,
+        188,
+        58,
+        78,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "coinCreator",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.index",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.creator",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.base_mint",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.quote_mint",
+                "account": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "newCoinCreator",
+          "type": "pubkey"
         }
       ]
     },
@@ -2359,6 +2854,19 @@ export type OpenpumpAmm = {
   ],
   "accounts": [
     {
+      "name": "feeConfig",
+      "discriminator": [
+        143,
+        52,
+        146,
+        187,
+        219,
+        123,
+        76,
+        155
+      ]
+    },
+    {
       "name": "globalConfig",
       "discriminator": [
         149,
@@ -2382,6 +2890,19 @@ export type OpenpumpAmm = {
         177,
         109,
         188
+      ]
+    },
+    {
+      "name": "sharingConfig",
+      "discriminator": [
+        216,
+        74,
+        9,
+        0,
+        56,
+        140,
+        93,
+        75
       ]
     }
   ],
@@ -2439,6 +2960,19 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "distributeCoinCreatorFeesEvent",
+      "discriminator": [
+        172,
+        215,
+        189,
+        216,
+        79,
+        230,
+        123,
+        56
+      ]
+    },
+    {
       "name": "sellEvent",
       "discriminator": [
         62,
@@ -2449,6 +2983,19 @@ export type OpenpumpAmm = {
         3,
         220,
         42
+      ]
+    },
+    {
+      "name": "setCoinCreatorEvent",
+      "discriminator": [
+        229,
+        25,
+        185,
+        183,
+        235,
+        88,
+        194,
+        78
       ]
     },
     {
@@ -2518,6 +3065,21 @@ export type OpenpumpAmm = {
       "code": 6007,
       "name": "invalidFeeRecipient",
       "msg": "Invalid protocol fee recipient"
+    },
+    {
+      "code": 6008,
+      "name": "sharingNotActive",
+      "msg": "Sharing config is not active"
+    },
+    {
+      "code": 6009,
+      "name": "sharingMismatch",
+      "msg": "Sharing config does not match this pool"
+    },
+    {
+      "code": 6010,
+      "name": "recipientsMismatch",
+      "msg": "Shareholders and remaining accounts do not match"
     }
   ],
   "types": [
@@ -2597,6 +3159,20 @@ export type OpenpumpAmm = {
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "configStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "paused"
+          },
+          {
+            "name": "active"
           }
         ]
       }
@@ -2693,6 +3269,151 @@ export type OpenpumpAmm = {
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "distributeCoinCreatorFeesEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "sharingConfig",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "distributed",
+            "type": "u64"
+          },
+          {
+            "name": "recipients",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "feeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "flatFees",
+            "docs": [
+              "Used when no tier applies / for foreign pools."
+            ],
+            "type": {
+              "defined": {
+                "name": "fees"
+              }
+            }
+          },
+          {
+            "name": "feeTiers",
+            "docs": [
+              "SOL-quoted coins (sorted ascending by threshold)."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "feeTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "stableFeeTiers",
+            "docs": [
+              "Coins quoted in a stable mint listed in `stable_mints`."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "feeTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "exoticFlatFees",
+            "docs": [
+              "Any other quote mint (custom pairs)."
+            ],
+            "type": {
+              "defined": {
+                "name": "fees"
+              }
+            }
+          },
+          {
+            "name": "stableMints",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "feeTier",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketCapLamportsThreshold",
+            "docs": [
+              "Market cap (in quote base units, i.e. lamports for SOL) from which this tier applies."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "fees",
+            "type": {
+              "defined": {
+                "name": "fees"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "fees",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lpFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "protocolFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "creatorFeeBps",
+            "type": "u64"
           }
         ]
       }
@@ -2844,6 +3565,96 @@ export type OpenpumpAmm = {
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "setCoinCreatorEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldCoinCreator",
+            "type": "pubkey"
+          },
+          {
+            "name": "newCoinCreator",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shareholder",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "pubkey"
+          },
+          {
+            "name": "shareBps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sharingConfig",
+      "docs": [
+        "Per-coin creator fee split. When a coin's `creator` is this PDA, its creator fees accrue in the",
+        "PDA's creator vault and `distribute_creator_fees` (curve / AMM) pays the shareholders."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "configStatus"
+              }
+            }
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "adminRevoked",
+            "type": "bool"
+          },
+          {
+            "name": "shareholders",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "shareholder"
+                }
+              }
+            }
           }
         ]
       }

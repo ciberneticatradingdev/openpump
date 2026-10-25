@@ -604,6 +604,74 @@ export type OpenpumpCurve = {
           }
         },
         {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based). Flat Global fees otherwise."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "buybackFeeRecipient",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -1129,6 +1197,69 @@ export type OpenpumpCurve = {
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -1557,6 +1688,74 @@ export type OpenpumpCurve = {
               }
             ]
           }
+        },
+        {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based). Flat Global fees otherwise."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "buybackFeeRecipient",
+          "writable": true,
+          "optional": true
         },
         {
           "name": "eventAuthority",
@@ -2084,6 +2283,69 @@ export type OpenpumpCurve = {
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -2502,8 +2764,7 @@ export type OpenpumpCurve = {
       "accounts": [
         {
           "name": "creator",
-          "writable": true,
-          "signer": true
+          "writable": true
         },
         {
           "name": "creatorVault",
@@ -2588,9 +2849,16 @@ export type OpenpumpCurve = {
       ],
       "accounts": [
         {
-          "name": "creator",
+          "name": "payer",
+          "docs": [
+            "Pays for the creator's ATA if missing."
+          ],
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "creator",
+          "writable": true
         },
         {
           "name": "quoteMint"
@@ -2788,7 +3056,9 @@ export type OpenpumpCurve = {
       "name": "create",
       "docs": [
         "Launch a coin: new mint (6 decimals), Metaplex metadata, full supply into the curve,",
-        "mint authority revoked. Anyone can call; `user` becomes the creator."
+        "mint authority revoked. Anyone can call; `user` becomes the creator.",
+        "`creator`: who earns the creator fee (Pubkey::default() = the launching wallet). May be a",
+        "fees-program PDA (social / donation / sharing) so fees accrue there from trade one."
       ],
       "discriminator": [
         24,
@@ -3048,6 +3318,10 @@ export type OpenpumpCurve = {
         {
           "name": "isHolderReward",
           "type": "bool"
+        },
+        {
+          "name": "creator",
+          "type": "pubkey"
         }
       ]
     },
@@ -3401,6 +3675,459 @@ export type OpenpumpCurve = {
         },
         {
           "name": "isHolderReward",
+          "type": "bool"
+        },
+        {
+          "name": "creator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "distributeCreatorFees",
+      "discriminator": [
+        165,
+        114,
+        103,
+        0,
+        121,
+        206,
+        247,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "mint",
+          "relations": [
+            "bondingCurve",
+            "sharingConfig"
+          ]
+        },
+        {
+          "name": "bondingCurve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sharingConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "creatorVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sharingConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "distributeCreatorFeesV2",
+      "discriminator": [
+        255,
+        203,
+        19,
+        79,
+        244,
+        68,
+        8,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bondingCurve",
+            "sharingConfig"
+          ]
+        },
+        {
+          "name": "bondingCurve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sharingConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "creatorVault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sharingConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creatorVaultQuote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "creatorVault"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "quoteMint",
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "quoteTokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "initializeAta",
           "type": "bool"
         }
       ]
@@ -5083,6 +5810,74 @@ export type OpenpumpCurve = {
           }
         },
         {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based). Flat Global fees otherwise."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "buybackFeeRecipient",
+          "writable": true,
+          "optional": true
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -5608,6 +6403,69 @@ export type OpenpumpCurve = {
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -5648,6 +6506,105 @@ export type OpenpumpCurve = {
         {
           "name": "minQuoteOutput",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "setCreator",
+      "discriminator": [
+        254,
+        148,
+        255,
+        112,
+        207,
+        142,
+        170,
+        165
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "docs": [
+            "The coin's current creator."
+          ],
+          "signer": true,
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "bondingCurve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "newCreator",
+          "type": "pubkey"
         }
       ]
     },
@@ -6159,6 +7116,19 @@ export type OpenpumpCurve = {
       ]
     },
     {
+      "name": "feeConfig",
+      "discriminator": [
+        143,
+        52,
+        146,
+        187,
+        219,
+        123,
+        76,
+        155
+      ]
+    },
+    {
       "name": "global",
       "discriminator": [
         167,
@@ -6195,6 +7165,19 @@ export type OpenpumpCurve = {
         28,
         182,
         112
+      ]
+    },
+    {
+      "name": "sharingConfig",
+      "discriminator": [
+        216,
+        74,
+        9,
+        0,
+        56,
+        140,
+        93,
+        75
       ]
     },
     {
@@ -6291,6 +7274,19 @@ export type OpenpumpCurve = {
       ]
     },
     {
+      "name": "distributeCreatorFeesEvent",
+      "discriminator": [
+        165,
+        55,
+        129,
+        112,
+        4,
+        179,
+        202,
+        40
+      ]
+    },
+    {
       "name": "distributeFeeToHoldersEvent",
       "discriminator": [
         227,
@@ -6340,6 +7336,19 @@ export type OpenpumpCurve = {
         98,
         108,
         21
+      ]
+    },
+    {
+      "name": "setCreatorEvent",
+      "discriminator": [
+        237,
+        52,
+        123,
+        37,
+        245,
+        251,
+        72,
+        210
       ]
     },
     {
@@ -6495,6 +7504,16 @@ export type OpenpumpCurve = {
       "code": 6019,
       "name": "incentiveTime",
       "msg": "Invalid incentive schedule time or day"
+    },
+    {
+      "code": 6020,
+      "name": "sharingNotActive",
+      "msg": "Sharing config is not active"
+    },
+    {
+      "code": 6021,
+      "name": "sharingMismatch",
+      "msg": "Sharing config does not match this coin"
     }
   ],
   "types": [
@@ -6717,6 +7736,20 @@ export type OpenpumpCurve = {
       }
     },
     {
+      "name": "configStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "paused"
+          },
+          {
+            "name": "active"
+          }
+        ]
+      }
+    },
+    {
       "name": "createEvent",
       "type": {
         "kind": "struct",
@@ -6781,6 +7814,38 @@ export type OpenpumpCurve = {
       }
     },
     {
+      "name": "distributeCreatorFeesEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "sharingConfig",
+            "type": "pubkey"
+          },
+          {
+            "name": "distributed",
+            "type": "u64"
+          },
+          {
+            "name": "recipients",
+            "type": "u64"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "distributeFeeToHoldersEvent",
       "type": {
         "kind": "struct",
@@ -6804,6 +7869,119 @@ export type OpenpumpCurve = {
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "feeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "flatFees",
+            "docs": [
+              "Used when no tier applies / for foreign pools."
+            ],
+            "type": {
+              "defined": {
+                "name": "fees"
+              }
+            }
+          },
+          {
+            "name": "feeTiers",
+            "docs": [
+              "SOL-quoted coins (sorted ascending by threshold)."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "feeTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "stableFeeTiers",
+            "docs": [
+              "Coins quoted in a stable mint listed in `stable_mints`."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "feeTier"
+                }
+              }
+            }
+          },
+          {
+            "name": "exoticFlatFees",
+            "docs": [
+              "Any other quote mint (custom pairs)."
+            ],
+            "type": {
+              "defined": {
+                "name": "fees"
+              }
+            }
+          },
+          {
+            "name": "stableMints",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "feeTier",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketCapLamportsThreshold",
+            "docs": [
+              "Market cap (in quote base units, i.e. lamports for SOL) from which this tier applies."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "fees",
+            "type": {
+              "defined": {
+                "name": "fees"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "fees",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lpFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "protocolFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "creatorFeeBps",
+            "type": "u64"
           }
         ]
       }
@@ -6879,6 +8057,14 @@ export type OpenpumpCurve = {
           {
             "name": "holderRewardAuthority",
             "type": "pubkey"
+          },
+          {
+            "name": "buybackBasisPoints",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeeRecipient",
+            "type": "pubkey"
           }
         ]
       }
@@ -6946,6 +8132,17 @@ export type OpenpumpCurve = {
           {
             "name": "paused",
             "type": "bool"
+          },
+          {
+            "name": "buybackBasisPoints",
+            "docs": [
+              "Share of the protocol fee (bps) routed to `buyback_fee_recipient` (the fees program's buyback vault)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeeRecipient",
+            "type": "pubkey"
           }
         ]
       }
@@ -7156,6 +8353,30 @@ export type OpenpumpCurve = {
       }
     },
     {
+      "name": "setCreatorEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldCreator",
+            "type": "pubkey"
+          },
+          {
+            "name": "newCreator",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "setParamsEvent",
       "type": {
         "kind": "struct",
@@ -7199,6 +8420,72 @@ export type OpenpumpCurve = {
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shareholder",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "pubkey"
+          },
+          {
+            "name": "shareBps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sharingConfig",
+      "docs": [
+        "Per-coin creator fee split. When a coin's `creator` is this PDA, its creator fees accrue in the",
+        "PDA's creator vault and `distribute_creator_fees` (curve / AMM) pays the shareholders."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "configStatus"
+              }
+            }
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "adminRevoked",
+            "type": "bool"
+          },
+          {
+            "name": "shareholders",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "shareholder"
+                }
+              }
+            }
           }
         ]
       }
@@ -7287,6 +8574,10 @@ export type OpenpumpCurve = {
           {
             "name": "quoteMint",
             "type": "pubkey"
+          },
+          {
+            "name": "buybackFee",
+            "type": "u64"
           }
         ]
       }

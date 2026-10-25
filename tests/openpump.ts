@@ -17,6 +17,7 @@ import { ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgr
 import { assert } from "chai";
 import { OpenpumpCurve } from "../target/types/openpump_curve";
 import { OpenpumpAmm } from "../target/types/openpump_amm";
+import { OpenpumpFees } from "../target/types/openpump_fees";
 
 const MPL_TOKEN_METADATA = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
@@ -32,6 +33,8 @@ const PARAMS = {
   antiSnipeSlots: new BN(0), // tests run fast; exercised separately
   antiSnipeMaxBps: new BN(100),
   paused: false,
+  buybackBasisPoints: new BN(0),
+  buybackFeeRecipient: PublicKey.default,
 };
 
 describe("OpenPump — curve + amm", () => {
@@ -41,6 +44,8 @@ describe("OpenPump — curve + amm", () => {
   const conn = provider.connection;
   const curve = new Program<OpenpumpCurve>(require("../target/idl/openpump_curve.json"), provider);
   const amm = new Program<OpenpumpAmm>(require("../target/idl/openpump_amm.json"), provider);
+  const fees = new Program<OpenpumpFees>(require("../target/idl/openpump_fees.json"), provider);
+  const ZERO = PublicKey.default;
   const logsOf = async (e: any) => { try { return e.logs ?? (await e.getLogs?.(conn)) ?? []; } catch { return []; } };
   const admin = (provider.wallet as anchor.Wallet).payer;
 
@@ -99,6 +104,8 @@ describe("OpenPump — curve + amm", () => {
     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     globalVolumeAccumulator: null,
     userVolumeAccumulator: null,
+    feeConfig: null,
+    buybackFeeRecipient: null,
   });
 
   before(async () => {
@@ -140,7 +147,7 @@ describe("OpenPump — curve + amm", () => {
 
   it("creates a coin: metadata, full supply on the curve, mint authority revoked", async () => {
     await curve.methods
-      .create("People Coin", "PEOPLE", "https://example.com/people.json", false)
+      .create("People Coin", "PEOPLE", "https://example.com/people.json", false, PublicKey.default)
       .accounts({
         mint,
         mintAuthority,
@@ -227,8 +234,7 @@ describe("OpenPump — curve + amm", () => {
     await curve.methods
       .collectCreatorFee()
       .accounts({ creator: creator.publicKey, creatorVault, systemProgram: SystemProgram.programId })
-      .signers([creator])
-      .rpc();
+      .rpc(); // permissionless: anyone can sweep a vault to its creator
     const after = await lamports(creator.publicKey);
     assert.isAbove(after, before + vault - 2_000_000, "creator received (almost) the whole vault");
   });
@@ -340,6 +346,7 @@ describe("OpenPump — curve + amm", () => {
     quoteTokenProgram: TOKEN_PROGRAM_ID,
     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     systemProgram: SystemProgram.programId,
+    feeConfig: null,
   });
 
   const wrapSol = async (user: Keypair, sol: number) => {
@@ -464,7 +471,7 @@ describe("OpenPump — curve + amm", () => {
       MPL_TOKEN_METADATA
     );
     await curve.methods
-      .create("Snipe Test", "SNIPE", "https://example.com/s.json", false)
+      .create("Snipe Test", "SNIPE", "https://example.com/s.json", false, PublicKey.default)
       .accounts({
         mint: mint2.publicKey,
         mintAuthority,
@@ -521,7 +528,7 @@ describe("OpenPump — curve + amm", () => {
       associatedUser: getAssociatedTokenAddressSync(mint2.publicKey, user), user, quoteMint,
       userQuote: getAssociatedTokenAddressSync(quoteMint, user), bondingCurveQuote: bcQuote, feeRecipientQuote: feeQuote,
       creatorVault, creatorVaultQuote, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID,
-      quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, feeConfig: null,
     });
 
     before(async () => {
@@ -548,7 +555,7 @@ describe("OpenPump — curve + amm", () => {
 
     it("create_v2 launches a coin paired with the quote mint", async () => {
       await curve.methods
-        .createV2("Quote Coin", "QC", "https://example.com/qc.json", false)
+        .createV2("Quote Coin", "QC", "https://example.com/qc.json", false, PublicKey.default)
         .accounts({
           mint: mint2.publicKey, mintAuthority, bondingCurve: bc2, associatedBondingCurve: abc2, quoteMint, quoteConfig: qcfg(), bondingCurveQuote: bcQuote,
           global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta2, user: creator.publicKey, systemProgram: SystemProgram.programId,
@@ -595,7 +602,7 @@ describe("OpenPump — curve + amm", () => {
       const before = await tokenBal(getAssociatedTokenAddressSync(quoteMint, creator.publicKey));
       await curve.methods
         .collectCreatorFeeV2()
-        .accounts({ creator: creator.publicKey, quoteMint, creatorVault, creatorVaultQuote, creatorQuote: getAssociatedTokenAddressSync(quoteMint, creator.publicKey), quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId })
+        .accounts({ payer: creator.publicKey, creator: creator.publicKey, quoteMint, creatorVault, creatorVaultQuote, creatorQuote: getAssociatedTokenAddressSync(quoteMint, creator.publicKey), quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId })
         .signers([creator])
         .rpc();
       assert.equal(((await tokenBal(getAssociatedTokenAddressSync(quoteMint, creator.publicKey))) - before).toString(), vault.toString());
@@ -639,7 +646,7 @@ describe("OpenPump — curve + amm", () => {
           poolBaseTokenAccount: p.poolBaseTokenAccount, poolQuoteTokenAccount: p.poolQuoteTokenAccount,
           protocolFeeRecipient: feeRecipient.publicKey, protocolFeeRecipientTokenAccount: feeQuote,
           coinCreatorVaultAuthority, coinCreatorVaultAta: getAssociatedTokenAddressSync(quoteMint, coinCreatorVaultAuthority, true),
-          baseTokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+          baseTokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, feeConfig: null,
         })
         .signers([trader])
         .rpc();
@@ -673,7 +680,7 @@ describe("OpenPump — curve + amm", () => {
     it("a holder-reward coin's creator is the holder-rewards PDA and fees accrue in its vault", async () => {
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), mintH.publicKey.toBuffer()], MPL_TOKEN_METADATA);
       await curve.methods
-        .create("Holders Coin", "HODL", "https://example.com/h.json", true)
+        .create("Holders Coin", "HODL", "https://example.com/h.json", true, PublicKey.default)
         .accounts({
           mint: mintH.publicKey, mintAuthority, bondingCurve: bcH, associatedBondingCurve: getAssociatedTokenAddressSync(mintH.publicKey, bcH, true), global,
           mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID,
@@ -776,7 +783,7 @@ describe("OpenPump — curve + amm", () => {
       [bcV] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), mintV.publicKey.toBuffer()], curve.programId);
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), mintV.publicKey.toBuffer()], MPL_TOKEN_METADATA);
       await curve.methods
-        .create("Volume Coin", "VOL", "https://example.com/v.json", false)
+        .create("Volume Coin", "VOL", "https://example.com/v.json", false, PublicKey.default)
         .accounts({ mint: mintV.publicKey, mintAuthority, bondingCurve: bcV, associatedBondingCurve: getAssociatedTokenAddressSync(mintV.publicKey, bcV, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([creator, mintV])
         .rpc();
@@ -844,6 +851,206 @@ describe("OpenPump — curve + amm", () => {
       }
       await curve.methods.closeUserVolumeAccumulator().accounts({ user: userA.publicKey, userVolumeAccumulator: uva(userA.publicKey) }).signers([userA]).rpc();
       assert.isNull(await conn.getAccountInfo(uva(userA.publicKey)));
+    });
+  });
+
+  // ------------------------------------------------------------------ fees program: tiers, buyback, sharing, social, donation
+  describe("fees program", () => {
+    const [feeGlobal] = PublicKey.findProgramAddressSync([Buffer.from("fee-program-global")], fees.programId);
+    const [feeConfig] = PublicKey.findProgramAddressSync([Buffer.from("fee-config"), ], fees.programId);
+    const [buybackVault] = PublicKey.findProgramAddressSync([Buffer.from("buyback"), Buffer.from([0])], fees.programId);
+    const socialAuthority = Keypair.generate();
+    const F = (p: number, c: number, lp = 0) => ({ lpFeeBps: new BN(lp), protocolFeeBps: new BN(p), creatorFeeBps: new BN(c) });
+    const tier = (solMcap: number, p: number, c: number) => ({ marketCapLamportsThreshold: new BN(solMcap).mul(new BN(LAMPORTS_PER_SOL)), fees: F(p, c) });
+    const [curveEv] = PublicKey.findProgramAddressSync([Buffer.from("__event_authority")], curve.programId);
+
+    it("initializes global + tiered fee config", async () => {
+      await airdrop(socialAuthority.publicKey, 2);
+      await fees.methods.initializeFeeProgramGlobal(socialAuthority.publicKey, 0, new BN(0)).accounts({ authority: admin.publicKey }).rpc();
+      await fees.methods
+        .initializeFeeConfig(F(50, 50), [tier(0, 50, 50), tier(100, 40, 40), tier(300, 30, 30)])
+        .accounts({ authority: admin.publicKey, feeProgramGlobal: feeGlobal, feeConfig })
+        .rpc();
+      const fc = await fees.account.feeConfig.fetch(feeConfig);
+      assert.equal(fc.feeTiers.length, 3);
+      try {
+        await fees.methods.updateFeeConfig([tier(100, 1, 1), tier(50, 1, 1)], F(1, 1)).accounts({ authority: admin.publicKey, feeConfig }).rpc();
+        assert.fail("unsorted");
+      } catch (e) {
+        assert.include(String(e), "TiersNotSorted");
+      }
+    });
+
+    it("a buy with fee_config pays the tier for its market cap (lower fees as mcap grows)", async () => {
+      // fresh coin: mcap starts at 30 SOL -> tier 0 (0.5 %/0.5 %)
+      const m = Keypair.generate();
+      const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
+      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      await curve.methods.create("Tier Coin", "TIER", "https://example.com/t.json", false, ZERO)
+        .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
+        .signers([creator, m]).rpc();
+      const accts = { ...tradeAccounts(trader.publicKey), mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), associatedUser: getAssociatedTokenAddressSync(m.publicKey, trader.publicKey), feeConfig };
+      let feeBefore = await lamports(feeRecipient.publicKey);
+      await curve.methods.buyExactSolIn(new BN(1 * LAMPORTS_PER_SOL), new BN(0)).accounts(accts).signers([trader]).rpc();
+      assert.equal((await lamports(feeRecipient.publicKey)) - feeBefore, 0.005 * LAMPORTS_PER_SOL, "tier 0: 0.5 % protocol");
+      // push mcap above 100 SOL: buy 40 SOL -> vSol 71, vTok 453M... mcap = 71/453M*1B ≈ 156 SOL -> tier 1 (0.4 %)
+      await curve.methods.buyExactSolIn(new BN(40 * LAMPORTS_PER_SOL), new BN(0)).accounts(accts).signers([trader]).rpc();
+      feeBefore = await lamports(feeRecipient.publicKey);
+      await curve.methods.buyExactSolIn(new BN(1 * LAMPORTS_PER_SOL), new BN(0)).accounts(accts).signers([trader]).rpc();
+      assert.equal((await lamports(feeRecipient.publicKey)) - feeBefore, 0.004 * LAMPORTS_PER_SOL, "tier 1: 0.4 % protocol");
+      // without fee_config the flat Global schedule applies (0.5 %)
+      feeBefore = await lamports(feeRecipient.publicKey);
+      await curve.methods.buyExactSolIn(new BN(1 * LAMPORTS_PER_SOL), new BN(0)).accounts({ ...accts, feeConfig: null }).signers([trader]).rpc();
+      assert.equal((await lamports(feeRecipient.publicKey)) - feeBefore, 0.005 * LAMPORTS_PER_SOL);
+    });
+
+    it("buyback: a share of the protocol fee lands in the buyback vault; authority sweeps it", async () => {
+      await fees.methods.initializeBuyback(0, admin.publicKey, new BN(0)).accounts({ authority: admin.publicKey, feeProgramGlobal: feeGlobal, buybackVault }).rpc();
+      await curve.methods.setParams({ feeRecipient: feeRecipient.publicKey, ...PARAMS, buybackBasisPoints: new BN(2000), buybackFeeRecipient: buybackVault }).accounts({ authority: admin.publicKey, global }).rpc();
+      const vaultBefore = await lamports(buybackVault);
+      const feeBefore = await lamports(feeRecipient.publicKey);
+      const m = Keypair.generate();
+      const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
+      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      await curve.methods.create("Buyback Coin", "BB", "https://example.com/bb.json", false, ZERO)
+        .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
+        .signers([creator, m]).rpc();
+      await curve.methods.buyExactSolIn(new BN(2 * LAMPORTS_PER_SOL), new BN(0))
+        .accounts({ ...tradeAccounts(trader.publicKey), mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), associatedUser: getAssociatedTokenAddressSync(m.publicKey, trader.publicKey), buybackFeeRecipient: buybackVault })
+        .signers([trader]).rpc();
+      const protocol = 0.005 * 2 * LAMPORTS_PER_SOL; // 0.01 SOL
+      assert.equal((await lamports(buybackVault)) - vaultBefore, protocol * 0.2);
+      assert.equal((await lamports(feeRecipient.publicKey)) - feeBefore, protocol * 0.8);
+      const adminBefore = await lamports(admin.publicKey);
+      await fees.methods.sweepBuyback(0).accounts({ authority: admin.publicKey, buybackVault }).rpc();
+      assert.isAbove(await lamports(admin.publicKey), adminBefore);
+      await curve.methods.setParams({ feeRecipient: feeRecipient.publicKey, ...PARAMS }).accounts({ authority: admin.publicKey, global }).rpc();
+    });
+
+    it("fee sharing: creator splits their fee 60/40; payout is pro-rata from the sharing vault", async () => {
+      const partner = Keypair.generate();
+      await airdrop(partner.publicKey, 1);
+      const m = Keypair.generate();
+      const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
+      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      const [sharing] = PublicKey.findProgramAddressSync([Buffer.from("sharing-config"), m.publicKey.toBuffer()], fees.programId);
+      const [sharingVault] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), sharing.toBuffer()], curve.programId);
+      await curve.methods.create("Shared Coin", "SHARE", "https://example.com/sh.json", false, ZERO)
+        .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
+        .signers([creator, m]).rpc();
+      await fees.methods.createFeeSharingConfig()
+        .accounts({ payer: creator.publicKey, feeProgramGlobal: feeGlobal, mint: m.publicKey, sharingConfig: sharing, bondingCurve: bc, curveProgram: curve.programId, curveEventAuthority: curveEv, pool: null, ammProgram: null, ammEventAuthority: null, systemProgram: SystemProgram.programId })
+        .signers([creator]).rpc();
+      assert.equal((await curve.account.bondingCurve.fetch(bc)).creator.toBase58(), sharing.toBase58());
+      await fees.methods.updateFeeShares([{ address: creator.publicKey, shareBps: 6000 }, { address: partner.publicKey, shareBps: 4000 }])
+        .accounts({ authority: creator.publicKey, mint: m.publicKey, sharingConfig: sharing, creatorVault: sharingVault }).signers([creator]).rpc();
+      // trade -> fees accrue in the sharing vault
+      await curve.methods.buyExactSolIn(new BN(4 * LAMPORTS_PER_SOL), new BN(0))
+        .accounts({ ...tradeAccounts(trader.publicKey), mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), associatedUser: getAssociatedTokenAddressSync(m.publicKey, trader.publicKey), creatorVault: sharingVault })
+        .signers([trader]).rpc();
+      const rentMin = await conn.getMinimumBalanceForRentExemption(0);
+      const available = (await lamports(sharingVault)) - rentMin;
+      assert.equal(available, 0.02 * LAMPORTS_PER_SOL - rentMin, "0.5 % of 4 SOL minus the vault's rent floor");
+      // changing the split with a non-empty vault is refused
+      try {
+        await fees.methods.updateFeeShares([{ address: creator.publicKey, shareBps: 10000 }]).accounts({ authority: creator.publicKey, mint: m.publicKey, sharingConfig: sharing, creatorVault: sharingVault }).signers([creator]).rpc();
+        assert.fail("vault not empty");
+      } catch (e) {
+        assert.include(String(e), "VaultNotEmpty");
+      }
+      const c0 = await lamports(creator.publicKey), p0 = await lamports(partner.publicKey);
+      await curve.methods.distributeCreatorFees()
+        .accounts({ mint: m.publicKey, bondingCurve: bc, sharingConfig: sharing, creatorVault: sharingVault, systemProgram: SystemProgram.programId })
+        .remainingAccounts([{ pubkey: creator.publicKey, isSigner: false, isWritable: true }, { pubkey: partner.publicKey, isSigner: false, isWritable: true }])
+        .rpc();
+      assert.equal((await lamports(creator.publicKey)) - c0, Math.floor(available * 0.6));
+      assert.equal((await lamports(partner.publicKey)) - p0, Math.floor(available * 0.4));
+      await fees.methods.revokeFeeSharingAuthority().accounts({ authority: creator.publicKey, sharingConfig: sharing }).signers([creator]).rpc();
+      assert.isTrue((await fees.account.sharingConfig.fetch(sharing)).adminRevoked);
+    });
+
+    it("social fees: a coin created for an X handle accrues to its PDA; the claim authority pays the verified wallet", async () => {
+      const userId = "jackduval";
+      const platform = 1;
+      const [social] = PublicKey.findProgramAddressSync([Buffer.from("social-fee-pda"), Buffer.from(userId), Buffer.from([platform])], fees.programId);
+      const [socialVault] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), social.toBuffer()], curve.programId);
+      await fees.methods.createSocialFeePda(userId, platform).accounts({ payer: trader.publicKey, feeProgramGlobal: feeGlobal, socialFeePda: social, systemProgram: SystemProgram.programId }).signers([trader]).rpc();
+      const m = Keypair.generate();
+      const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
+      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      await curve.methods.create("Social Coin", "SOC", "https://example.com/soc.json", false, social)
+        .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: trader.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
+        .signers([trader, m]).rpc();
+      assert.equal((await curve.account.bondingCurve.fetch(bc)).creator.toBase58(), social.toBase58());
+      await curve.methods.buyExactSolIn(new BN(2 * LAMPORTS_PER_SOL), new BN(0))
+        .accounts({ ...tradeAccounts(trader.publicKey), mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), associatedUser: getAssociatedTokenAddressSync(m.publicKey, trader.publicKey), creatorVault: socialVault })
+        .signers([trader]).rpc();
+      // anyone sweeps the vault into the social PDA (permissionless collect)
+      await curve.methods.collectCreatorFee().accounts({ creator: social, creatorVault: socialVault, systemProgram: SystemProgram.programId }).rpc();
+      const recipient = Keypair.generate();
+      const r0 = await lamports(recipient.publicKey);
+      try {
+        await fees.methods.claimSocialFeePda(userId, platform).accounts({ socialClaimAuthority: trader.publicKey, feeProgramGlobal: feeGlobal, socialFeePda: social, recipient: recipient.publicKey }).signers([trader]).rpc();
+        assert.fail("not the claim authority");
+      } catch (e) {
+        assert.include(String(e), "NotAuthorized");
+      }
+      await fees.methods.claimSocialFeePda(userId, platform).accounts({ socialClaimAuthority: socialAuthority.publicKey, feeProgramGlobal: feeGlobal, socialFeePda: social, recipient: recipient.publicKey }).signers([socialAuthority]).rpc();
+      const rentMin0 = await conn.getMinimumBalanceForRentExemption(0);
+      assert.equal((await lamports(recipient.publicKey)) - r0, 0.01 * LAMPORTS_PER_SOL - rentMin0, "vault keeps its rent floor; the rest reaches the verified wallet");
+    });
+
+    it("donation: creator routes fees to a beneficiary; crank forwards them", async () => {
+      const beneficiary = Keypair.generate();
+      const m = Keypair.generate();
+      const [donation] = PublicKey.findProgramAddressSync([Buffer.from("donation-fee-pda"), m.publicKey.toBuffer(), beneficiary.publicKey.toBuffer()], fees.programId);
+      const [donationVault] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), donation.toBuffer()], curve.programId);
+      const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
+      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      await fees.methods.createDonationFeePda().accounts({ payer: creator.publicKey, feeProgramGlobal: feeGlobal, baseMint: m.publicKey, beneficiary: beneficiary.publicKey, donationFeePda: donation, systemProgram: SystemProgram.programId }).signers([creator]).rpc().catch(async (e) => { throw e; });
+      await curve.methods.create("Charity Coin", "GIVE", "https://example.com/g.json", false, donation)
+        .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
+        .signers([creator, m]).rpc();
+      await curve.methods.buyExactSolIn(new BN(2 * LAMPORTS_PER_SOL), new BN(0))
+        .accounts({ ...tradeAccounts(trader.publicKey), mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), associatedUser: getAssociatedTokenAddressSync(m.publicKey, trader.publicKey), creatorVault: donationVault })
+        .signers([trader]).rpc();
+      await curve.methods.collectCreatorFee().accounts({ creator: donation, creatorVault: donationVault, systemProgram: SystemProgram.programId }).rpc();
+      const b0 = await lamports(beneficiary.publicKey);
+      await fees.methods.crankDonationFeePda().accounts({ payer: trader.publicKey, feeProgramGlobal: feeGlobal, donationFeePda: donation, beneficiary: beneficiary.publicKey }).signers([trader]).rpc();
+      const rentMin0 = await conn.getMinimumBalanceForRentExemption(0);
+      assert.equal((await lamports(beneficiary.publicKey)) - b0, 0.01 * LAMPORTS_PER_SOL - rentMin0);
+    });
+
+    it("graduated coin: sharing config reassigns the AMM pool's coin creator and AMM fees split too", async () => {
+      // PEOPLE (first coin) is migrated; its creator is `creator`
+      const [sharing] = PublicKey.findProgramAddressSync([Buffer.from("sharing-config"), mint.toBuffer()], fees.programId);
+      await fees.methods.createFeeSharingConfig()
+        .accounts({ payer: creator.publicKey, feeProgramGlobal: feeGlobal, mint, sharingConfig: sharing, bondingCurve, curveProgram: curve.programId, curveEventAuthority: curveEv, pool, ammProgram: amm.programId, ammEventAuthority, systemProgram: SystemProgram.programId })
+        .signers([creator]).rpc();
+      const p = await amm.account.pool.fetch(pool);
+      assert.equal(p.coinCreator.toBase58(), sharing.toBase58());
+      const partner = Keypair.generate();
+      const [sharingVaultCurve] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), sharing.toBuffer()], curve.programId);
+      await fees.methods.updateFeeShares([{ address: creator.publicKey, shareBps: 5000 }, { address: partner.publicKey, shareBps: 5000 }])
+        .accounts({ authority: creator.publicKey, mint, sharingConfig: sharing, creatorVault: sharingVaultCurve }).signers([creator]).rpc();
+      // AMM buy now credits the sharing config's AMM vault
+      const [vaultAuth] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), sharing.toBuffer()], amm.programId);
+      const vaultAta = getAssociatedTokenAddressSync(NATIVE_MINT, vaultAuth, true);
+      await amm.methods.buy(new BN("1000000000000"), new BN(10 * LAMPORTS_PER_SOL))
+        .accounts({ ...swapAccounts(trader.publicKey), coinCreatorVaultAuthority: vaultAuth, coinCreatorVaultAta: vaultAta, feeConfig: null })
+        .preInstructions([createAssociatedTokenAccountIdempotentInstruction(trader.publicKey, vaultAta, vaultAuth, NATIVE_MINT)])
+        .signers([trader]).rpc();
+      const accrued = await tokenBal(vaultAta);
+      assert.isAbove(Number(accrued), 0);
+      await amm.methods.distributeCoinCreatorFees(true)
+        .accounts({ payer: trader.publicKey, pool, sharingConfig: sharing, quoteMint: NATIVE_MINT, coinCreatorVaultAuthority: vaultAuth, coinCreatorVaultAta: vaultAta, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId })
+        .remainingAccounts([
+          { pubkey: creator.publicKey, isSigner: false, isWritable: false }, { pubkey: partner.publicKey, isSigner: false, isWritable: false },
+          { pubkey: getAssociatedTokenAddressSync(NATIVE_MINT, creator.publicKey), isSigner: false, isWritable: true }, { pubkey: getAssociatedTokenAddressSync(NATIVE_MINT, partner.publicKey), isSigner: false, isWritable: true },
+        ])
+        .signers([trader]).rpc();
+      assert.equal((await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, partner.publicKey))).toString(), (accrued / 2n).toString());
+      assert.equal((await tokenBal(vaultAta)).toString(), (accrued - (accrued / 2n) * 2n).toString());
     });
   });
 });
