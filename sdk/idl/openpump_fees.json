@@ -3472,6 +3472,13 @@
           {
             "name": "can_edit_creator_fee",
             "type": "bool"
+          },
+          {
+            "name": "is_mayhem_mode",
+            "docs": [
+              "Launched in mayhem mode: the mayhem vault trades it until its deadline, then burns."
+            ],
+            "type": "bool"
           }
         ]
       }

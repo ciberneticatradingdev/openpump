@@ -9,11 +9,13 @@ skip-lint = false
 openpump_curve = "AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB"
 openpump_amm = "BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb"
 openpump_fees = "goxedqtEDBUXsuMxYDpgfivPGZuQD4ifzfcFkhVCUe5"
+openpump_mayhem = "Bh6Tz6WwwQbxEAMB2FjkrLWjAXbAxDn3t445jU1pZMAP"
 
 [programs.devnet]
 openpump_curve = "AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB"
 openpump_amm = "BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb"
 openpump_fees = "goxedqtEDBUXsuMxYDpgfivPGZuQD4ifzfcFkhVCUe5"
+openpump_mayhem = "Bh6Tz6WwwQbxEAMB2FjkrLWjAXbAxDn3t445jU1pZMAP"
 
 [registry]
 url = "https://api.apr.dev"

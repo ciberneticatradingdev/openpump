@@ -3478,6 +3478,13 @@ export type OpenpumpFees = {
           {
             "name": "canEditCreatorFee",
             "type": "bool"
+          },
+          {
+            "name": "isMayhemMode",
+            "docs": [
+              "Launched in mayhem mode: the mayhem vault trades it until its deadline, then burns."
+            ],
+            "type": "bool"
           }
         ]
       }

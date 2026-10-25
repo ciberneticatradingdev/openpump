@@ -24,6 +24,7 @@ export default function CreatePage() {
   const [pair, setPair] = useState<QuoteMintInfo | null>(null);
   const [dest, setDest] = useState<"you" | "holders" | "social" | "charity">("you");
   const [standard, setStandard] = useState<"spl" | "token2022">("spl");
+  const [mayhemMode, setMayhemMode] = useState(false);
   const [handle, setHandle] = useState("");
   const [charity, setCharity] = useState("");
   const holderRewards = dest === "holders";
@@ -101,9 +102,10 @@ export default function CreatePage() {
         v2
           ? await client.createV2Ix(publicKey, mintKp.publicKey, new PublicKey(pair.mint), name, symbol, uri, holderRewards, creatorPk)
           : standard === "token2022"
-            ? await client.createV3Ix(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards, creatorPk)
-            : await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards, creatorPk)
+            ? await client.createV3Ix(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards, creatorPk, mayhemMode)
+            : await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards, creatorPk, mayhemMode)
       );
+      if (mayhemMode && !v2) ixs.push(await client.mayhemInitStateIx(publicKey, mintKp.publicKey));
       if (quote) {
         const units = BigInt(Math.floor(Number(devBuy) * 10 ** qDec));
         const minOut = (quote.tokensOut * 97n) / 100n;
@@ -178,6 +180,12 @@ export default function CreatePage() {
           ))}
           {pairs.length <= 1 && <span className="text-[12px] text-dim self-center">No custom pairs enabled on this cluster yet.</span>}
         </div>
+        {!v2 && cfg?.global.mayhemModeEnabled && (
+          <label className="flex items-start gap-2 rounded-xl border border-red/30 bg-red/5 p-3 cursor-pointer">
+            <input type="checkbox" className="mt-0.5" checked={mayhemMode} onChange={(e) => setMayhemMode(e.target.checked)} />
+            <span className="text-[12px]"><b className="text-red">Mayhem mode.</b> <span className="text-mute">The protocol's vault trades your coin for a limited time (buys and sells within a price band, then burns what it holds). Starts from the mayhem virtual reserves instead of the default ones.</span></span>
+          </label>
+        )}
         {!v2 && (
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <span className="text-[12px] text-mute">Token standard</span>

@@ -3279,6 +3279,10 @@
         {
           "name": "creator",
           "type": "pubkey"
+        },
+        {
+          "name": "is_mayhem_mode",
+          "type": "bool"
         }
       ]
     },
@@ -3859,6 +3863,10 @@
         {
           "name": "creator",
           "type": "pubkey"
+        },
+        {
+          "name": "is_mayhem_mode",
+          "type": "bool"
         }
       ]
     },
@@ -6803,6 +6811,89 @@
       ]
     },
     {
+      "name": "set_mayhem_virtual_params",
+      "discriminator": [
+        61,
+        169,
+        188,
+        191,
+        153,
+        149,
+        42,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "initial_virtual_sol_reserves",
+          "type": "u64"
+        },
+        {
+          "name": "initial_virtual_token_reserves",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "set_params",
       "discriminator": [
         27,
@@ -7131,6 +7222,85 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "toggle_mayhem_mode",
+      "discriminator": [
+        1,
+        9,
+        111,
+        208,
+        100,
+        31,
+        255,
+        163
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "update_authority",
@@ -7845,6 +8015,11 @@
       "code": 6024,
       "name": "CreatorFeeLocked",
       "msg": "Creator fee is locked for this coin"
+    },
+    {
+      "code": 6025,
+      "name": "MayhemDisabled",
+      "msg": "Mayhem mode is disabled"
     }
   ],
   "types": [
@@ -8008,6 +8183,13 @@
           },
           {
             "name": "can_edit_creator_fee",
+            "type": "bool"
+          },
+          {
+            "name": "is_mayhem_mode",
+            "docs": [
+              "Launched in mayhem mode: the mayhem vault trades it until its deadline, then burns."
+            ],
             "type": "bool"
           }
         ]
@@ -8199,6 +8381,10 @@
           {
             "name": "token_program",
             "type": "pubkey"
+          },
+          {
+            "name": "is_mayhem_mode",
+            "type": "bool"
           }
         ]
       }
@@ -8469,6 +8655,21 @@
           },
           {
             "name": "max_configurable_creator_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "mayhem_mode_enabled",
+            "docs": [
+              "Mayhem mode: coins launched with it start from these virtual reserves and are traded by the mayhem vault."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "mayhem_initial_virtual_sol_reserves",
+            "type": "u64"
+          },
+          {
+            "name": "mayhem_initial_virtual_token_reserves",
             "type": "u64"
           }
         ]

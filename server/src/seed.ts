@@ -6,6 +6,8 @@
 import "dotenv/config";
 import fs from "node:fs";
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import anchorPkg from "@coral-xyz/anchor";
+const { BN } = anchorPkg as any;
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { DEFAULT_AMM_FEES, DEFAULT_FEE_TIERS, DEFAULT_FLAT_FEES, DEFAULT_PARAMS, OpenpumpClient, curve as curveMath, pda } from "@openpump/sdk";
 import { createMint, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
@@ -170,6 +172,26 @@ async function main() {
       await tp.sendAndConfirm(new Transaction().add(...ixs), [t]);
     }
     console.log("  3 HODL buys; pot:", Number(await client.holderPot(kp.publicKey)) / 1e9, "SOL");
+  }
+
+  // ---- mayhem demo coin (local only): protocol vault trades it for a limited window, then burns
+  if (local) {
+    const mg = client.mayhem.methods;
+    await send([
+      await client.curve.methods.toggleMayhemMode(true).accounts({ authority: admin.publicKey, global: pda.global() } as any).instruction(),
+      await client.curve.methods.setMayhemVirtualParams(new BN("60000000000"), new BN(DEFAULT_PARAMS.initialVirtualTokenReserves.toString())).accounts({ authority: admin.publicKey, global: pda.global() } as any).instruction(),
+    ]);
+    if (!(await client.fetchMayhemParams())) {
+      await send([await mg.initializeGlobalParams(admin.publicKey, global.feeRecipient, new BN("5000000000"), new BN(1800)).accounts({ admin: admin.publicKey } as any).instruction()]);
+      await send([SystemProgram.transfer({ fromPubkey: admin.publicKey, toPubkey: pda.mayhemSolVault(), lamports: 20 * 1e9 })]);
+    }
+    const kp = Keypair.generate();
+    const { uri } = await uploadMeta({ name: "Mayhem Mode", symbol: "MAYHEM", desc: "the vault trades this one for 30 minutes", color: "ff4d4d" });
+    await send([await client.createIx(admin.publicKey, kp.publicKey, "Mayhem Mode", "MAYHEM", uri, false, PublicKey.default, true), await client.mayhemInitStateIx(admin.publicKey, kp.publicKey)], [kp]);
+    const c = (await client.fetchBondingCurve(kp.publicKey))!;
+    const ref = OpenpumpClient.mayhemReference(c);
+    await send([await client.mayhemBuyIx(admin.publicKey, kp.publicKey, admin.publicKey, global.feeRecipient, 2_000_000_000n, ref, 300)]);
+    console.log("created MAYHEM (vault bought 2 SOL)", kp.publicKey.toBase58());
   }
 
   // ---- custom pair demo: a quote token "OPEN" + one coin paired with it (local or QUOTE_MINT provided)

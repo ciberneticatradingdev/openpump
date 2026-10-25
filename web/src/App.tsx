@@ -9,6 +9,7 @@ import CoinPage from "./pages/Coin";
 import CreatePage from "./pages/Create";
 import ProfilePage from "./pages/Profile";
 import HowItWorks from "./pages/HowItWorks";
+import SwapPage from "./pages/Swap";
 
 function Shell() {
   useLive();
@@ -22,6 +23,7 @@ function Shell() {
           <Route path="/create" element={<CreatePage />} />
           <Route path="/profile/:pubkey?" element={<ProfilePage />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/swap" element={<SwapPage />} />
         </Routes>
       </main>
       <Dock />

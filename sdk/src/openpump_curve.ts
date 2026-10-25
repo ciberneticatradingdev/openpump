@@ -3285,6 +3285,10 @@ export type OpenpumpCurve = {
         {
           "name": "creator",
           "type": "pubkey"
+        },
+        {
+          "name": "isMayhemMode",
+          "type": "bool"
         }
       ]
     },
@@ -3865,6 +3869,10 @@ export type OpenpumpCurve = {
         {
           "name": "creator",
           "type": "pubkey"
+        },
+        {
+          "name": "isMayhemMode",
+          "type": "bool"
         }
       ]
     },
@@ -6809,6 +6817,89 @@ export type OpenpumpCurve = {
       ]
     },
     {
+      "name": "setMayhemVirtualParams",
+      "discriminator": [
+        61,
+        169,
+        188,
+        191,
+        153,
+        149,
+        42,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "initialVirtualSolReserves",
+          "type": "u64"
+        },
+        {
+          "name": "initialVirtualTokenReserves",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "setParams",
       "discriminator": [
         27,
@@ -7137,6 +7228,85 @@ export type OpenpumpCurve = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "toggleMayhemMode",
+      "discriminator": [
+        1,
+        9,
+        111,
+        208,
+        100,
+        31,
+        255,
+        163
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "updateAuthority",
@@ -7851,6 +8021,11 @@ export type OpenpumpCurve = {
       "code": 6024,
       "name": "creatorFeeLocked",
       "msg": "Creator fee is locked for this coin"
+    },
+    {
+      "code": 6025,
+      "name": "mayhemDisabled",
+      "msg": "Mayhem mode is disabled"
     }
   ],
   "types": [
@@ -8014,6 +8189,13 @@ export type OpenpumpCurve = {
           },
           {
             "name": "canEditCreatorFee",
+            "type": "bool"
+          },
+          {
+            "name": "isMayhemMode",
+            "docs": [
+              "Launched in mayhem mode: the mayhem vault trades it until its deadline, then burns."
+            ],
             "type": "bool"
           }
         ]
@@ -8205,6 +8387,10 @@ export type OpenpumpCurve = {
           {
             "name": "tokenProgram",
             "type": "pubkey"
+          },
+          {
+            "name": "isMayhemMode",
+            "type": "bool"
           }
         ]
       }
@@ -8475,6 +8661,21 @@ export type OpenpumpCurve = {
           },
           {
             "name": "maxConfigurableCreatorFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "mayhemModeEnabled",
+            "docs": [
+              "Mayhem mode: coins launched with it start from these virtual reserves and are traded by the mayhem vault."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "mayhemInitialVirtualSolReserves",
+            "type": "u64"
+          },
+          {
+            "name": "mayhemInitialVirtualTokenReserves",
             "type": "u64"
           }
         ]

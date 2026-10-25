@@ -18,7 +18,8 @@ import {
   SYSVAR_RENT_PUBKEY,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { AMM_IDL, AMM_PROGRAM_ID, CURVE_IDL, CURVE_PROGRAM_ID, FEES_IDL, FEES_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
+import { AMM_IDL, AMM_PROGRAM_ID, CURVE_IDL, CURVE_PROGRAM_ID, FEES_IDL, FEES_PROGRAM_ID, MAYHEM_IDL, MAYHEM_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
+import type { OpenpumpMayhem } from "./openpump_mayhem";
 import type { OpenpumpFees } from "./openpump_fees";
 import { pda } from "./pda";
 import type { OpenpumpAmm } from "./openpump_amm";
@@ -45,6 +46,7 @@ export interface GlobalState {
   buybackBasisPoints: bigint;
   buybackFeeRecipient: PublicKey;
   holderRewardAuthority: PublicKey;
+  mayhemModeEnabled: boolean;
 }
 
 export interface BondingCurveState extends CurveState {
@@ -93,6 +95,7 @@ export class OpenpumpClient {
   readonly curve: Program<OpenpumpCurve>;
   readonly amm: Program<OpenpumpAmm>;
   readonly fees: Program<OpenpumpFees>;
+  readonly mayhem: Program<OpenpumpMayhem>;
   /** Set once the fees program is initialised; trade builders then pass the tiered schedule. */
   feeConfigEnabled = false;
   /** Set to Global.buyback_fee_recipient when buybacks are on; buys/sells then route the share. */
@@ -102,6 +105,7 @@ export class OpenpumpClient {
     this.curve = new Program<OpenpumpCurve>(CURVE_IDL, provider);
     this.amm = new Program<OpenpumpAmm>(AMM_IDL, provider);
     this.fees = new Program<OpenpumpFees>(FEES_IDL, provider);
+    this.mayhem = new Program<OpenpumpMayhem>(MAYHEM_IDL, provider);
   }
 
   /** Detect fee program state so builders include fee_config / buyback automatically. */
@@ -133,6 +137,7 @@ export class OpenpumpClient {
       buybackBasisPoints: big(g.buybackBasisPoints),
       buybackFeeRecipient: g.buybackFeeRecipient,
       holderRewardAuthority: g.holderRewardAuthority,
+      mayhemModeEnabled: g.mayhemModeEnabled,
     };
   }
 
@@ -228,9 +233,9 @@ export class OpenpumpClient {
 
   // ------------------------------------------------------------- curve instructions
 
-  async createIx(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, creator: PublicKey = PublicKey.default) {
+  async createIx(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, creator: PublicKey = PublicKey.default, isMayhemMode = false) {
     return this.curve.methods
-      .create(name, symbol, uri, isHolderReward, creator)
+      .create(name, symbol, uri, isHolderReward, creator, isMayhemMode)
       .accounts({
         mint,
         mintAuthority: pda.mintAuthority(),
@@ -302,10 +307,10 @@ export class OpenpumpClient {
   }
 
   /** Token-2022 coin with on-mint metadata (no Metaplex account). */
-  async createV3Ix(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, creator: PublicKey = PublicKey.default) {
+  async createV3Ix(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, creator: PublicKey = PublicKey.default, isMayhemMode = false) {
     this.setCoinTokenProgram(mint, TOKEN_2022_PROGRAM_ID);
     return this.curve.methods
-      .createV3(name, symbol, uri, isHolderReward, creator)
+      .createV3(name, symbol, uri, isHolderReward, creator, isMayhemMode)
       .accounts({
         mint, mintAuthority: pda.mintAuthority(), bondingCurve: pda.bondingCurve(mint),
         associatedBondingCurve: getAssociatedTokenAddressSync(mint, pda.bondingCurve(mint), true, TOKEN_2022_PROGRAM_ID),
@@ -750,6 +755,51 @@ export class OpenpumpClient {
   }
   async sweepBuybackIx(authority: PublicKey, index = 0) {
     return this.fees.methods.sweepBuyback(index).accounts({ authority, buybackVault: pda.buybackVault(index) } as any).instruction();
+  }
+
+  // ------------------------------------------------------------- mayhem
+
+  async fetchMayhemParams() {
+    const info = await this.connection.getAccountInfo(pda.mayhemGlobalParams(), "confirmed");
+    if (!info) return null;
+    const g = this.mayhem.coder.accounts.decode("globalParams", info.data);
+    return { admin: g.admin as PublicKey, trader: g.trader as PublicKey, paused: g.paused as boolean, solDeployed: BigInt(g.solDeployed.toString()), maxSolPerSweep: big(g.maxSolPerSweep), durationSeconds: Number(g.mayhemDurationSeconds) };
+  }
+  async fetchMayhemState(mint: PublicKey) {
+    const info = await this.connection.getAccountInfo(pda.mayhemState(mint), "confirmed");
+    if (!info) return null;
+    const s = this.mayhem.coder.accounts.decode("mayhemState", info.data);
+    return { endTimestamp: Number(s.endTimestamp), solDeployed: BigInt(s.solDeployed.toString()), ended: !!s.status.ended, burnedAmount: big(s.burnedAmount) };
+  }
+  /** Register a freshly launched mayhem coin (same tx as create). */
+  async mayhemInitStateIx(payer: PublicKey, mint: PublicKey) {
+    return this.mayhem.methods.initState().accounts({ payer, globalParams: pda.mayhemGlobalParams(), mint, bondingCurve: pda.bondingCurve(mint), mayhemState: pda.mayhemState(mint), systemProgram: SystemProgram.programId } as any).instruction();
+  }
+  private async mayhemTradeAccounts(trader: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey) {
+    const tp = await this.coinTokenProgram(mint);
+    const vault = pda.mayhemSolVault();
+    return {
+      trader, globalParams: pda.mayhemGlobalParams(), mayhemState: pda.mayhemState(mint), mint, solVault: vault, mayhemTokenVault: getAssociatedTokenAddressSync(mint, vault, true, tp),
+      curveProgram: CURVE_PROGRAM_ID, global: pda.global(), feeRecipient, bondingCurve: pda.bondingCurve(mint), associatedBondingCurve: getAssociatedTokenAddressSync(mint, pda.bondingCurve(mint), true, tp),
+      creatorVault: pda.creatorVault(creator), feeConfig: this.feeConfigEnabled ? pda.feeConfig() : null, buybackFeeRecipient: this.buybackRecipient, curveEventAuthority: pda.curveEventAuthority(),
+      tokenProgram: tp, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any;
+  }
+  /** reference = lamports per whole token × 1e9 (see program PRICE_SCALE). */
+  async mayhemBuyIx(trader: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, solAmount: bigint, reference: bigint, toleranceBps: number) {
+    return this.mayhem.methods.buy(bn(solAmount), bn(reference), toleranceBps).accounts(await this.mayhemTradeAccounts(trader, mint, creator, feeRecipient)).instruction();
+  }
+  async mayhemSellIx(trader: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, tokenAmount: bigint, reference: bigint, toleranceBps: number, retainedReserveBps: number) {
+    return this.mayhem.methods.sell(bn(tokenAmount), bn(reference), toleranceBps, retainedReserveBps).accounts(await this.mayhemTradeAccounts(trader, mint, creator, feeRecipient)).instruction();
+  }
+  async mayhemBurnIx(mint: PublicKey) {
+    const tp = await this.coinTokenProgram(mint);
+    const vault = pda.mayhemSolVault();
+    return this.mayhem.methods.burnTokens().accounts({ mayhemState: pda.mayhemState(mint), mint, mayhemTokenVault: getAssociatedTokenAddressSync(mint, vault, true, tp), solVault: vault, tokenProgram: tp } as any).instruction();
+  }
+  /** Spot price in the mayhem reference scale. */
+  static mayhemReference(c: CurveState) {
+    return (c.virtualSolReserves * 1_000_000_000n * 1_000_000n) / c.virtualTokenReserves;
   }
 
   // ------------------------------------------------------------- multi-hop

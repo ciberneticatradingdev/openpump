@@ -40,6 +40,8 @@ export interface Coin {
   holder_paid: string;
   creator_kind: "wallet" | "holders" | "sharing" | "social" | "donation" | "pending";
   token_program: string;
+  is_mayhem_mode: number;
+  mayhem_end: number | null;
 }
 export const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
@@ -93,6 +95,7 @@ export interface Config {
     migrationFeeLamports: string;
     buybackBasisPoints?: string;
     buybackFeeRecipient?: string;
+    mayhemModeEnabled?: boolean;
     antiSnipeSlots: string;
     antiSnipeMaxBps: string;
     paused: boolean;

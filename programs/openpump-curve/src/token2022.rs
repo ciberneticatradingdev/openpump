@@ -9,10 +9,11 @@ use anchor_spl::token_2022_extensions::token_metadata::{token_metadata_initializ
 use anchor_spl::token_interface::{self as ti, Mint as MintI, TokenAccount as TokenAccountI};
 use anchor_spl::token_interface::spl_pod::optional_keys::OptionalNonZeroPubkey;
 
-pub fn create_v3(ctx: Context<CreateV3>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey) -> Result<()> {
+pub fn create_v3(ctx: Context<CreateV3>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey, is_mayhem_mode: bool) -> Result<()> {
     let g = &ctx.accounts.global;
     require!(!g.paused, CurveError::Paused);
     require!(!is_holder_reward || g.holder_reward_enabled, CurveError::HolderRewardDisabled);
+    require!(!is_mayhem_mode || g.mayhem_mode_enabled, CurveError::MayhemDisabled);
     require!(name.len() <= 32 && symbol.len() <= 10 && uri.len() <= 200, CurveError::MetadataTooLong);
 
     let seeds: &[&[u8]] = &[MINT_AUTHORITY_SEED, &[ctx.bumps.mint_authority]];
@@ -83,8 +84,9 @@ pub fn create_v3(ctx: Context<CreateV3>, name: String, symbol: String, uri: Stri
     bc.is_holder_reward = is_holder_reward;
     bc.creator_fee_bps = 0;
     bc.can_edit_creator_fee = !is_holder_reward;
-    bc.virtual_token_reserves = g.initial_virtual_token_reserves;
-    bc.virtual_sol_reserves = g.initial_virtual_sol_reserves;
+    bc.is_mayhem_mode = is_mayhem_mode;
+    bc.virtual_token_reserves = if is_mayhem_mode { g.mayhem_initial_virtual_token_reserves } else { g.initial_virtual_token_reserves };
+    bc.virtual_sol_reserves = if is_mayhem_mode { g.mayhem_initial_virtual_sol_reserves } else { g.initial_virtual_sol_reserves };
     bc.real_token_reserves = g.initial_real_token_reserves;
     bc.real_sol_reserves = 0;
     bc.token_total_supply = g.token_total_supply;
@@ -103,7 +105,8 @@ pub fn create_v3(ctx: Context<CreateV3>, name: String, symbol: String, uri: Stri
         real_token_reserves: bc.real_token_reserves, token_total_supply: bc.token_total_supply,
         timestamp: clock.unix_timestamp, quote_mint: bc.quote_mint, is_holder_reward: bc.is_holder_reward,
         token_program: ctx.accounts.token_program.key(),
-    });
+        is_mayhem_mode: bc.is_mayhem_mode,
+        });
     Ok(())
 }
 

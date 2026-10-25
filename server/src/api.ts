@@ -34,6 +34,7 @@ export function apiRouter(db: Db, conn: Connection) {
         migrationFeeLamports: g.migrationFeeLamports.toString(),
         buybackBasisPoints: g.buybackBasisPoints.toString(),
         buybackFeeRecipient: g.buybackFeeRecipient.toBase58(),
+        mayhemModeEnabled: (g as any).mayhemModeEnabled ?? false,
         antiSnipeSlots: g.antiSnipeSlots.toString(),
         antiSnipeMaxBps: g.antiSnipeMaxBps.toString(),
         paused: g.paused,

@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, FEES_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, FEES_PROGRAM_ID, MAYHEM_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
 
 const u16le = (n: number) => Buffer.from([n & 0xff, (n >> 8) & 0xff]);
 
@@ -30,6 +30,10 @@ export const pda = {
   donationFeePda: (mint: PublicKey, beneficiary: PublicKey) =>
     PublicKey.findProgramAddressSync([Buffer.from("donation-fee-pda"), mint.toBuffer(), beneficiary.toBuffer()], FEES_PROGRAM_ID)[0],
   buybackVault: (index = 0) => PublicKey.findProgramAddressSync([Buffer.from("buyback"), Buffer.from([index])], FEES_PROGRAM_ID)[0],
+  /** Mayhem */
+  mayhemGlobalParams: () => PublicKey.findProgramAddressSync([Buffer.from("global-params")], MAYHEM_PROGRAM_ID)[0],
+  mayhemSolVault: () => PublicKey.findProgramAddressSync([Buffer.from("sol-vault")], MAYHEM_PROGRAM_ID)[0],
+  mayhemState: (mint: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("mayhem-state"), mint.toBuffer()], MAYHEM_PROGRAM_ID)[0],
   /** Volume incentives */
   globalVolumeAccumulator: () => PublicKey.findProgramAddressSync([Buffer.from("global_volume_accumulator")], CURVE_PROGRAM_ID)[0],
   userVolumeAccumulator: (user: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("user_volume_accumulator"), user.toBuffer()], CURVE_PROGRAM_ID)[0],

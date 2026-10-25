@@ -22,6 +22,7 @@ export default function CoinCard({ c, initialReal, flash }: { c: Coin; initialRe
             <span className="font-head font-semibold text-[14px] truncate">{c.symbol}</span>
             <span className="text-mute text-[12px] truncate">{c.name}</span>
             {!!c.is_holder_reward && <span className="text-[10px] font-semibold text-acc border border-acc/30 bg-acc/10 rounded-full px-1.5 py-0.5">→ holders</span>}
+            {!!c.is_mayhem_mode && <span className="text-[10px] font-semibold text-red border border-red/30 bg-red/10 rounded-full px-1.5 py-0.5">mayhem</span>}
             {c.quote_symbol && c.quote_symbol !== "SOL" && <span className="text-[10px] font-semibold text-mute border border-line rounded-full px-1.5 py-0.5">/{c.quote_symbol}</span>}
             {graduated && <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-acc bg-acc/10 border border-acc/30 rounded-full px-1.5 py-0.5">AMM</span>}
             {!graduated && c.complete === 1 && <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-gold bg-gold/10 border border-gold/30 rounded-full px-1.5 py-0.5">graduating</span>}
