@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useCoin, useConfig, useHolders, useTrades } from "../lib/api";
+import { useCoin, useConfig, useHolders, useRewards, useTrades } from "../lib/api";
 import { ago, compact, explorer, priceQ, qty, short, sol } from "../lib/format";
 import Avatar from "../components/Avatar";
 import Chart from "../components/Chart";
@@ -14,6 +14,7 @@ export default function CoinPage() {
   const { mint } = useParams();
   const { data: coin, isLoading, refetch } = useCoin(mint);
   const { data: cfg } = useConfig();
+  const { data: rewards } = useRewards(mint, !!coin?.is_holder_reward);
   const { publicKey } = useWallet();
   const toast = useToast();
   const [tab, setTab] = useState<"trades" | "holders" | "about">("trades");
@@ -42,10 +43,15 @@ export default function CoinPage() {
               <span className="text-mute text-[14px] truncate">{coin.name}</span>
               {graduated ? <Badge color="acc">AMM</Badge> : coin.complete ? <Badge color="gold">graduating</Badge> : <Badge>bonding curve</Badge>}
               {qSym !== "SOL" && <Badge>pair /{qSym}</Badge>}
+              {!!coin.is_holder_reward && <Badge color="acc">rewards → holders</Badge>}
             </div>
             <div className="flex items-center gap-2 flex-wrap text-[12px] text-mute mt-1">
               <button onClick={() => copy(coin.mint)} className="pill !h-7 num hover:border-line2" title="Copy contract address">{short(coin.mint, 5)} <span className="text-dim">⧉</span></button>
-              <Link to={`/profile/${coin.creator}`} className="pill !h-7 hover:border-line2">by {short(coin.creator)}{isCreator && <span className="text-acc">(you)</span>}</Link>
+              {coin.is_holder_reward ? (
+                <span className="pill !h-7">creator fee → holders</span>
+              ) : (
+                <Link to={`/profile/${coin.creator}`} className="pill !h-7 hover:border-line2">by {short(coin.creator)}{isCreator && <span className="text-acc">(you)</span>}</Link>
+              )}
               <span className="pill !h-7">{ago(coin.created_at)} ago</span>
               {coin.twitter && <a href={coin.twitter} target="_blank" rel="noreferrer" className="pill !h-7 hover:border-line2">X ↗</a>}
               {coin.telegram && <a href={coin.telegram} target="_blank" rel="noreferrer" className="pill !h-7 hover:border-line2">TG ↗</a>}
@@ -61,7 +67,11 @@ export default function CoinPage() {
           <Kpi k="Price" v={`${priceQ(coin.price, qDec)} ${qSym}`} />
           <Kpi k="Volume" v={`${qty(coin.volume_sol, qDec, 1)} ${qSym}`} />
           <Kpi k="Trades" v={coin.trades} />
-          <Kpi k="Creator earned" v={`${qty(coin.creator_fees, qDec, 3)} ${qSym}`} />
+          {coin.is_holder_reward ? (
+            <Kpi k="Paid to holders" v={`${qty(coin.holder_paid || 0, qDec, 3)} ${qSym}`} />
+          ) : (
+            <Kpi k="Creator earned" v={`${qty(coin.creator_fees, qDec, 3)} ${qSym}`} />
+          )}
         </div>
 
         <Chart mint={coin.mint} qSym={qSym} qDec={qDec} />
@@ -106,12 +116,24 @@ export default function CoinPage() {
           </p>
         </div>
 
+        {!!coin.is_holder_reward && (
+          <div className="panel p-3 text-[12px] text-mute space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="label">Holder rewards</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-acc">live</span>
+            </div>
+            <Row k="Pot (undistributed)" v={`${qty(rewards?.pot || 0, qDec, 4)} ${qSym}`} />
+            <Row k="Paid out so far" v={`${qty(coin.holder_paid || 0, qDec, 4)} ${qSym}`} />
+            <Row k="Payouts" v={rewards?.distributions.length ?? 0} />
+            <p className="pt-1">The creator fee of every trade goes to this coin's holders instead of the creator. Paid pro-rata to the top 20 holders every few minutes.</p>
+          </div>
+        )}
         <div className="panel p-3 text-[12px] text-mute space-y-1.5">
           <div className="label mb-1">Fee split on every trade</div>
-          <Row k="Creator" v={`${Number(cfg.global.creatorFeeBasisPoints) / 100}%`} />
+          <Row k={coin.is_holder_reward ? "Holders" : "Creator"} v={`${Number(cfg.global.creatorFeeBasisPoints) / 100}%`} />
           <Row k="Protocol" v={`${Number(cfg.global.feeBasisPoints) / 100}%`} />
           {graduated && cfg.global.amm && <Row k="AMM LPs" v={`${Number(cfg.global.amm.lpFeeBasisPoints) / 100}%`} />}
-          {isCreator && <Link to="/profile" className="btn btn-ghost w-full mt-2 !h-9">Claim your fees →</Link>}
+          {isCreator && !coin.is_holder_reward && <Link to="/profile" className="btn btn-ghost w-full mt-2 !h-9">Claim your fees →</Link>}
         </div>
       </div>
     </div>

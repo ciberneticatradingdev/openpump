@@ -22,6 +22,7 @@ export default function CreatePage() {
   const [devBuy, setDevBuy] = useState("");
   const [busy, setBusy] = useState(false);
   const [pair, setPair] = useState<QuoteMintInfo | null>(null);
+  const [holderRewards, setHolderRewards] = useState(false);
   const [quoteCfg, setQuoteCfg] = useState<{ initialVirtualQuoteReserves: bigint; initialVirtualTokenReserves: bigint; initialRealTokenReserves: bigint; enabled: boolean } | null>(null);
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value }));
 
@@ -79,8 +80,8 @@ export default function CreatePage() {
       const symbol = f.symbol.trim().toUpperCase();
       const feeRecipient = new PublicKey(cfg.global.feeRecipient!);
       const ixs = v2
-        ? [await client.createV2Ix(publicKey, mintKp.publicKey, new PublicKey(pair.mint), name, symbol, uri)]
-        : [await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri)];
+        ? [await client.createV2Ix(publicKey, mintKp.publicKey, new PublicKey(pair.mint), name, symbol, uri, holderRewards)]
+        : [await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards)];
       if (quote) {
         const units = BigInt(Math.floor(Number(devBuy) * 10 ** qDec));
         const minOut = (quote.tokensOut * 97n) / 100n;
@@ -161,6 +162,24 @@ export default function CreatePage() {
           </div>
         )}
         {v2 && !quoteCfg && <div className="text-[12px] text-red">This pair is not configured on-chain yet.</div>}
+      </div>
+
+      {/* creator rewards recipient */}
+      <div className="panel p-4 space-y-3">
+        <div>
+          <div className="font-head font-semibold text-[14px]">Creator rewards go to</div>
+          <div className="text-[12px] text-mute">{g ? Number(g.creatorFeeBasisPoints) / 100 : 0.5}% of every trade, on the curve and on the AMM. Choose who receives it; this cannot be changed later.</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => setHolderRewards(false)} className={`rounded-xl border p-3 text-left transition ${!holderRewards ? "border-acc/50 bg-acc/10" : "border-line hover:border-line2"}`}>
+            <div className="font-semibold text-[13px]">You (the creator)</div>
+            <div className="text-[11px] text-mute mt-0.5">Claim any time from your profile.</div>
+          </button>
+          <button onClick={() => setHolderRewards(true)} className={`rounded-xl border p-3 text-left transition ${holderRewards ? "border-acc/50 bg-acc/10" : "border-line hover:border-line2"}`}>
+            <div className="font-semibold text-[13px]">Holders <span className="text-[10px] font-bold uppercase tracking-wider text-acc bg-acc/10 border border-acc/30 rounded-full px-1.5 py-0.5 ml-1">rewards → holders</span></div>
+            <div className="text-[11px] text-mute mt-0.5">Paid out pro-rata to the top holders every few minutes. You earn nothing as creator.</div>
+          </button>
+        </div>
       </div>
 
       <div className="panel p-4 space-y-3">

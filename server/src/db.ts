@@ -34,8 +34,18 @@ export function openDb(file: string) {
       metadata_fetched INTEGER DEFAULT 0,
       quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112',
       quote_symbol TEXT DEFAULT 'SOL',
-      quote_decimals INTEGER DEFAULT 9
+      quote_decimals INTEGER DEFAULT 9,
+      is_holder_reward INTEGER DEFAULT 0,
+      holder_paid TEXT DEFAULT '0'
     );
+    CREATE TABLE IF NOT EXISTS distributions (
+      sig TEXT PRIMARY KEY,
+      mint TEXT NOT NULL,
+      total TEXT NOT NULL,
+      recipients INTEGER NOT NULL,
+      ts INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS distributions_mint ON distributions(mint, ts DESC);
     CREATE INDEX IF NOT EXISTS coins_created ON coins(created_at DESC);
     CREATE INDEX IF NOT EXISTS coins_last_trade ON coins(last_trade_at DESC);
     CREATE INDEX IF NOT EXISTS coins_creator ON coins(creator);
@@ -62,7 +72,7 @@ export function openDb(file: string) {
     CREATE TABLE IF NOT EXISTS cursors (program TEXT PRIMARY KEY, last_sig TEXT, backfilled INTEGER DEFAULT 0);
     CREATE TABLE IF NOT EXISTS pools (pool TEXT PRIMARY KEY, mint TEXT NOT NULL);
   `);
-  for (const col of ["quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112'", "quote_symbol TEXT DEFAULT 'SOL'", "quote_decimals INTEGER DEFAULT 9"]) {
+  for (const col of ["quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112'", "quote_symbol TEXT DEFAULT 'SOL'", "quote_decimals INTEGER DEFAULT 9", "is_holder_reward INTEGER DEFAULT 0", "holder_paid TEXT DEFAULT '0'"]) {
     try { db.exec(`ALTER TABLE coins ADD COLUMN ${col}`); } catch {}
   }
   return db;

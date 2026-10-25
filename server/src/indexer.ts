@@ -142,15 +142,15 @@ export class Indexer {
         const q = quoteInfo(toStr(d.quoteMint));
         this.db
           .prepare(
-            `INSERT INTO coins(mint,name,symbol,uri,creator,bonding_curve,created_at,created_slot,create_sig,v_sol,v_tok,r_sol,r_tok,supply,price,mcap,quote_mint,quote_symbol,quote_decimals)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(mint) DO NOTHING`
+            `INSERT INTO coins(mint,name,symbol,uri,creator,bonding_curve,created_at,created_slot,create_sig,v_sol,v_tok,r_sol,r_tok,supply,price,mcap,quote_mint,quote_symbol,quote_decimals,is_holder_reward)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(mint) DO NOTHING`
           )
           .run(
             toStr(d.mint), d.name, d.symbol, d.uri, toStr(d.creator), toStr(d.bondingCurve), ts, ev.slot, ev.signature,
             toStr(d.virtualSolReserves), toStr(d.virtualTokenReserves), "0", toStr(d.realTokenReserves), toStr(d.tokenTotalSupply),
             (num(d.virtualSolReserves) / num(d.virtualTokenReserves)) * 1e6,
             (num(d.virtualSolReserves) / num(d.virtualTokenReserves)) * num(d.tokenTotalSupply),
-            q.mint, q.symbol, q.decimals
+            q.mint, q.symbol, q.decimals, d.isHolderReward ? 1 : 0
           );
         this.broadcast({ type: "create", mint: toStr(d.mint), name: d.name, symbol: d.symbol, creator: toStr(d.creator), ts });
       },
@@ -183,6 +183,13 @@ export class Indexer {
         this.db.prepare("UPDATE coins SET migrated=1, migrated_at=?, pool=?, pool_base=?, pool_quote=? WHERE mint=?").run(ts, toStr(d.pool), toStr(d.baseAmount), toStr(d.quoteAmount), toStr(d.mint));
         this.db.prepare("INSERT OR IGNORE INTO pools(pool,mint) VALUES(?,?)").run(toStr(d.pool), toStr(d.mint));
         this.broadcast({ type: "migrate", mint: toStr(d.mint), pool: toStr(d.pool), ts });
+      },
+      "curve:DistributeFeeToHoldersEvent": () => {
+        const mint = toStr(d.mint)!;
+        const ins = this.db.prepare("INSERT INTO distributions(sig,mint,total,recipients,ts) VALUES(?,?,?,?,?) ON CONFLICT(sig) DO NOTHING").run(ev.signature, mint, toStr(d.total), num(d.recipients), ts);
+        if (!ins.changes) return;
+        this.db.prepare("UPDATE coins SET holder_paid=CAST(CAST(holder_paid AS INTEGER)+? AS TEXT) WHERE mint=?").run(num(d.total), mint);
+        this.broadcast({ type: "holder_rewards", mint, total: toStr(d.total), recipients: num(d.recipients), sig: ev.signature, ts });
       },
       "amm:BuyEvent": () => this.ammTrade(ev, idx, true, ts),
       "amm:SellEvent": () => this.ammTrade(ev, idx, false, ts),

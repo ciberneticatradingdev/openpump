@@ -9,6 +9,7 @@ import { openDb } from "./db";
 import { Indexer } from "./indexer";
 import { apiRouter } from "./api";
 import { uploadRouter } from "./upload";
+import { HolderCrank } from "./crank";
 
 const PORT = Number(process.env.PORT || 8787);
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
@@ -39,11 +40,14 @@ const broadcast = (msg: any) => {
 wss.on("connection", (ws) => ws.send(JSON.stringify({ type: "hello", ts: Date.now() })));
 
 const indexer = new Indexer(conn, db, broadcast);
+const crank = new HolderCrank(conn, db, broadcast);
 server.listen(PORT, () => {
   console.log(`[openpump] api http://localhost:${PORT}  rpc ${RPC_URL}`);
   indexer.start();
+  crank.start();
 });
 process.on("SIGTERM", () => {
   indexer.stop();
+  crank.stop();
   server.close();
 });

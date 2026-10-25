@@ -15,7 +15,12 @@ export interface LiveTrade {
   ts: number;
   sig: string;
 }
-export type LiveMsg = LiveTrade | { type: "create"; mint: string; name: string; symbol: string; creator: string; ts: number } | { type: "complete" | "migrate"; mint: string; ts: number } | { type: "hello" };
+export type LiveMsg =
+  | LiveTrade
+  | { type: "create"; mint: string; name: string; symbol: string; creator: string; ts: number }
+  | { type: "complete" | "migrate"; mint: string; ts: number }
+  | { type: "holder_rewards"; mint: string; total: string; recipients: number; sig: string; ts: number }
+  | { type: "hello" };
 
 const listeners = new Set<(m: LiveMsg) => void>();
 let socket: WebSocket | null = null;
@@ -49,6 +54,9 @@ export function useLive(onMsg?: (m: LiveMsg) => void) {
         qc.invalidateQueries({ queryKey: ["candles", m.mint] });
         qc.invalidateQueries({ queryKey: ["coins"] });
         qc.invalidateQueries({ queryKey: ["activity"] });
+      } else if (m.type === "holder_rewards") {
+        qc.invalidateQueries({ queryKey: ["rewards", m.mint] });
+        qc.invalidateQueries({ queryKey: ["coin", m.mint] });
       } else if (m.type !== "hello") {
         qc.invalidateQueries({ queryKey: ["coins"] });
         qc.invalidateQueries({ queryKey: ["coin", (m as any).mint] });

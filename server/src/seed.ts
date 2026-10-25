@@ -134,6 +134,23 @@ async function main() {
       console.log("  4 AMM buys done");
     }
   }
+  // ---- holder-rewards demo coin: fees accrue to holders, crank pays them out
+  {
+    const kp = Keypair.generate();
+    const { uri } = await uploadMeta({ name: "Holders Club", symbol: "HODL", desc: "creator fee goes to holders", color: "7cff5c" });
+    await send([await client.createIx(admin.publicKey, kp.publicKey, "Holders Club", "HODL", uri, true)], [kp]);
+    console.log("created HODL (rewards → holders)", kp.publicKey.toBase58());
+    const holderPda = pda.holderRewards(kp.publicKey);
+    for (const t of traders.slice(0, 3)) {
+      const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });
+      const tc = new OpenpumpClient(conn, tp);
+      const sol = BigInt(Math.floor((local ? 1 + Math.random() * 3 : 0.02) * 1e9));
+      const ix = await tc.buyExactSolIx(t.publicKey, kp.publicKey, holderPda, global.feeRecipient, sol, 0n);
+      await tp.sendAndConfirm(new Transaction().add(ix), [t]);
+    }
+    console.log("  3 HODL buys; pot:", Number(await client.holderPot(kp.publicKey)) / 1e9, "SOL");
+  }
+
   // ---- custom pair demo: a quote token "OPEN" + one coin paired with it (local or QUOTE_MINT provided)
   if (process.env.SEED_PAIR || local) {
     let quoteMint: PublicKey;

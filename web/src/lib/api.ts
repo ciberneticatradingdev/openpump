@@ -36,6 +36,8 @@ export interface Coin {
   quote_mint: string;
   quote_symbol: string;
   quote_decimals: number;
+  is_holder_reward: number;
+  holder_paid: string;
 }
 
 export const WSOL = "So11111111111111111111111111111111111111112";
@@ -112,3 +114,7 @@ export const useCreator = (pubkey?: string) =>
     enabled: !!pubkey,
     refetchInterval: 10_000,
   });
+
+export interface Rewards { isHolderReward: boolean; paid: string; pot: string; distributions: { sig: string; mint: string; total: string; recipients: number; ts: number }[] }
+export const useRewards = (mint?: string, enabled = true) =>
+  useQuery({ queryKey: ["rewards", mint], queryFn: () => get<Rewards>(`/api/coins/${mint}/rewards`), enabled: !!mint && enabled, refetchInterval: 15_000 });

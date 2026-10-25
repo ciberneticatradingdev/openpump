@@ -104,6 +104,19 @@ export function apiRouter(db: Db, conn: Connection) {
     res.json({ ...(coin as any), recentTrades: trades });
   });
 
+  /** Holder-reward coins: paid-out history + the undistributed pot (live from chain). */
+  r.get("/api/coins/:mint/rewards", async (req, res) => {
+    try {
+      const coin = db.prepare("SELECT quote_mint, is_holder_reward, holder_paid FROM coins WHERE mint=?").get(req.params.mint) as any;
+      if (!coin) return res.status(404).json({ error: "not found" });
+      const rows = db.prepare("SELECT * FROM distributions WHERE mint=? ORDER BY ts DESC LIMIT 50").all(req.params.mint);
+      const pot = coin.is_holder_reward ? await client.holderPot(new PublicKey(req.params.mint), new PublicKey(coin.quote_mint)) : 0n;
+      res.json({ isHolderReward: !!coin.is_holder_reward, paid: coin.holder_paid, pot: pot.toString(), distributions: rows });
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
   r.get("/api/coins/:mint/trades", (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 100, 500);
     res.json(db.prepare("SELECT * FROM trades WHERE mint=? ORDER BY ts DESC, slot DESC LIMIT ?").all(req.params.mint, limit));
