@@ -658,7 +658,7 @@ export class OpenpumpClient {
       .createFeeSharingConfig()
       .accounts({
         payer: creator, feeProgramGlobal: pda.feeProgramGlobal(), mint, sharingConfig: pda.sharingConfig(mint), bondingCurve: pda.bondingCurve(mint),
-        curveProgram: CURVE_PROGRAM_ID, curveEventAuthority: pda.curveEventAuthority(), pool, ammProgram: graduated ? AMM_PROGRAM_ID : null, ammEventAuthority: graduated ? pda.ammEventAuthority() : null,
+        curveProgram: CURVE_PROGRAM_ID, curveEventAuthority: pda.curveEventAuthority(), pool, ammProgram: graduated ? AMM_PROGRAM_ID : null, ammEventAuthority: graduated ? pda.ammEventAuthority() : null, ammGlobalConfig: graduated ? pda.ammGlobalConfig() : null,
         systemProgram: SystemProgram.programId,
       } as any)
       .instruction();
@@ -715,6 +715,28 @@ export class OpenpumpClient {
   }
   async sweepBuybackIx(authority: PublicKey, index = 0) {
     return this.fees.methods.sweepBuyback(index).accounts({ authority, buybackVault: pda.buybackVault(index) } as any).instruction();
+  }
+
+  // ------------------------------------------------------------- creator management (CTO / creator fee)
+
+  async adminCtoIx(authority: PublicKey, mint: PublicKey, currentCreator: PublicKey, opts: { toHolders?: boolean; newCreator?: PublicKey; creatorFeeBps?: bigint }) {
+    const hr = pda.holderRewards(mint);
+    return this.curve.methods
+      .adminCto(!!opts.toHolders, opts.creatorFeeBps != null ? bn(opts.creatorFeeBps) : null, opts.newCreator ?? null)
+      .accounts({ authority, global: pda.global(), mint, bondingCurve: pda.bondingCurve(mint), oldCreatorVault: pda.creatorVault(currentCreator), holderRewards: hr, holderCreatorVault: pda.creatorVault(hr), systemProgram: SystemProgram.programId } as any)
+      .instruction();
+  }
+  async setCreatorFeeBpsIx(creator: PublicKey, mint: PublicKey, bps: bigint, lock = false) {
+    return this.curve.methods.setCreatorFeeBps(bn(bps), lock).accounts({ creator, global: pda.global(), mint, bondingCurve: pda.bondingCurve(mint) } as any).instruction();
+  }
+  async setCreatorIx(creator: PublicKey, mint: PublicKey, newCreator: PublicKey) {
+    return this.curve.methods.setCreator(newCreator).accounts({ creator, mint, bondingCurve: pda.bondingCurve(mint) } as any).instruction();
+  }
+  async ammAdminCtoPoolIx(authority: PublicKey, pool: PublicKey, coinCreator: PublicKey, toHolders: boolean, creatorFeeBps?: bigint) {
+    return this.amm.methods.adminCtoPool(coinCreator, toHolders, creatorFeeBps != null ? bn(creatorFeeBps) : null).accounts({ authority, globalConfig: pda.ammGlobalConfig(), pool } as any).instruction();
+  }
+  async ammSetCoinCreatorFeeBpsIx(coinCreator: PublicKey, pool: PublicKey, bps: bigint, lock = false) {
+    return this.amm.methods.setCoinCreatorFeeBps(bn(bps), lock).accounts({ coinCreator, pool, globalConfig: pda.ammGlobalConfig() } as any).instruction();
   }
 
   // ------------------------------------------------------------- admin

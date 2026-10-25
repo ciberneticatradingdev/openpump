@@ -34,6 +34,8 @@ pub mod incentives;
 use incentives::*;
 pub mod sharing;
 use sharing::*;
+pub mod admin;
+use admin::*;
 use openpump_fee_types::{FeeConfig, FEES_PROGRAM_ID, FEE_CONFIG_SEED};
 
 declare_id!("AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB");
@@ -87,6 +89,9 @@ pub mod openpump_curve {
         g.bump = ctx.bumps.global;
         g.holder_reward_enabled = true;
         g.holder_reward_authority = ctx.accounts.authority.key();
+        g.admin_set_creator_authority = ctx.accounts.authority.key();
+        g.creator_fee_configurable = true;
+        g.max_configurable_creator_fee_bps = 100; // creators may set up to 1 %
         g.apply(&params);
         emit_cpi!(SetParamsEvent { authority: g.authority, params, timestamp: Clock::get()?.unix_timestamp });
         Ok(())
@@ -165,6 +170,8 @@ pub mod openpump_curve {
         bc.mint = ctx.accounts.mint.key();
         bc.creator = if is_holder_reward { holder_rewards_pda(&bc.mint) } else if creator == Pubkey::default() { ctx.accounts.user.key() } else { creator };
         bc.is_holder_reward = is_holder_reward;
+        bc.creator_fee_bps = 0;
+        bc.can_edit_creator_fee = !is_holder_reward;
         bc.virtual_token_reserves = g.initial_virtual_token_reserves;
         bc.virtual_sol_reserves = g.initial_virtual_sol_reserves;
         bc.real_token_reserves = g.initial_real_token_reserves;
@@ -448,6 +455,21 @@ pub mod openpump_curve {
         holders::distribute_fee_to_holders_v2(ctx, amounts)
     }
 
+    // ----- community takeover + creator fee configuration (see admin.rs)
+
+    pub fn admin_cto(ctx: Context<AdminCto>, is_holder_reward: bool, creator_fee_bps: Option<u64>, new_creator: Option<Pubkey>) -> Result<()> {
+        admin::admin_cto(ctx, is_holder_reward, creator_fee_bps, new_creator)
+    }
+    pub fn update_creator_fee_config(ctx: Context<AuthorityOnly>, creator_fee_configurable: bool, max_configurable_creator_fee_bps: u64) -> Result<()> {
+        admin::update_creator_fee_config(ctx, creator_fee_configurable, max_configurable_creator_fee_bps)
+    }
+    pub fn set_admin_set_creator_authority(ctx: Context<AuthorityOnly>, authority: Pubkey) -> Result<()> {
+        admin::set_admin_set_creator_authority(ctx, authority)
+    }
+    pub fn set_creator_fee_bps(ctx: Context<CreatorOnly>, creator_fee_bps: u64, lock: bool) -> Result<()> {
+        admin::set_creator_fee_bps(ctx, creator_fee_bps, lock)
+    }
+
     // ----- creator reassignment + fee sharing payouts (see sharing.rs)
 
     pub fn set_creator(ctx: Context<SetCreator>, new_creator: Pubkey) -> Result<()> {
@@ -623,13 +645,15 @@ fn execute_buy(ctx: Context<Trade>, tokens_out: u64, sol_in: u64, max_sol_cost: 
 /// (protocol_bps, creator_bps) for a trade: the fees program's market-cap tiers when a FeeConfig
 /// is passed, otherwise Global's flat schedule.
 pub fn trade_fee_bps(g: &Global, fee_config: &Option<Box<Account<FeeConfig>>>, bc: &BondingCurve) -> (u64, u64) {
-    if let Some(fc) = fee_config {
+    let (p, c) = if let Some(fc) = fee_config {
         let mcap = openpump_fee_types::market_cap(bc.virtual_sol_reserves, bc.virtual_token_reserves, bc.token_total_supply);
         let f = openpump_fee_types::fees_for(fc, true, mcap, bc.quote_mint);
         (f.protocol_fee_bps, f.creator_fee_bps)
     } else {
         (g.fee_basis_points, g.creator_fee_basis_points)
-    }
+    };
+    // creator-configured override (within the admin ceiling, enforced when set)
+    (p, if bc.creator_fee_bps > 0 { bc.creator_fee_bps } else { c })
 }
 
 fn total_fee(sol: u64, g: &Global, fee_config: &Option<Box<Account<FeeConfig>>>, bc: &BondingCurve) -> Result<u64> {
@@ -851,6 +875,10 @@ pub struct Global {
     pub holder_reward_authority: Pubkey,
     pub buyback_basis_points: u64,
     pub buyback_fee_recipient: Pubkey,
+    /// Community takeover authority (defaults to `authority`).
+    pub admin_set_creator_authority: Pubkey,
+    pub creator_fee_configurable: bool,
+    pub max_configurable_creator_fee_bps: u64,
 }
 
 impl Global {
@@ -891,6 +919,9 @@ pub struct BondingCurve {
     pub quote_mint: Pubkey,
     /// If set, `creator` is the ["holder-rewards", mint] PDA and the creator fee is paid out to holders.
     pub is_holder_reward: bool,
+    /// Per-coin creator fee override (bps). 0 = follow the fee schedule.
+    pub creator_fee_bps: u64,
+    pub can_edit_creator_fee: bool,
 }
 
 // ---------------------------------------------------------------- events
@@ -1017,4 +1048,10 @@ pub enum CurveError {
     SharingNotActive,
     #[msg("Sharing config does not match this coin")]
     SharingMismatch,
+    #[msg("The creator of a holder-reward coin cannot be changed")]
+    HolderRewardCreatorImmutable,
+    #[msg("Creator fee is not configurable")]
+    CreatorFeeNotConfigurable,
+    #[msg("Creator fee is locked for this coin")]
+    CreatorFeeLocked,
 }

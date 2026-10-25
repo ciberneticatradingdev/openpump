@@ -159,13 +159,14 @@ pub mod openpump_fees {
             sharing_key,
         )?;
         // AMM pool (graduated coins)
-        if let (Some(pool), Some(amm), Some(ev)) = (&ctx.accounts.pool, &ctx.accounts.amm_program, &ctx.accounts.amm_event_authority) {
+        if let (Some(pool), Some(amm), Some(ev), Some(gc)) = (&ctx.accounts.pool, &ctx.accounts.amm_program, &ctx.accounts.amm_event_authority, &ctx.accounts.amm_global_config) {
             openpump_amm::cpi::set_coin_creator(
                 CpiContext::new(
                     amm.to_account_info(),
                     openpump_amm::cpi::accounts::SetCoinCreator {
                         coin_creator: ctx.accounts.payer.to_account_info(),
                         pool: pool.to_account_info(),
+                        global_config: gc.to_account_info(),
                         event_authority: ev.to_account_info(),
                         program: amm.to_account_info(),
                     },
@@ -508,6 +509,8 @@ pub struct CreateFeeSharingConfig<'info> {
     pub amm_program: Option<Program<'info, openpump_amm::program::OpenpumpAmm>>,
     /// CHECK: AMM event authority PDA.
     pub amm_event_authority: Option<UncheckedAccount<'info>>,
+    /// CHECK: AMM global config PDA (validated by the AMM during CPI).
+    pub amm_global_config: Option<UncheckedAccount<'info>>,
     pub system_program: Program<'info, System>,
 }
 

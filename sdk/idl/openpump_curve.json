@@ -8,6 +8,225 @@
   },
   "instructions": [
     {
+      "name": "admin_cto",
+      "discriminator": [
+        125,
+        126,
+        214,
+        134,
+        77,
+        229,
+        188,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "global",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "bonding_curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "old_creator_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bonding_curve.creator",
+                "account": "BondingCurve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_rewards",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  101,
+                  114,
+                  45,
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_creator_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "holder_rewards"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "is_holder_reward",
+          "type": "bool"
+        },
+        {
+          "name": "creator_fee_bps",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "new_creator",
+          "type": {
+            "option": "pubkey"
+          }
+        }
+      ]
+    },
+    {
       "name": "admin_update_token_incentives",
       "discriminator": [
         209,
@@ -6504,6 +6723,85 @@
       ]
     },
     {
+      "name": "set_admin_set_creator_authority",
+      "discriminator": [
+        19,
+        211,
+        36,
+        37,
+        156,
+        173,
+        89,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "set_creator",
       "discriminator": [
         254,
@@ -6599,6 +6897,124 @@
         {
           "name": "new_creator",
           "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_creator_fee_bps",
+      "discriminator": [
+        156,
+        10,
+        151,
+        113,
+        17,
+        250,
+        177,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "global",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bonding_curve"
+          ]
+        },
+        {
+          "name": "bonding_curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "creator_fee_bps",
+          "type": "u64"
+        },
+        {
+          "name": "lock",
+          "type": "bool"
         }
       ]
     },
@@ -7012,6 +7428,89 @@
       ]
     },
     {
+      "name": "update_creator_fee_config",
+      "discriminator": [
+        61,
+        175,
+        160,
+        249,
+        66,
+        66,
+        136,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "creator_fee_configurable",
+          "type": "bool"
+        },
+        {
+          "name": "max_configurable_creator_fee_bps",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "update_holder_reward_config",
       "discriminator": [
         225,
@@ -7190,6 +7689,19 @@
   ],
   "events": [
     {
+      "name": "AdminCtoEvent",
+      "discriminator": [
+        110,
+        124,
+        226,
+        98,
+        170,
+        255,
+        17,
+        120
+      ]
+    },
+    {
       "name": "AdminUpdateTokenIncentivesEvent",
       "discriminator": [
         147,
@@ -7346,6 +7858,19 @@
       ]
     },
     {
+      "name": "SetCreatorFeeBpsEvent",
+      "discriminator": [
+        53,
+        161,
+        215,
+        177,
+        100,
+        118,
+        123,
+        45
+      ]
+    },
+    {
       "name": "SetParamsEvent",
       "discriminator": [
         223,
@@ -7395,6 +7920,19 @@
         230,
         97,
         238
+      ]
+    },
+    {
+      "name": "UpdateCreatorFeeConfigEvent",
+      "discriminator": [
+        152,
+        198,
+        124,
+        124,
+        106,
+        246,
+        127,
+        191
       ]
     }
   ],
@@ -7508,9 +8046,68 @@
       "code": 6021,
       "name": "SharingMismatch",
       "msg": "Sharing config does not match this coin"
+    },
+    {
+      "code": 6022,
+      "name": "HolderRewardCreatorImmutable",
+      "msg": "The creator of a holder-reward coin cannot be changed"
+    },
+    {
+      "code": 6023,
+      "name": "CreatorFeeNotConfigurable",
+      "msg": "Creator fee is not configurable"
+    },
+    {
+      "code": 6024,
+      "name": "CreatorFeeLocked",
+      "msg": "Creator fee is locked for this coin"
     }
   ],
   "types": [
+    {
+      "name": "AdminCtoEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_holder_reward",
+            "type": "bool"
+          },
+          {
+            "name": "old_creator_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "new_creator_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "swept_to_holder_vault",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
     {
       "name": "AdminUpdateTokenIncentivesEvent",
       "type": {
@@ -7616,6 +8213,17 @@
             "docs": [
               "If set, `creator` is the [\"holder-rewards\", mint] PDA and the creator fee is paid out to holders."
             ],
+            "type": "bool"
+          },
+          {
+            "name": "creator_fee_bps",
+            "docs": [
+              "Per-coin creator fee override (bps). 0 = follow the fee schedule."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "can_edit_creator_fee",
             "type": "bool"
           }
         ]
@@ -8059,6 +8667,21 @@
           {
             "name": "buyback_fee_recipient",
             "type": "pubkey"
+          },
+          {
+            "name": "admin_set_creator_authority",
+            "docs": [
+              "Community takeover authority (defaults to `authority`)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "creator_fee_configurable",
+            "type": "bool"
+          },
+          {
+            "name": "max_configurable_creator_fee_bps",
+            "type": "u64"
           }
         ]
       }
@@ -8371,6 +8994,34 @@
       }
     },
     {
+      "name": "SetCreatorFeeBpsEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "can_edit_creator_fee",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "SetParamsEvent",
       "type": {
         "kind": "struct",
@@ -8572,6 +9223,30 @@
           {
             "name": "buyback_fee",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateCreatorFeeConfigEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator_fee_configurable",
+            "type": "bool"
+          },
+          {
+            "name": "max_configurable_creator_fee_bps",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

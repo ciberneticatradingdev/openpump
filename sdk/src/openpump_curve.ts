@@ -14,6 +14,225 @@ export type OpenpumpCurve = {
   },
   "instructions": [
     {
+      "name": "adminCto",
+      "discriminator": [
+        125,
+        126,
+        214,
+        134,
+        77,
+        229,
+        188,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "global",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "bondingCurve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "oldCreatorVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bonding_curve.creator",
+                "account": "bondingCurve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holderRewards",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  108,
+                  100,
+                  101,
+                  114,
+                  45,
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holderCreatorVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "holderRewards"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "isHolderReward",
+          "type": "bool"
+        },
+        {
+          "name": "creatorFeeBps",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "newCreator",
+          "type": {
+            "option": "pubkey"
+          }
+        }
+      ]
+    },
+    {
       "name": "adminUpdateTokenIncentives",
       "discriminator": [
         209,
@@ -6510,6 +6729,85 @@ export type OpenpumpCurve = {
       ]
     },
     {
+      "name": "setAdminSetCreatorAuthority",
+      "discriminator": [
+        19,
+        211,
+        36,
+        37,
+        156,
+        173,
+        89,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "setCreator",
       "discriminator": [
         254,
@@ -6605,6 +6903,124 @@ export type OpenpumpCurve = {
         {
           "name": "newCreator",
           "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "setCreatorFeeBps",
+      "discriminator": [
+        156,
+        10,
+        151,
+        113,
+        17,
+        250,
+        177,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "global",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bondingCurve"
+          ]
+        },
+        {
+          "name": "bondingCurve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103,
+                  45,
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "creatorFeeBps",
+          "type": "u64"
+        },
+        {
+          "name": "lock",
+          "type": "bool"
         }
       ]
     },
@@ -7018,6 +7434,89 @@ export type OpenpumpCurve = {
       ]
     },
     {
+      "name": "updateCreatorFeeConfig",
+      "discriminator": [
+        61,
+        175,
+        160,
+        249,
+        66,
+        66,
+        136,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global"
+          ]
+        },
+        {
+          "name": "global",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "creatorFeeConfigurable",
+          "type": "bool"
+        },
+        {
+          "name": "maxConfigurableCreatorFeeBps",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "updateHolderRewardConfig",
       "discriminator": [
         225,
@@ -7196,6 +7695,19 @@ export type OpenpumpCurve = {
   ],
   "events": [
     {
+      "name": "adminCtoEvent",
+      "discriminator": [
+        110,
+        124,
+        226,
+        98,
+        170,
+        255,
+        17,
+        120
+      ]
+    },
+    {
       "name": "adminUpdateTokenIncentivesEvent",
       "discriminator": [
         147,
@@ -7352,6 +7864,19 @@ export type OpenpumpCurve = {
       ]
     },
     {
+      "name": "setCreatorFeeBpsEvent",
+      "discriminator": [
+        53,
+        161,
+        215,
+        177,
+        100,
+        118,
+        123,
+        45
+      ]
+    },
+    {
       "name": "setParamsEvent",
       "discriminator": [
         223,
@@ -7401,6 +7926,19 @@ export type OpenpumpCurve = {
         230,
         97,
         238
+      ]
+    },
+    {
+      "name": "updateCreatorFeeConfigEvent",
+      "discriminator": [
+        152,
+        198,
+        124,
+        124,
+        106,
+        246,
+        127,
+        191
       ]
     }
   ],
@@ -7514,9 +8052,68 @@ export type OpenpumpCurve = {
       "code": 6021,
       "name": "sharingMismatch",
       "msg": "Sharing config does not match this coin"
+    },
+    {
+      "code": 6022,
+      "name": "holderRewardCreatorImmutable",
+      "msg": "The creator of a holder-reward coin cannot be changed"
+    },
+    {
+      "code": 6023,
+      "name": "creatorFeeNotConfigurable",
+      "msg": "Creator fee is not configurable"
+    },
+    {
+      "code": 6024,
+      "name": "creatorFeeLocked",
+      "msg": "Creator fee is locked for this coin"
     }
   ],
   "types": [
+    {
+      "name": "adminCtoEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldCreator",
+            "type": "pubkey"
+          },
+          {
+            "name": "newCreator",
+            "type": "pubkey"
+          },
+          {
+            "name": "isHolderReward",
+            "type": "bool"
+          },
+          {
+            "name": "oldCreatorFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "newCreatorFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "sweptToHolderVault",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
     {
       "name": "adminUpdateTokenIncentivesEvent",
       "type": {
@@ -7622,6 +8219,17 @@ export type OpenpumpCurve = {
             "docs": [
               "If set, `creator` is the [\"holder-rewards\", mint] PDA and the creator fee is paid out to holders."
             ],
+            "type": "bool"
+          },
+          {
+            "name": "creatorFeeBps",
+            "docs": [
+              "Per-coin creator fee override (bps). 0 = follow the fee schedule."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "canEditCreatorFee",
             "type": "bool"
           }
         ]
@@ -8065,6 +8673,21 @@ export type OpenpumpCurve = {
           {
             "name": "buybackFeeRecipient",
             "type": "pubkey"
+          },
+          {
+            "name": "adminSetCreatorAuthority",
+            "docs": [
+              "Community takeover authority (defaults to `authority`)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "creatorFeeConfigurable",
+            "type": "bool"
+          },
+          {
+            "name": "maxConfigurableCreatorFeeBps",
+            "type": "u64"
           }
         ]
       }
@@ -8377,6 +9000,34 @@ export type OpenpumpCurve = {
       }
     },
     {
+      "name": "setCreatorFeeBpsEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "creatorFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "canEditCreatorFee",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "setParamsEvent",
       "type": {
         "kind": "struct",
@@ -8578,6 +9229,30 @@ export type OpenpumpCurve = {
           {
             "name": "buybackFee",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "updateCreatorFeeConfigEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "creatorFeeConfigurable",
+            "type": "bool"
+          },
+          {
+            "name": "maxConfigurableCreatorFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

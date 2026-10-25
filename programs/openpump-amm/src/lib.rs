@@ -64,6 +64,9 @@ pub mod openpump_amm {
         cfg.protocol_fee_recipient = protocol_fee_recipient;
         cfg.disable_flags = 0;
         cfg.bump = ctx.bumps.global_config;
+        cfg.admin_set_coin_creator_authority = ctx.accounts.admin.key();
+        cfg.creator_fee_configurable = true;
+        cfg.max_configurable_creator_fee_bps = 100;
         emit_cpi!(UpdateConfigEvent {
             admin: cfg.admin,
             lp_fee_basis_points,
@@ -158,6 +161,9 @@ pub mod openpump_amm {
         pool.coin_creator = coin_creator;
         pool.protocol_fees = 0;
         pool.creator_fees = 0;
+        pool.is_holder_reward = false;
+        pool.creator_fee_bps = 0;
+        pool.can_edit_creator_fee = true;
 
         // Mint LP: creator share + permanently locked minimum (held by the pool's own ATA).
         let signer_seeds: &[&[&[u8]]] = &[pool_seeds!(pool)];
@@ -344,7 +350,8 @@ pub mod openpump_amm {
 
         let quote_in = quote_in_for_base_out(base_amount_out, base_reserve, quote_reserve)?;
         let has_creator = ctx.accounts.pool.coin_creator != Pubkey::default();
-        let sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
+        let mut sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
+        if ctx.accounts.pool.creator_fee_bps > 0 { sched.creator = ctx.accounts.pool.creator_fee_bps; }
         let fees = compute_fees(quote_in, &sched, has_creator)?;
         let total_in = quote_in
             .checked_add(fees.lp)
@@ -424,7 +431,8 @@ pub mod openpump_amm {
 
         let quote_out = quote_out_for_base_in(base_amount_in, base_reserve, quote_reserve)?;
         let has_creator = ctx.accounts.pool.coin_creator != Pubkey::default();
-        let sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
+        let mut sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
+        if ctx.accounts.pool.creator_fee_bps > 0 { sched.creator = ctx.accounts.pool.creator_fee_bps; }
         let fees = compute_fees(quote_out, &sched, has_creator)?;
         let total_fees = fees
             .lp
@@ -494,6 +502,41 @@ pub mod openpump_amm {
             coin_creator: pool.coin_creator,
             timestamp: Clock::get()?.unix_timestamp,
         });
+        Ok(())
+    }
+
+    /// Protocol: community takeover of a pool's coin creator (mirrors the curve's admin_cto).
+    pub fn admin_cto_pool(ctx: Context<AdminCtoPool>, coin_creator: Pubkey, is_holder_reward: bool, creator_fee_bps: Option<u64>) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        require!(!pool.is_holder_reward, AmmError::HolderRewardCreatorImmutable);
+        if let Some(bps) = creator_fee_bps {
+            require!(bps <= ctx.accounts.global_config.max_configurable_creator_fee_bps, AmmError::FeeTooHigh);
+            pool.creator_fee_bps = bps;
+        }
+        let old = pool.coin_creator;
+        pool.coin_creator = coin_creator;
+        pool.is_holder_reward = is_holder_reward;
+        if is_holder_reward { pool.can_edit_creator_fee = false; }
+        emit_cpi!(AdminCtoPoolEvent { pool: pool.key(), authority: ctx.accounts.authority.key(), old_coin_creator: old, new_coin_creator: coin_creator, is_holder_reward, creator_fee_bps: pool.creator_fee_bps, timestamp: Clock::get()?.unix_timestamp });
+        Ok(())
+    }
+    pub fn update_creator_fee_config(ctx: Context<AdminOnly>, creator_fee_configurable: bool, max_configurable_creator_fee_bps: u64, admin_set_coin_creator_authority: Pubkey) -> Result<()> {
+        require!(max_configurable_creator_fee_bps <= MAX_TOTAL_FEE_BPS, AmmError::FeeTooHigh);
+        let cfg = &mut ctx.accounts.global_config;
+        cfg.creator_fee_configurable = creator_fee_configurable;
+        cfg.max_configurable_creator_fee_bps = max_configurable_creator_fee_bps;
+        cfg.admin_set_coin_creator_authority = admin_set_coin_creator_authority;
+        Ok(())
+    }
+    /// Coin creator sets the pool's creator fee (0 = schedule) within the ceiling; `lock` makes it final.
+    pub fn set_coin_creator_fee_bps(ctx: Context<SetCoinCreator>, creator_fee_bps: u64, lock: bool) -> Result<()> {
+        let cfg = &ctx.accounts.global_config;
+        require!(cfg.creator_fee_configurable, AmmError::CreatorFeeNotConfigurable);
+        require!(creator_fee_bps <= cfg.max_configurable_creator_fee_bps, AmmError::FeeTooHigh);
+        let pool = &mut ctx.accounts.pool;
+        require!(pool.can_edit_creator_fee, AmmError::CreatorFeeLocked);
+        pool.creator_fee_bps = creator_fee_bps;
+        if lock { pool.can_edit_creator_fee = false; }
         Ok(())
     }
 
@@ -906,6 +949,18 @@ pub struct SetCoinCreator<'info> {
     pub coin_creator: Signer<'info>,
     #[account(mut, seeds = [POOL_SEED, &pool.index.to_le_bytes(), pool.creator.as_ref(), pool.base_mint.as_ref(), pool.quote_mint.as_ref()], bump = pool.bump, has_one = coin_creator @ AmmError::Unauthorized)]
     pub pool: Box<Account<'info, Pool>>,
+    #[account(seeds = [GLOBAL_CONFIG_SEED], bump = global_config.bump)]
+    pub global_config: Box<Account<'info, GlobalConfig>>,
+}
+
+#[event_cpi]
+#[derive(Accounts)]
+pub struct AdminCtoPool<'info> {
+    pub authority: Signer<'info>,
+    #[account(seeds = [GLOBAL_CONFIG_SEED], bump = global_config.bump, constraint = global_config.admin_set_coin_creator_authority == authority.key() @ AmmError::Unauthorized)]
+    pub global_config: Box<Account<'info, GlobalConfig>>,
+    #[account(mut, seeds = [POOL_SEED, &pool.index.to_le_bytes(), pool.creator.as_ref(), pool.base_mint.as_ref(), pool.quote_mint.as_ref()], bump = pool.bump)]
+    pub pool: Box<Account<'info, Pool>>,
 }
 
 #[event_cpi]
@@ -969,6 +1024,9 @@ pub struct GlobalConfig {
     pub protocol_fee_recipient: Pubkey,
     pub disable_flags: u8,
     pub bump: u8,
+    pub admin_set_coin_creator_authority: Pubkey,
+    pub creator_fee_configurable: bool,
+    pub max_configurable_creator_fee_bps: u64,
 }
 
 #[account]
@@ -987,6 +1045,10 @@ pub struct Pool {
     /// Lifetime stats (informational).
     pub protocol_fees: u64,
     pub creator_fees: u64,
+    pub is_holder_reward: bool,
+    /// Per-pool creator fee override (bps). 0 = follow the schedule.
+    pub creator_fee_bps: u64,
+    pub can_edit_creator_fee: bool,
 }
 
 // ---------------------------------------------------------------- events
@@ -1076,6 +1138,8 @@ pub struct SellEvent {
 }
 
 #[event]
+pub struct AdminCtoPoolEvent { pub pool: Pubkey, pub authority: Pubkey, pub old_coin_creator: Pubkey, pub new_coin_creator: Pubkey, pub is_holder_reward: bool, pub creator_fee_bps: u64, pub timestamp: i64 }
+#[event]
 pub struct SetCoinCreatorEvent { pub pool: Pubkey, pub old_coin_creator: Pubkey, pub new_coin_creator: Pubkey, pub timestamp: i64 }
 #[event]
 pub struct DistributeCoinCreatorFeesEvent { pub pool: Pubkey, pub sharing_config: Pubkey, pub quote_mint: Pubkey, pub distributed: u64, pub recipients: u64, pub timestamp: i64 }
@@ -1114,4 +1178,10 @@ pub enum AmmError {
     SharingMismatch,
     #[msg("Shareholders and remaining accounts do not match")]
     RecipientsMismatch,
+    #[msg("The creator of a holder-reward pool cannot be changed")]
+    HolderRewardCreatorImmutable,
+    #[msg("Creator fee is not configurable")]
+    CreatorFeeNotConfigurable,
+    #[msg("Creator fee is locked for this pool")]
+    CreatorFeeLocked,
 }

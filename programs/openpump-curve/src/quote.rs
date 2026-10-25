@@ -117,6 +117,8 @@ pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: Stri
     bc.mint = ctx.accounts.mint.key();
     bc.creator = if is_holder_reward { holder_rewards_pda(&bc.mint) } else if creator == Pubkey::default() { ctx.accounts.user.key() } else { creator };
     bc.is_holder_reward = is_holder_reward;
+    bc.creator_fee_bps = 0;
+    bc.can_edit_creator_fee = !is_holder_reward;
     bc.virtual_token_reserves = q.initial_virtual_token_reserves;
     bc.virtual_sol_reserves = q.initial_virtual_quote_reserves;
     bc.real_token_reserves = q.initial_real_token_reserves;

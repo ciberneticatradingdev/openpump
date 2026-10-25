@@ -768,7 +768,7 @@ describe("OpenPump — curve + amm", () => {
   // ------------------------------------------------------------------ volume incentives
   describe("volume incentives", () => {
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    const DAY = 4; // seconds per "day" for the test campaign
+    const DAY = 12; // seconds per "day" for the test campaign (long enough that the in-day claim really is in-day)
     let incMint: PublicKey;
     const [gva] = PublicKey.findProgramAddressSync([Buffer.from("global_volume_accumulator")], curve.programId);
     const uva = (u: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("user_volume_accumulator"), u.toBuffer()], curve.programId)[0];
@@ -939,7 +939,7 @@ describe("OpenPump — curve + amm", () => {
         .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([creator, m]).rpc();
       await fees.methods.createFeeSharingConfig()
-        .accounts({ payer: creator.publicKey, feeProgramGlobal: feeGlobal, mint: m.publicKey, sharingConfig: sharing, bondingCurve: bc, curveProgram: curve.programId, curveEventAuthority: curveEv, pool: null, ammProgram: null, ammEventAuthority: null, systemProgram: SystemProgram.programId })
+        .accounts({ payer: creator.publicKey, feeProgramGlobal: feeGlobal, mint: m.publicKey, sharingConfig: sharing, bondingCurve: bc, curveProgram: curve.programId, curveEventAuthority: curveEv, pool: null, ammProgram: null, ammEventAuthority: null, ammGlobalConfig: null, systemProgram: SystemProgram.programId })
         .signers([creator]).rpc();
       assert.equal((await curve.account.bondingCurve.fetch(bc)).creator.toBase58(), sharing.toBase58());
       await fees.methods.updateFeeShares([{ address: creator.publicKey, shareBps: 6000 }, { address: partner.publicKey, shareBps: 4000 }])
@@ -1025,7 +1025,7 @@ describe("OpenPump — curve + amm", () => {
       // PEOPLE (first coin) is migrated; its creator is `creator`
       const [sharing] = PublicKey.findProgramAddressSync([Buffer.from("sharing-config"), mint.toBuffer()], fees.programId);
       await fees.methods.createFeeSharingConfig()
-        .accounts({ payer: creator.publicKey, feeProgramGlobal: feeGlobal, mint, sharingConfig: sharing, bondingCurve, curveProgram: curve.programId, curveEventAuthority: curveEv, pool, ammProgram: amm.programId, ammEventAuthority, systemProgram: SystemProgram.programId })
+        .accounts({ payer: creator.publicKey, feeProgramGlobal: feeGlobal, mint, sharingConfig: sharing, bondingCurve, curveProgram: curve.programId, curveEventAuthority: curveEv, pool, ammProgram: amm.programId, ammEventAuthority, ammGlobalConfig, systemProgram: SystemProgram.programId })
         .signers([creator]).rpc();
       const p = await amm.account.pool.fetch(pool);
       assert.equal(p.coinCreator.toBase58(), sharing.toBase58());
@@ -1051,6 +1051,96 @@ describe("OpenPump — curve + amm", () => {
         .signers([trader]).rpc();
       assert.equal((await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, partner.publicKey))).toString(), (accrued / 2n).toString());
       assert.equal((await tokenBal(vaultAta)).toString(), (accrued - (accrued / 2n) * 2n).toString());
+    });
+  });
+
+  // ------------------------------------------------------------------ community takeover + creator fee config
+  describe("admin CTO + creator fee", () => {
+    const m = Keypair.generate();
+    let bc: PublicKey;
+    const newCreator = Keypair.generate();
+    const mk = async () => {
+      [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
+      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      await curve.methods.create("CTO Coin", "CTO", "https://example.com/cto.json", false, PublicKey.default)
+        .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
+        .signers([creator, m]).rpc();
+    };
+    const accts = (user: PublicKey, cv: PublicKey) => ({ ...tradeAccounts(user), mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), associatedUser: getAssociatedTokenAddressSync(m.publicKey, user), creatorVault: cv });
+
+    it("creator sets their own fee within the ceiling; trades use it", async () => {
+      await mk();
+      try {
+        await curve.methods.setCreatorFeeBps(new BN(500), false).accounts({ creator: creator.publicKey, global, mint: m.publicKey, bondingCurve: bc }).signers([creator]).rpc();
+        assert.fail("above ceiling");
+      } catch (e) {
+        assert.include(String(e), "FeeTooHigh");
+      }
+      await curve.methods.setCreatorFeeBps(new BN(100), false).accounts({ creator: creator.publicKey, global, mint: m.publicKey, bondingCurve: bc }).signers([creator]).rpc();
+      const v0 = await lamports(creatorVault);
+      await curve.methods.buyExactSolIn(new BN(1 * LAMPORTS_PER_SOL), new BN(0)).accounts(accts(trader.publicKey, creatorVault)).signers([trader]).rpc();
+      assert.equal((await lamports(creatorVault)) - v0, 0.01 * LAMPORTS_PER_SOL, "1 % creator fee override");
+      await curve.methods.setCreatorFeeBps(new BN(0), true).accounts({ creator: creator.publicKey, global, mint: m.publicKey, bondingCurve: bc }).signers([creator]).rpc();
+      try {
+        await curve.methods.setCreatorFeeBps(new BN(50), false).accounts({ creator: creator.publicKey, global, mint: m.publicKey, bondingCurve: bc }).signers([creator]).rpc();
+        assert.fail("locked");
+      } catch (e) {
+        assert.include(String(e), "CreatorFeeLocked");
+      }
+    });
+
+    it("admin CTO: reassign the creator, then convert to holder rewards sweeping the old vault", async () => {
+      const [hr] = PublicKey.findProgramAddressSync([Buffer.from("holder-rewards"), m.publicKey.toBuffer()], curve.programId);
+      const [hrVault] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), hr.toBuffer()], curve.programId);
+      const cto = (currentCreator: PublicKey, toHolders: boolean, nc: PublicKey | null) =>
+        curve.methods.adminCto(toHolders, null, nc).accounts({ authority: admin.publicKey, global, mint: m.publicKey, bondingCurve: bc, oldCreatorVault: PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), currentCreator.toBuffer()], curve.programId)[0], holderRewards: hr, holderCreatorVault: hrVault, systemProgram: SystemProgram.programId });
+      try {
+        await curve.methods.adminCto(false, null, newCreator.publicKey).accounts({ authority: trader.publicKey, global, mint: m.publicKey, bondingCurve: bc, oldCreatorVault: creatorVault, holderRewards: hr, holderCreatorVault: hrVault, systemProgram: SystemProgram.programId }).signers([trader]).rpc();
+        assert.fail("stranger");
+      } catch (e) {
+        assert.include(String(e), "Unauthorized");
+      }
+      await cto(creator.publicKey, false, newCreator.publicKey).rpc();
+      assert.equal((await curve.account.bondingCurve.fetch(bc)).creator.toBase58(), newCreator.publicKey.toBase58());
+      // fees now accrue to the new creator's vault
+      const [ncVault] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), newCreator.publicKey.toBuffer()], curve.programId);
+      await curve.methods.buyExactSolIn(new BN(2 * LAMPORTS_PER_SOL), new BN(0)).accounts(accts(trader.publicKey, ncVault)).signers([trader]).rpc();
+      const pending = await lamports(ncVault);
+      assert.isAbove(pending, 0);
+      // convert to holder rewards: the pending vault is swept into the holder vault
+      await cto(newCreator.publicKey, true, null).rpc();
+      const after = await curve.account.bondingCurve.fetch(bc);
+      assert.isTrue(after.isHolderReward);
+      assert.equal(after.creator.toBase58(), hr.toBase58());
+      const rentMin = await conn.getMinimumBalanceForRentExemption(0);
+      assert.equal(await lamports(hrVault), pending - rentMin);
+      try {
+        await cto(hr, false, newCreator.publicKey).rpc();
+        assert.fail("holder coins are immutable");
+      } catch (e) {
+        assert.include(String(e), "HolderRewardCreatorImmutable");
+      }
+    });
+
+    it("AMM: admin CTO on a pool + coin creator fee override", async () => {
+      const p0 = await amm.account.pool.fetch(pool);
+      const sharingCreator = p0.coinCreator; // the sharing PDA from the earlier test
+      try {
+        await amm.methods.adminCtoPool(newCreator.publicKey, false, new BN(50)).accounts({ authority: trader.publicKey, globalConfig: ammGlobalConfig, pool }).signers([trader]).rpc();
+        assert.fail("stranger");
+      } catch (e) {
+        assert.include(String(e), "Unauthorized");
+      }
+      await amm.methods.adminCtoPool(newCreator.publicKey, false, new BN(80)).accounts({ authority: admin.publicKey, globalConfig: ammGlobalConfig, pool }).rpc();
+      let p = await amm.account.pool.fetch(pool);
+      assert.equal(p.coinCreator.toBase58(), newCreator.publicKey.toBase58());
+      assert.equal(p.creatorFeeBps.toNumber(), 80);
+      await airdrop(newCreator.publicKey, 1);
+      await amm.methods.setCoinCreatorFeeBps(new BN(0), true).accounts({ coinCreator: newCreator.publicKey, pool, globalConfig: ammGlobalConfig }).signers([newCreator]).rpc();
+      p = await amm.account.pool.fetch(pool);
+      assert.isFalse(p.canEditCreatorFee);
+      // hand it back to the sharing config so later tests keep working
+      await amm.methods.adminCtoPool(sharingCreator, false, null).accounts({ authority: admin.publicKey, globalConfig: ammGlobalConfig, pool }).rpc();
     });
   });
 });

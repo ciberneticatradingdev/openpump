@@ -4,6 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useCoin, useConfig, useHolders, useRewards, useSharing, useTrades } from "../lib/api";
 import { currentTier } from "../components/TradePanel";
 import SharingCard from "../components/SharingCard";
+import CreatorFeeCard from "../components/CreatorFeeCard";
 import { ago, compact, explorer, priceQ, qty, short, sol } from "../lib/format";
 import Avatar from "../components/Avatar";
 import Chart from "../components/Chart";
@@ -149,6 +150,7 @@ export default function CoinPage() {
           {isCreator && !coin.is_holder_reward && coin.creator_kind === "wallet" && <Link to="/profile" className="btn btn-ghost w-full mt-2 !h-9">Claim your fees →</Link>}
         </div>
         {!coin.is_holder_reward && (coin.creator_kind === "wallet" || coin.creator_kind === "sharing") && <SharingCard coin={coin} sharing={sharing ?? null} />}
+        {coin.creator_kind === "wallet" && <CreatorFeeCard coin={coin} cfg={cfg} currentBps={Number(tier ? tier.creatorFeeBps : cfg.global.creatorFeeBasisPoints)} />}
       </div>
     </div>
   );

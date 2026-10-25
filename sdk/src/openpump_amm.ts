@@ -14,6 +14,138 @@ export type OpenpumpAmm = {
   },
   "instructions": [
     {
+      "name": "adminCtoPool",
+      "docs": [
+        "Protocol: community takeover of a pool's coin creator (mirrors the curve's admin_cto)."
+      ],
+      "discriminator": [
+        45,
+        61,
+        165,
+        151,
+        104,
+        0,
+        49,
+        189
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "globalConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.index",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.creator",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.base_mint",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.quote_mint",
+                "account": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "coinCreator",
+          "type": "pubkey"
+        },
+        {
+          "name": "isHolderReward",
+          "type": "bool"
+        },
+        {
+          "name": "creatorFeeBps",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    },
+    {
       "name": "buy",
       "docs": [
         "Buy an exact amount of base tokens, paying at most `max_quote_amount_in` (fees included)."
@@ -2385,6 +2517,31 @@ export type OpenpumpAmm = {
           }
         },
         {
+          "name": "globalConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -2421,6 +2578,135 @@ export type OpenpumpAmm = {
         {
           "name": "newCoinCreator",
           "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "setCoinCreatorFeeBps",
+      "docs": [
+        "Coin creator sets the pool's creator fee (0 = schedule) within the ceiling; `lock` makes it final."
+      ],
+      "discriminator": [
+        66,
+        89,
+        202,
+        237,
+        8,
+        118,
+        158,
+        169
+      ],
+      "accounts": [
+        {
+          "name": "coinCreator",
+          "signer": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.index",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.creator",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.base_mint",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.quote_mint",
+                "account": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "globalConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "creatorFeeBps",
+          "type": "u64"
+        },
+        {
+          "name": "lock",
+          "type": "bool"
         }
       ]
     },
@@ -2506,6 +2792,100 @@ export type OpenpumpAmm = {
       "args": [
         {
           "name": "newAdmin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "updateCreatorFeeConfig",
+      "discriminator": [
+        61,
+        175,
+        160,
+        249,
+        66,
+        66,
+        136,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "globalConfig"
+          ]
+        },
+        {
+          "name": "globalConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "creatorFeeConfigurable",
+          "type": "bool"
+        },
+        {
+          "name": "maxConfigurableCreatorFeeBps",
+          "type": "u64"
+        },
+        {
+          "name": "adminSetCoinCreatorAuthority",
           "type": "pubkey"
         }
       ]
@@ -2908,6 +3288,19 @@ export type OpenpumpAmm = {
   ],
   "events": [
     {
+      "name": "adminCtoPoolEvent",
+      "discriminator": [
+        47,
+        35,
+        163,
+        249,
+        150,
+        157,
+        147,
+        122
+      ]
+    },
+    {
       "name": "buyEvent",
       "discriminator": [
         103,
@@ -3080,9 +3473,60 @@ export type OpenpumpAmm = {
       "code": 6010,
       "name": "recipientsMismatch",
       "msg": "Shareholders and remaining accounts do not match"
+    },
+    {
+      "code": 6011,
+      "name": "holderRewardCreatorImmutable",
+      "msg": "The creator of a holder-reward pool cannot be changed"
+    },
+    {
+      "code": 6012,
+      "name": "creatorFeeNotConfigurable",
+      "msg": "Creator fee is not configurable"
+    },
+    {
+      "code": 6013,
+      "name": "creatorFeeLocked",
+      "msg": "Creator fee is locked for this pool"
     }
   ],
   "types": [
+    {
+      "name": "adminCtoPoolEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldCoinCreator",
+            "type": "pubkey"
+          },
+          {
+            "name": "newCoinCreator",
+            "type": "pubkey"
+          },
+          {
+            "name": "isHolderReward",
+            "type": "bool"
+          },
+          {
+            "name": "creatorFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
     {
       "name": "buyEvent",
       "type": {
@@ -3450,6 +3894,18 @@ export type OpenpumpAmm = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "adminSetCoinCreatorAuthority",
+            "type": "pubkey"
+          },
+          {
+            "name": "creatorFeeConfigurable",
+            "type": "bool"
+          },
+          {
+            "name": "maxConfigurableCreatorFeeBps",
+            "type": "u64"
           }
         ]
       }
@@ -3509,6 +3965,21 @@ export type OpenpumpAmm = {
           {
             "name": "creatorFees",
             "type": "u64"
+          },
+          {
+            "name": "isHolderReward",
+            "type": "bool"
+          },
+          {
+            "name": "creatorFeeBps",
+            "docs": [
+              "Per-pool creator fee override (bps). 0 = follow the schedule."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "canEditCreatorFee",
+            "type": "bool"
           }
         ]
       }

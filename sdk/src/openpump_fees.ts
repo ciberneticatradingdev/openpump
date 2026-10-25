@@ -931,6 +931,10 @@ export type OpenpumpFees = {
           "optional": true
         },
         {
+          "name": "ammGlobalConfig",
+          "optional": true
+        },
+        {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
@@ -3463,6 +3467,17 @@ export type OpenpumpFees = {
               "If set, `creator` is the [\"holder-rewards\", mint] PDA and the creator fee is paid out to holders."
             ],
             "type": "bool"
+          },
+          {
+            "name": "creatorFeeBps",
+            "docs": [
+              "Per-coin creator fee override (bps). 0 = follow the fee schedule."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "canEditCreatorFee",
+            "type": "bool"
           }
         ]
       }
@@ -3867,6 +3882,21 @@ export type OpenpumpFees = {
           {
             "name": "creatorFees",
             "type": "u64"
+          },
+          {
+            "name": "isHolderReward",
+            "type": "bool"
+          },
+          {
+            "name": "creatorFeeBps",
+            "docs": [
+              "Per-pool creator fee override (bps). 0 = follow the schedule."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "canEditCreatorFee",
+            "type": "bool"
           }
         ]
       }

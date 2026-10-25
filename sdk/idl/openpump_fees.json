@@ -925,6 +925,10 @@
           "optional": true
         },
         {
+          "name": "amm_global_config",
+          "optional": true
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
@@ -3457,6 +3461,17 @@
               "If set, `creator` is the [\"holder-rewards\", mint] PDA and the creator fee is paid out to holders."
             ],
             "type": "bool"
+          },
+          {
+            "name": "creator_fee_bps",
+            "docs": [
+              "Per-coin creator fee override (bps). 0 = follow the fee schedule."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "can_edit_creator_fee",
+            "type": "bool"
           }
         ]
       }
@@ -3861,6 +3876,21 @@
           {
             "name": "creator_fees",
             "type": "u64"
+          },
+          {
+            "name": "is_holder_reward",
+            "type": "bool"
+          },
+          {
+            "name": "creator_fee_bps",
+            "docs": [
+              "Per-pool creator fee override (bps). 0 = follow the schedule."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "can_edit_creator_fee",
+            "type": "bool"
           }
         ]
       }
