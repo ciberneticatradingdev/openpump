@@ -21,6 +21,9 @@ export const pda = {
   /** Holder rewards: the "creator" of a holder-reward coin, and the vault its fees accrue in. */
   holderRewards: (mint: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("holder-rewards"), mint.toBuffer()], CURVE_PROGRAM_ID)[0],
   holderVault: (mint: PublicKey) => pda.creatorVault(pda.holderRewards(mint)),
+  /** Volume incentives */
+  globalVolumeAccumulator: () => PublicKey.findProgramAddressSync([Buffer.from("global_volume_accumulator")], CURVE_PROGRAM_ID)[0],
+  userVolumeAccumulator: (user: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("user_volume_accumulator"), user.toBuffer()], CURVE_PROGRAM_ID)[0],
   /** v2 (custom pairs) */
   quoteConfig: (quoteMint: PublicKey) =>
     PublicKey.findProgramAddressSync([Buffer.from("quote-config"), quoteMint.toBuffer()], CURVE_PROGRAM_ID)[0],

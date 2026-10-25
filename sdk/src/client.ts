@@ -222,8 +222,10 @@ export class OpenpumpClient {
       .instruction();
   }
 
-  private tradeAccounts(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey) {
+  private tradeAccounts(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, trackVolume = false) {
     return {
+      globalVolumeAccumulator: trackVolume ? pda.globalVolumeAccumulator() : null,
+      userVolumeAccumulator: trackVolume ? pda.userVolumeAccumulator(user) : null,
       global: pda.global(),
       feeRecipient,
       mint,
@@ -238,14 +240,14 @@ export class OpenpumpClient {
     } as any;
   }
 
-  async buyIx(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, tokensOut: bigint, maxSolCost: bigint) {
-    return this.curve.methods.buy(bn(tokensOut), bn(maxSolCost)).accounts(this.tradeAccounts(user, mint, creator, feeRecipient)).instruction();
+  async buyIx(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, tokensOut: bigint, maxSolCost: bigint, trackVolume = false) {
+    return this.curve.methods.buy(bn(tokensOut), bn(maxSolCost)).accounts(this.tradeAccounts(user, mint, creator, feeRecipient, trackVolume)).instruction();
   }
 
-  async buyExactSolIx(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, solIn: bigint, minTokensOut: bigint) {
+  async buyExactSolIx(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, solIn: bigint, minTokensOut: bigint, trackVolume = false) {
     return this.curve.methods
       .buyExactSolIn(bn(solIn), bn(minTokensOut))
-      .accounts(this.tradeAccounts(user, mint, creator, feeRecipient))
+      .accounts(this.tradeAccounts(user, mint, creator, feeRecipient, trackVolume))
       .instruction();
   }
 
@@ -496,6 +498,49 @@ export class OpenpumpClient {
       } as any)
       .instruction();
     return [ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }), ix];
+  }
+
+  // ------------------------------------------------------------- volume incentives
+
+  async fetchIncentives() {
+    const info = await this.connection.getAccountInfo(pda.globalVolumeAccumulator(), "confirmed");
+    if (!info) return null;
+    const g = this.curve.coder.accounts.decode("globalVolumeAccumulator", info.data);
+    return {
+      startTime: Number(g.startTime), endTime: Number(g.endTime), secondsInADay: Number(g.secondsInADay), mint: g.mint as PublicKey,
+      totalTokenSupply: (g.totalTokenSupply as any[]).map((x) => big(x)), solVolumes: (g.solVolumes as any[]).map((x) => big(x)),
+    };
+  }
+
+  async fetchUserVolume(user: PublicKey) {
+    const info = await this.connection.getAccountInfo(pda.userVolumeAccumulator(user), "confirmed");
+    if (!info) return null;
+    const u = this.curve.coder.accounts.decode("userVolumeAccumulator", info.data);
+    return { needsClaim: u.needsClaim as boolean, totalUnclaimedTokens: big(u.totalUnclaimedTokens), totalClaimedTokens: big(u.totalClaimedTokens), currentSolVolume: big(u.currentSolVolume), lastUpdateTimestamp: Number(u.lastUpdateTimestamp) };
+  }
+
+  async initUserVolumeIx(payer: PublicKey, user: PublicKey = payer) {
+    return this.curve.methods.initUserVolumeAccumulator().accounts({ payer, user, userVolumeAccumulator: pda.userVolumeAccumulator(user), systemProgram: SystemProgram.programId } as any).instruction();
+  }
+
+  async claimIncentivesIx(payer: PublicKey, user: PublicKey, incentiveMint: PublicKey, tokenProgram = TOKEN_PROGRAM_ID) {
+    const gva = pda.globalVolumeAccumulator();
+    return this.curve.methods
+      .claimTokenIncentives()
+      .accounts({
+        user, payer, globalVolumeAccumulator: gva, globalIncentiveTokenAccount: getAssociatedTokenAddressSync(incentiveMint, gva, true, tokenProgram),
+        userVolumeAccumulator: pda.userVolumeAccumulator(user), mint: incentiveMint, userAta: getAssociatedTokenAddressSync(incentiveMint, user, true, tokenProgram),
+        tokenProgram, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+      } as any)
+      .instruction();
+  }
+
+  async adminUpdateIncentivesIx(authority: PublicKey, incentiveMint: PublicKey, p: { startTime: number; endTime: number; secondsInADay: number; dayNumber: number; tokenSupplyPerDay: bigint }, tokenProgram = TOKEN_PROGRAM_ID) {
+    const gva = pda.globalVolumeAccumulator();
+    return this.curve.methods
+      .adminUpdateTokenIncentives(bn(p.startTime), bn(p.endTime), bn(p.secondsInADay), bn(p.dayNumber), bn(p.tokenSupplyPerDay))
+      .accounts({ authority, global: pda.global(), globalVolumeAccumulator: gva, mint: incentiveMint, globalIncentiveTokenAccount: getAssociatedTokenAddressSync(incentiveMint, gva, true, tokenProgram), tokenProgram, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId } as any)
+      .instruction();
   }
 
   // ------------------------------------------------------------- holder rewards

@@ -97,6 +97,8 @@ describe("OpenPump — curve + amm", () => {
     systemProgram: SystemProgram.programId,
     tokenProgram: TOKEN_PROGRAM_ID,
     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    globalVolumeAccumulator: null,
+    userVolumeAccumulator: null,
   });
 
   before(async () => {
@@ -753,6 +755,95 @@ describe("OpenPump — curve + amm", () => {
       const g = await curve.account.global.fetch(global);
       assert.equal(g.holderRewardAuthority.toBase58(), newAuth.publicKey.toBase58());
       await curve.methods.updateHolderRewardConfig(true, admin.publicKey).accounts({ authority: admin.publicKey, global }).rpc();
+    });
+  });
+
+  // ------------------------------------------------------------------ volume incentives
+  describe("volume incentives", () => {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const DAY = 4; // seconds per "day" for the test campaign
+    let incMint: PublicKey;
+    const [gva] = PublicKey.findProgramAddressSync([Buffer.from("global_volume_accumulator")], curve.programId);
+    const uva = (u: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("user_volume_accumulator"), u.toBuffer()], curve.programId)[0];
+    const userA = Keypair.generate();
+    const userB = Keypair.generate();
+    const mintV = Keypair.generate();
+    let bcV: PublicKey;
+
+    before(async () => {
+      await Promise.all([airdrop(userA.publicKey, 20), airdrop(userB.publicKey, 20)]);
+      incMint = await createMint(conn, admin, admin.publicKey, null, 6);
+      [bcV] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), mintV.publicKey.toBuffer()], curve.programId);
+      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), mintV.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+      await curve.methods
+        .create("Volume Coin", "VOL", "https://example.com/v.json", false)
+        .accounts({ mint: mintV.publicKey, mintAuthority, bondingCurve: bcV, associatedBondingCurve: getAssociatedTokenAddressSync(mintV.publicKey, bcV, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
+        .signers([creator, mintV])
+        .rpc();
+    });
+
+    const buyAccts = (u: PublicKey, tracked: boolean) => ({
+      ...tradeAccounts(u),
+      mint: mintV.publicKey, bondingCurve: bcV, associatedBondingCurve: getAssociatedTokenAddressSync(mintV.publicKey, bcV, true),
+      associatedUser: getAssociatedTokenAddressSync(mintV.publicKey, u),
+      globalVolumeAccumulator: tracked ? gva : null, userVolumeAccumulator: tracked ? uva(u) : null,
+    });
+
+    it("admin schedules a campaign and funds the incentive vault", async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const start = now + 3, end = start + DAY * 5;
+      await curve.methods
+        .adminUpdateTokenIncentives(new BN(start), new BN(end), new BN(DAY), new BN(30), new BN(1_000_000_000)) // 1000 tokens/day for every day
+        .accounts({ authority: admin.publicKey, global, globalVolumeAccumulator: gva, mint: incMint, globalIncentiveTokenAccount: getAssociatedTokenAddressSync(incMint, gva, true), tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId })
+        .rpc();
+      await mintTo(conn, admin, incMint, getAssociatedTokenAddressSync(incMint, gva, true), admin, 100_000_000_000);
+      const g = await curve.account.globalVolumeAccumulator.fetch(gva);
+      assert.equal(g.startTime.toNumber(), start);
+      assert.equal(g.totalTokenSupply[0].toNumber(), 1_000_000_000);
+      assert.equal(g.totalTokenSupply[5].toNumber(), 1_000_000_000);
+      assert.equal(g.totalTokenSupply[6].toNumber(), 0);
+    });
+
+    it("tracked buys accrue SOL volume for the user and the day", async () => {
+      for (const u of [userA, userB]) {
+        await curve.methods.initUserVolumeAccumulator().accounts({ payer: u.publicKey, user: u.publicKey, userVolumeAccumulator: uva(u.publicKey), systemProgram: SystemProgram.programId }).signers([u]).rpc();
+      }
+      await sleep(3500); // campaign start
+      await curve.methods.buyExactSolIn(new BN(1 * LAMPORTS_PER_SOL), new BN(0)).accounts(buyAccts(userA.publicKey, true)).signers([userA]).rpc();
+      await curve.methods.buyExactSolIn(new BN(3 * LAMPORTS_PER_SOL), new BN(0)).accounts(buyAccts(userB.publicKey, true)).signers([userB]).rpc();
+      // untracked buy must not count
+      await curve.methods.buyExactSolIn(new BN(5 * LAMPORTS_PER_SOL), new BN(0)).accounts(buyAccts(trader.publicKey, false)).signers([trader]).rpc();
+      const a = await curve.account.userVolumeAccumulator.fetch(uva(userA.publicKey));
+      const g = await curve.account.globalVolumeAccumulator.fetch(gva);
+      assert.equal(a.currentSolVolume.toNumber(), 1 * LAMPORTS_PER_SOL);
+      assert.isTrue(a.needsClaim);
+      assert.equal(g.solVolumes[0].toNumber(), 4 * LAMPORTS_PER_SOL);
+    });
+
+    it("claiming during the day pays nothing; after the day it pays pro-rata (25 % / 75 %)", async () => {
+      const claimAccts = (u: PublicKey) => ({ user: u, payer: admin.publicKey, globalVolumeAccumulator: gva, globalIncentiveTokenAccount: getAssociatedTokenAddressSync(incMint, gva, true), userVolumeAccumulator: uva(u), mint: incMint, userAta: getAssociatedTokenAddressSync(incMint, u), tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId });
+      await curve.methods.claimTokenIncentives().accounts(claimAccts(userA.publicKey)).rpc();
+      assert.equal((await tokenBal(getAssociatedTokenAddressSync(incMint, userA.publicKey))).toString(), "0");
+      await sleep(DAY * 1000 + 500); // cross into day 1
+      await curve.methods.claimTokenIncentives().accounts(claimAccts(userA.publicKey)).rpc();
+      await curve.methods.claimTokenIncentives().accounts(claimAccts(userB.publicKey)).rpc();
+      assert.equal((await tokenBal(getAssociatedTokenAddressSync(incMint, userA.publicKey))).toString(), "250000000");
+      assert.equal((await tokenBal(getAssociatedTokenAddressSync(incMint, userB.publicKey))).toString(), "750000000");
+      const a = await curve.account.userVolumeAccumulator.fetch(uva(userA.publicKey));
+      assert.equal(a.totalClaimedTokens.toNumber(), 250000000);
+      assert.equal(a.currentSolVolume.toNumber(), 0);
+      assert.isFalse(a.needsClaim);
+    });
+
+    it("a stranger cannot change the schedule; user can close the accumulator", async () => {
+      try {
+        await curve.methods.adminUpdateTokenIncentives(new BN(0), new BN(0), new BN(DAY), new BN(0), new BN(1)).accounts({ authority: trader.publicKey, global, globalVolumeAccumulator: gva, mint: incMint, globalIncentiveTokenAccount: getAssociatedTokenAddressSync(incMint, gva, true), tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId }).signers([trader]).rpc();
+        assert.fail("should reject");
+      } catch (e) {
+        assert.include(String(e), "Unauthorized");
+      }
+      await curve.methods.closeUserVolumeAccumulator().accounts({ user: userA.publicKey, userVolumeAccumulator: uva(userA.publicKey) }).signers([userA]).rpc();
+      assert.isNull(await conn.getAccountInfo(uva(userA.publicKey)));
     });
   });
 });

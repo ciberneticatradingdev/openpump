@@ -30,6 +30,8 @@ pub mod quote;
 use quote::*;
 pub mod holders;
 use holders::*;
+pub mod incentives;
+use incentives::*;
 
 declare_id!("AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB");
 
@@ -432,6 +434,24 @@ pub mod openpump_curve {
         holders::distribute_fee_to_holders_v2(ctx, amounts)
     }
 
+    // ----- volume incentives (see incentives.rs)
+
+    pub fn init_user_volume_accumulator(ctx: Context<InitUserVolumeAccumulator>) -> Result<()> {
+        incentives::init_user_volume_accumulator(ctx)
+    }
+    pub fn close_user_volume_accumulator(ctx: Context<CloseUserVolumeAccumulator>) -> Result<()> {
+        incentives::close_user_volume_accumulator(ctx)
+    }
+    pub fn sync_user_volume_accumulator(ctx: Context<SyncUserVolumeAccumulator>) -> Result<()> {
+        incentives::sync_user_volume_accumulator(ctx)
+    }
+    pub fn admin_update_token_incentives(ctx: Context<AdminUpdateTokenIncentives>, start_time: i64, end_time: i64, seconds_in_a_day: i64, day_number: u64, token_supply_per_day: u64) -> Result<()> {
+        incentives::admin_update_token_incentives(ctx, start_time, end_time, seconds_in_a_day, day_number, token_supply_per_day)
+    }
+    pub fn claim_token_incentives(ctx: Context<ClaimTokenIncentives>) -> Result<()> {
+        incentives::claim_token_incentives(ctx)
+    }
+
     // ----- custom pairs (v2 family, see quote.rs)
 
     pub fn set_quote_config(ctx: Context<SetQuoteConfig>, params: QuoteParams) -> Result<()> {
@@ -533,6 +553,11 @@ fn execute_buy(ctx: Context<Trade>, tokens_out: u64, sol_in: u64, max_sol_cost: 
     bc.creator_fees_total = bc.creator_fees_total.saturating_add(creator_fee);
     if bc.real_token_reserves == 0 {
         bc.complete = true;
+    }
+
+    // volume incentives (opt-in by passing both accumulator accounts)
+    if let (Some(g_acc), Some(u_acc)) = (ctx.accounts.global_volume_accumulator.as_mut(), ctx.accounts.user_volume_accumulator.as_mut()) {
+        incentives::track(g_acc, u_acc, clock.unix_timestamp, sol_in)?;
     }
 
     emit_cpi!(TradeEvent {
@@ -669,6 +694,11 @@ pub struct Trade<'info> {
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    /// Optional: pass both accumulators to have this buy count toward volume incentives.
+    #[account(mut, seeds = [GLOBAL_VOLUME_SEED], bump = global_volume_accumulator.bump)]
+    pub global_volume_accumulator: Option<Box<Account<'info, GlobalVolumeAccumulator>>>,
+    #[account(mut, seeds = [USER_VOLUME_SEED, user.key().as_ref()], bump = user_volume_accumulator.bump)]
+    pub user_volume_accumulator: Option<Box<Account<'info, UserVolumeAccumulator>>>,
 }
 
 #[event_cpi]
@@ -918,4 +948,6 @@ pub enum CurveError {
     NotHolderRewardCoin,
     #[msg("Amounts and recipient accounts do not match")]
     HolderRecipientsMismatch,
+    #[msg("Invalid incentive schedule time or day")]
+    IncentiveTime,
 }
