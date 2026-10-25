@@ -142,7 +142,7 @@ pub struct DistributeFeeToHolders<'info> {
     /// The configured distribution authority (signs and pays tx fees).
     #[account(mut)]
     pub holder_reward_authority: Signer<'info>,
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
     /// CHECK: the coin's "creator": PDA ["holder-rewards", mint]; must equal bonding_curve.creator.
@@ -164,7 +164,7 @@ pub struct DistributeFeeToHoldersV2<'info> {
     /// CHECK: same signer, aliased for the ATA-creation CPI payer.
     #[account(mut, address = holder_reward_authority.key())]
     pub authority: UncheckedAccount<'info>,
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, has_one = quote_mint @ CurveError::WrongQuoteMint)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
     /// CHECK: PDA ["holder-rewards", mint]; must equal bonding_curve.creator.

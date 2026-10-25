@@ -135,7 +135,7 @@ pub fn distribute_creator_fees_v2<'info>(ctx: Context<'_, '_, 'info, 'info, Dist
 pub struct SetCreator<'info> {
     /// The coin's current creator.
     pub creator: Signer<'info>,
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, has_one = creator @ CurveError::Unauthorized)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
 }
@@ -143,7 +143,7 @@ pub struct SetCreator<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct DistributeCreatorFees<'info> {
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, constraint = bonding_curve.creator == sharing_config.key() @ CurveError::SharingMismatch)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
     #[account(seeds = [SHARING_CONFIG_SEED, mint.key().as_ref()], bump = sharing_config.bump, seeds::program = FEES_PROGRAM_ID, has_one = mint @ CurveError::SharingMismatch)]
@@ -159,7 +159,7 @@ pub struct DistributeCreatorFees<'info> {
 pub struct DistributeCreatorFeesV2<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, has_one = quote_mint @ CurveError::WrongQuoteMint, constraint = bonding_curve.creator == sharing_config.key() @ CurveError::SharingMismatch)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
     #[account(seeds = [SHARING_CONFIG_SEED, mint.key().as_ref()], bump = sharing_config.bump, seeds::program = FEES_PROGRAM_ID, has_one = mint @ CurveError::SharingMismatch)]

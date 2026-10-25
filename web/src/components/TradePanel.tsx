@@ -29,6 +29,8 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
   const [reserves, setReserves] = useState<{ baseReserve: bigint; quoteReserve: bigint } | null>(null);
 
   const mint = useMemo(() => new PublicKey(coin.mint), [coin.mint]);
+  const tokenProgram = useMemo(() => new PublicKey(coin.token_program || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"), [coin.token_program]);
+  useEffect(() => { client.setCoinTokenProgram(mint, tokenProgram); }, [client, mint, tokenProgram]);
   const v2 = isV2(coin);
   const quoteMint = useMemo(() => new PublicKey(coin.quote_mint), [coin.quote_mint]);
   const qSym = coin.quote_symbol || "SOL";
@@ -42,7 +44,7 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
     let alive = true;
     const load = async () => {
       if (!publicKey) return setBal({ quote: 0n, tok: 0n });
-      const tokP = connection.getTokenAccountBalance(getAssociatedTokenAddressSync(mint, publicKey), "confirmed").then((r) => BigInt(r.value.amount)).catch(() => 0n);
+      const tokP = connection.getTokenAccountBalance(getAssociatedTokenAddressSync(mint, publicKey, false, tokenProgram), "confirmed").then((r) => BigInt(r.value.amount)).catch(() => 0n);
       const quoteP = v2
         ? connection.getTokenAccountBalance(getAssociatedTokenAddressSync(quoteMint, publicKey), "confirmed").then((r) => BigInt(r.value.amount)).catch(() => 0n)
         : connection.getBalance(publicKey, "confirmed").then((b) => BigInt(b));
@@ -52,7 +54,7 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
     load();
     const id = setInterval(load, 8000);
     return () => { alive = false; clearInterval(id); };
-  }, [publicKey, connection, mint, quoteMint, v2, coin.trades]);
+  }, [publicKey, connection, mint, quoteMint, v2, coin.trades, tokenProgram]);
 
   // AMM pool state (after graduation)
   useEffect(() => {

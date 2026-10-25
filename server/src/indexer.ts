@@ -155,7 +155,7 @@ export class Indexer {
             q.mint, q.symbol, q.decimals, d.isHolderReward ? 1 : 0
           );
         const kind = d.isHolderReward ? "holders" : toStr(d.creator) === toStr(d.user) ? "wallet" : "pending";
-        this.db.prepare("UPDATE coins SET creator_kind=? WHERE mint=?").run(kind, toStr(d.mint));
+        this.db.prepare("UPDATE coins SET creator_kind=?, token_program=? WHERE mint=?").run(kind, toStr(d.tokenProgram) || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", toStr(d.mint));
         this.broadcast({ type: "create", mint: toStr(d.mint), name: d.name, symbol: d.symbol, creator: toStr(d.creator), ts });
       },
       "curve:TradeEvent": () => {

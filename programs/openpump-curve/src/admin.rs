@@ -10,6 +10,7 @@
 //! * `set_can_edit_creator_fee(false)`: creator locks it permanently.
 
 use crate::*;
+use anchor_spl::token_interface::Mint as MintI;
 
 #[event]
 pub struct AdminCtoEvent {
@@ -109,7 +110,7 @@ pub struct AdminCto<'info> {
     pub authority: Signer<'info>,
     #[account(seeds = [GLOBAL_SEED], bump = global.bump, constraint = global.admin_set_creator_authority == authority.key() @ CurveError::Unauthorized)]
     pub global: Box<Account<'info, Global>>,
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
     /// CHECK: the current creator's vault (swept when converting to holder rewards).
@@ -130,7 +131,7 @@ pub struct CreatorOnly<'info> {
     pub creator: Signer<'info>,
     #[account(seeds = [GLOBAL_SEED], bump = global.bump)]
     pub global: Box<Account<'info, Global>>,
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, has_one = creator @ CurveError::Unauthorized)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
 }

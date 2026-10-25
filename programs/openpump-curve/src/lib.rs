@@ -22,6 +22,7 @@ use anchor_spl::metadata::{
 };
 use anchor_spl::token::{self, Burn, CloseAccount, Mint, MintTo, SetAuthority, Token, TokenAccount, Transfer};
 use anchor_spl::token::spl_token::instruction::AuthorityType;
+use anchor_spl::token_interface::{self as ti, Mint as MintI, TokenAccount as TokenAccountI, TokenInterface, TransferChecked};
 use openpump_amm::program::OpenpumpAmm;
 
 pub mod math;
@@ -36,6 +37,8 @@ pub mod sharing;
 use sharing::*;
 pub mod admin;
 use admin::*;
+pub mod token2022;
+use token2022::*;
 use openpump_fee_types::{FeeConfig, FEES_PROGRAM_ID, FEE_CONFIG_SEED};
 
 declare_id!("AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB");
@@ -199,6 +202,7 @@ pub mod openpump_curve {
             timestamp: clock.unix_timestamp,
             quote_mint: bc.quote_mint,
             is_holder_reward: bc.is_holder_reward,
+            token_program: ctx.accounts.token_program.key(),
         });
         Ok(())
     }
@@ -251,16 +255,18 @@ pub mod openpump_curve {
         require!(user_out >= min_sol_output, CurveError::ExceededSlippage);
 
         // tokens: user -> curve
-        token::transfer(
+        ti::transfer_checked(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                Transfer {
+                TransferChecked {
                     from: ctx.accounts.associated_user.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
                     to: ctx.accounts.associated_bonding_curve.to_account_info(),
                     authority: ctx.accounts.user.to_account_info(),
                 },
             ),
             amount,
+            TOKEN_DECIMALS,
         )?;
 
         // lamports: curve -> user / fee recipient / creator vault (curve is program-owned, debit directly)
@@ -378,7 +384,7 @@ pub mod openpump_curve {
                     coin_creator_vault_authority: ctx.accounts.coin_creator_vault_authority.to_account_info(),
                     coin_creator_vault_ata: ctx.accounts.coin_creator_vault_ata.to_account_info(),
                     token_program: ctx.accounts.token_program.to_account_info(),
-                    base_token_program: ctx.accounts.token_program.to_account_info(),
+                    base_token_program: ctx.accounts.base_token_program.to_account_info(),
                     quote_token_program: ctx.accounts.token_program.to_account_info(),
                     associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
                     system_program: ctx.accounts.system_program.to_account_info(),
@@ -500,6 +506,12 @@ pub mod openpump_curve {
         incentives::claim_token_incentives(ctx)
     }
 
+    // ----- Token-2022 coins (see token2022.rs)
+
+    pub fn create_v3(ctx: Context<CreateV3>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey) -> Result<()> {
+        token2022::create_v3(ctx, name, symbol, uri, is_holder_reward, creator)
+    }
+
     // ----- custom pairs (v2 family, see quote.rs)
 
     pub fn set_quote_config(ctx: Context<SetQuoteConfig>, params: QuoteParams) -> Result<()> {
@@ -584,17 +596,19 @@ fn execute_buy(ctx: Context<Trade>, tokens_out: u64, sol_in: u64, max_sol_cost: 
     // tokens: curve -> user
     let mint_key = bc.mint;
     let bc_seeds: &[&[u8]] = &[BONDING_CURVE_SEED, mint_key.as_ref(), &[bc.bump]];
-    token::transfer(
+    ti::transfer_checked(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
-            Transfer {
+            TransferChecked {
                 from: ctx.accounts.associated_bonding_curve.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
                 to: ctx.accounts.associated_user.to_account_info(),
                 authority: ctx.accounts.bonding_curve.to_account_info(),
             },
             &[bc_seeds],
         ),
         tokens_out,
+        TOKEN_DECIMALS,
     )?;
 
     let bc = &mut ctx.accounts.bonding_curve;
@@ -754,20 +768,21 @@ pub struct Trade<'info> {
     /// CHECK: must equal the configured protocol fee recipient.
     #[account(mut, address = global.fee_recipient @ CurveError::InvalidFeeRecipient)]
     pub fee_recipient: UncheckedAccount<'info>,
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, constraint = bonding_curve.quote_mint == Pubkey::default() @ CurveError::WrongQuoteMint)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
-    #[account(mut, associated_token::mint = mint, associated_token::authority = bonding_curve)]
-    pub associated_bonding_curve: Box<Account<'info, TokenAccount>>,
-    #[account(init_if_needed, payer = user, associated_token::mint = mint, associated_token::authority = user)]
-    pub associated_user: Box<Account<'info, TokenAccount>>,
+    #[account(mut, associated_token::mint = mint, associated_token::authority = bonding_curve, associated_token::token_program = token_program)]
+    pub associated_bonding_curve: Box<InterfaceAccount<'info, TokenAccountI>>,
+    #[account(init_if_needed, payer = user, associated_token::mint = mint, associated_token::authority = user, associated_token::token_program = token_program)]
+    pub associated_user: Box<InterfaceAccount<'info, TokenAccountI>>,
     #[account(mut)]
     pub user: Signer<'info>,
     /// CHECK: system-owned PDA that accrues the creator's fees.
     #[account(mut, seeds = [CREATOR_VAULT_SEED, bonding_curve.creator.as_ref()], bump)]
     pub creator_vault: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
+    /// Token program of the coin (SPL Token or Token-2022).
+    pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     /// Optional: pass both accumulators to have this buy count toward volume incentives.
     #[account(mut, seeds = [GLOBAL_VOLUME_SEED], bump = global_volume_accumulator.bump)]
@@ -790,11 +805,13 @@ pub struct Migrate<'info> {
     /// CHECK: must equal the configured protocol fee recipient.
     #[account(mut, address = global.fee_recipient @ CurveError::InvalidFeeRecipient)]
     pub fee_recipient: UncheckedAccount<'info>,
-    pub mint: Box<Account<'info, Mint>>,
+    pub mint: Box<InterfaceAccount<'info, MintI>>,
     #[account(mut, seeds = [BONDING_CURVE_SEED, mint.key().as_ref()], bump = bonding_curve.bump, has_one = mint, constraint = bonding_curve.quote_mint == Pubkey::default() @ CurveError::WrongQuoteMint)]
     pub bonding_curve: Box<Account<'info, BondingCurve>>,
-    #[account(mut, associated_token::mint = mint, associated_token::authority = bonding_curve)]
-    pub associated_bonding_curve: Box<Account<'info, TokenAccount>>,
+    #[account(mut, associated_token::mint = mint, associated_token::authority = bonding_curve, associated_token::token_program = base_token_program)]
+    pub associated_bonding_curve: Box<InterfaceAccount<'info, TokenAccountI>>,
+    /// Token program of the coin (SPL Token or Token-2022).
+    pub base_token_program: Interface<'info, TokenInterface>,
     /// CHECK: curve-owned WSOL ATA, created in this instruction and closed at the end.
     #[account(mut)]
     pub bonding_curve_wsol: UncheckedAccount<'info>,
@@ -949,6 +966,7 @@ pub struct CreateEvent {
     pub timestamp: i64,
     pub quote_mint: Pubkey,
     pub is_holder_reward: bool,
+    pub token_program: Pubkey,
 }
 
 #[event]

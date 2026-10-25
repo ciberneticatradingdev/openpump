@@ -2,6 +2,7 @@ import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import BN from "bn.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
   createCloseAccountInstruction,
@@ -247,7 +248,22 @@ export class OpenpumpClient {
       .instruction();
   }
 
-  private tradeAccounts(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, trackVolume = false) {
+  /** Token program of a coin (SPL Token or Token-2022), cached per mint. */
+  private tokenPrograms = new Map<string, PublicKey>();
+  async coinTokenProgram(mint: PublicKey): Promise<PublicKey> {
+    const k = mint.toBase58();
+    const hit = this.tokenPrograms.get(k);
+    if (hit) return hit;
+    const info = await this.connection.getAccountInfo(mint, "confirmed");
+    const tp = info && info.owner.equals(TOKEN_2022_PROGRAM_ID) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+    this.tokenPrograms.set(k, tp);
+    return tp;
+  }
+  setCoinTokenProgram(mint: PublicKey, tp: PublicKey) {
+    this.tokenPrograms.set(mint.toBase58(), tp);
+  }
+
+  private tradeAccounts(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, trackVolume = false, tokenProgram: PublicKey = TOKEN_PROGRAM_ID) {
     return {
       globalVolumeAccumulator: trackVolume ? pda.globalVolumeAccumulator() : null,
       userVolumeAccumulator: trackVolume ? pda.userVolumeAccumulator(user) : null,
@@ -257,29 +273,45 @@ export class OpenpumpClient {
       feeRecipient,
       mint,
       bondingCurve: pda.bondingCurve(mint),
-      associatedBondingCurve: pda.associatedBondingCurve(mint),
-      associatedUser: getAssociatedTokenAddressSync(mint, user),
+      associatedBondingCurve: getAssociatedTokenAddressSync(mint, pda.bondingCurve(mint), true, tokenProgram),
+      associatedUser: getAssociatedTokenAddressSync(mint, user, false, tokenProgram),
       user,
       creatorVault: pda.creatorVault(creator),
       systemProgram: SystemProgram.programId,
-      tokenProgram: TOKEN_PROGRAM_ID,
+      tokenProgram,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     } as any;
   }
 
   async buyIx(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, tokensOut: bigint, maxSolCost: bigint, trackVolume = false) {
-    return this.curve.methods.buy(bn(tokensOut), bn(maxSolCost)).accounts(this.tradeAccounts(user, mint, creator, feeRecipient, trackVolume)).instruction();
+    const tp = await this.coinTokenProgram(mint);
+    return this.curve.methods.buy(bn(tokensOut), bn(maxSolCost)).accounts(this.tradeAccounts(user, mint, creator, feeRecipient, trackVolume, tp)).instruction();
   }
 
   async buyExactSolIx(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, solIn: bigint, minTokensOut: bigint, trackVolume = false) {
+    const tp = await this.coinTokenProgram(mint);
     return this.curve.methods
       .buyExactSolIn(bn(solIn), bn(minTokensOut))
-      .accounts(this.tradeAccounts(user, mint, creator, feeRecipient, trackVolume))
+      .accounts(this.tradeAccounts(user, mint, creator, feeRecipient, trackVolume, tp))
       .instruction();
   }
 
   async sellIx(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, tokensIn: bigint, minSolOut: bigint) {
-    return this.curve.methods.sell(bn(tokensIn), bn(minSolOut)).accounts(this.tradeAccounts(user, mint, creator, feeRecipient)).instruction();
+    const tp = await this.coinTokenProgram(mint);
+    return this.curve.methods.sell(bn(tokensIn), bn(minSolOut)).accounts(this.tradeAccounts(user, mint, creator, feeRecipient, false, tp)).instruction();
+  }
+
+  /** Token-2022 coin with on-mint metadata (no Metaplex account). */
+  async createV3Ix(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, creator: PublicKey = PublicKey.default) {
+    this.setCoinTokenProgram(mint, TOKEN_2022_PROGRAM_ID);
+    return this.curve.methods
+      .createV3(name, symbol, uri, isHolderReward, creator)
+      .accounts({
+        mint, mintAuthority: pda.mintAuthority(), bondingCurve: pda.bondingCurve(mint),
+        associatedBondingCurve: getAssociatedTokenAddressSync(mint, pda.bondingCurve(mint), true, TOKEN_2022_PROGRAM_ID),
+        global: pda.global(), user, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_2022_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      } as any)
+      .instruction();
   }
 
   async collectCreatorFeeIx(creator: PublicKey) {
@@ -294,6 +326,7 @@ export class OpenpumpClient {
     const bondingCurve = pda.bondingCurve(mint);
     const pool = pda.migrationPool(mint);
     const lpMint = pda.lpMint(pool);
+    const tp = await this.coinTokenProgram(mint);
     const ix = await this.curve.methods
       .migrate()
       .accounts({
@@ -301,7 +334,8 @@ export class OpenpumpClient {
         feeRecipient,
         mint,
         bondingCurve,
-        associatedBondingCurve: pda.associatedBondingCurve(mint),
+        associatedBondingCurve: getAssociatedTokenAddressSync(mint, bondingCurve, true, tp),
+        baseTokenProgram: tp,
         bondingCurveWsol: getAssociatedTokenAddressSync(WSOL_MINT, bondingCurve, true),
         bondingCurveLp: getAssociatedTokenAddressSync(lpMint, bondingCurve, true),
         user,
@@ -311,7 +345,7 @@ export class OpenpumpClient {
         pool,
         lpMint,
         lockedLpTokenAccount: pda.lockedLp(pool),
-        poolBaseTokenAccount: pda.poolBase(pool, mint),
+        poolBaseTokenAccount: getAssociatedTokenAddressSync(mint, pool, true, tp),
         poolQuoteTokenAccount: pda.poolQuote(pool),
         coinCreatorVaultAuthority: pda.ammCreatorVaultAuthority(creator),
         coinCreatorVaultAta: pda.ammCreatorVaultAta(creator),
@@ -326,7 +360,7 @@ export class OpenpumpClient {
 
   // ------------------------------------------------------------- AMM instructions (quote = WSOL)
 
-  private swapAccounts(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey) {
+  private swapAccounts(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseTokenProgram: PublicKey = TOKEN_PROGRAM_ID) {
     const q = pool.quoteMint;
     return {
       feeConfig: this.feeConfigEnabled ? pda.feeConfig() : null,
@@ -335,7 +369,7 @@ export class OpenpumpClient {
       globalConfig: pda.ammGlobalConfig(),
       baseMint: mint,
       quoteMint: q,
-      userBaseTokenAccount: getAssociatedTokenAddressSync(mint, user),
+      userBaseTokenAccount: getAssociatedTokenAddressSync(mint, user, false, baseTokenProgram),
       userQuoteTokenAccount: getAssociatedTokenAddressSync(q, user),
       poolBaseTokenAccount: pool.poolBaseTokenAccount,
       poolQuoteTokenAccount: pool.poolQuoteTokenAccount,
@@ -343,7 +377,7 @@ export class OpenpumpClient {
       protocolFeeRecipientTokenAccount: getAssociatedTokenAddressSync(q, protocolFeeRecipient, true),
       coinCreatorVaultAuthority: pda.ammCreatorVaultAuthority(pool.coinCreator),
       coinCreatorVaultAta: pda.ammCreatorVaultAta(pool.coinCreator, q),
-      baseTokenProgram: TOKEN_PROGRAM_ID,
+      baseTokenProgram,
       quoteTokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
@@ -367,7 +401,7 @@ export class OpenpumpClient {
 
   /** Buy on the AMM. WSOL pools: wrap -> buy -> unwrap in one tx. Custom quote: pay from the user's quote ATA. */
   async ammBuyIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseOut: bigint, maxQuoteIn: bigint) {
-    const buy = await this.amm.methods.buy(bn(baseOut), bn(maxQuoteIn)).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient)).instruction();
+    const buy = await this.amm.methods.buy(bn(baseOut), bn(maxQuoteIn)).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient, await this.coinTokenProgram(mint))).instruction();
     if (!pool.quoteMint.equals(WSOL_MINT)) return [buy];
     return [...this.wrapSolIxs(user, maxQuoteIn), buy, this.unwrapSolIx(user)];
   }
@@ -375,7 +409,7 @@ export class OpenpumpClient {
   async ammSellIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseIn: bigint, minQuoteOut: bigint) {
     const q = pool.quoteMint;
     const ata = getAssociatedTokenAddressSync(q, user);
-    const sell = await this.amm.methods.sell(bn(baseIn), bn(minQuoteOut)).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient)).instruction();
+    const sell = await this.amm.methods.sell(bn(baseIn), bn(minQuoteOut)).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient, await this.coinTokenProgram(mint))).instruction();
     const ensure = createAssociatedTokenAccountIdempotentInstruction(user, ata, user, q);
     if (!q.equals(WSOL_MINT)) return [ensure, sell];
     return [ensure, sell, this.unwrapSolIx(user)];
@@ -445,15 +479,15 @@ export class OpenpumpClient {
       .instruction();
   }
 
-  private tradeV2Accounts(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, quoteTokenProgram: PublicKey) {
+  private tradeV2Accounts(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, quoteTokenProgram: PublicKey, tokenProgram: PublicKey = TOKEN_PROGRAM_ID) {
     return {
       feeConfig: this.feeConfigEnabled ? pda.feeConfig() : null,
       global: pda.global(),
       feeRecipient,
       mint,
       bondingCurve: pda.bondingCurve(mint),
-      associatedBondingCurve: pda.associatedBondingCurve(mint),
-      associatedUser: getAssociatedTokenAddressSync(mint, user),
+      associatedBondingCurve: getAssociatedTokenAddressSync(mint, pda.bondingCurve(mint), true, tokenProgram),
+      associatedUser: getAssociatedTokenAddressSync(mint, user, false, tokenProgram),
       user,
       quoteMint,
       userQuote: getAssociatedTokenAddressSync(quoteMint, user, false, quoteTokenProgram),
@@ -462,7 +496,7 @@ export class OpenpumpClient {
       creatorVault: pda.creatorVault(creator),
       creatorVaultQuote: pda.creatorVaultQuote(creator, quoteMint, quoteTokenProgram),
       systemProgram: SystemProgram.programId,
-      tokenProgram: TOKEN_PROGRAM_ID,
+      tokenProgram,
       quoteTokenProgram,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     } as any;
@@ -505,7 +539,8 @@ export class OpenpumpClient {
         feeRecipientQuote: getAssociatedTokenAddressSync(quoteMint, feeRecipient, true, quoteTokenProgram),
         mint,
         bondingCurve,
-        associatedBondingCurve: pda.associatedBondingCurve(mint),
+        associatedBondingCurve: getAssociatedTokenAddressSync(mint, bondingCurve, true, await this.coinTokenProgram(mint)),
+        baseTokenProgram: await this.coinTokenProgram(mint),
         bondingCurveQuote: pda.bondingCurveQuote(mint, quoteMint, quoteTokenProgram),
         bondingCurveLp: getAssociatedTokenAddressSync(lpMint, bondingCurve, true),
         user,
@@ -516,7 +551,7 @@ export class OpenpumpClient {
         pool,
         lpMint,
         lockedLpTokenAccount: pda.lockedLp(pool),
-        poolBaseTokenAccount: pda.poolBase(pool, mint),
+        poolBaseTokenAccount: getAssociatedTokenAddressSync(mint, pool, true, await this.coinTokenProgram(mint)),
         poolQuoteTokenAccount: getAssociatedTokenAddressSync(quoteMint, pool, true, quoteTokenProgram),
         coinCreatorVaultAuthority: pda.ammCreatorVaultAuthority(creator),
         coinCreatorVaultAta: pda.ammCreatorVaultAta(creator, quoteMint),
@@ -715,6 +750,84 @@ export class OpenpumpClient {
   }
   async sweepBuybackIx(authority: PublicKey, index = 0) {
     return this.fees.methods.sweepBuyback(index).accounts({ authority, buybackVault: pda.buybackVault(index) } as any).instruction();
+  }
+
+  // ------------------------------------------------------------- multi-hop
+
+  /** One instruction routing through AMM pools: input ATA -> pools... -> output ATA. */
+  async multiHopIx(user: PublicKey, inputMint: PublicKey, outputMint: PublicKey, pools: PoolState[], amountIn: bigint, minAmountOut: bigint, protocolFeeRecipient: PublicKey) {
+    const inTp = await this.coinTokenProgram(inputMint);
+    const outTp = await this.coinTokenProgram(outputMint);
+    const remaining = [];
+    for (const p of pools) {
+      const qTp = await this.coinTokenProgram(p.quoteMint);
+      remaining.push(
+        { pubkey: p.address, isSigner: false, isWritable: true },
+        { pubkey: p.poolBaseTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: p.poolQuoteTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: p.baseMint, isSigner: false, isWritable: false },
+        { pubkey: p.quoteMint, isSigner: false, isWritable: false },
+        { pubkey: getAssociatedTokenAddressSync(p.quoteMint, protocolFeeRecipient, true, qTp), isSigner: false, isWritable: true },
+        { pubkey: pda.ammCreatorVaultAta(p.coinCreator, p.quoteMint), isSigner: false, isWritable: true }
+      );
+    }
+    return this.amm.methods
+      .multiHopSwap(bn(amountIn), bn(minAmountOut))
+      .accounts({
+        user, userInTokenAccount: getAssociatedTokenAddressSync(inputMint, user, false, inTp), userOutTokenAccount: getAssociatedTokenAddressSync(outputMint, user, false, outTp),
+        globalConfig: pda.ammGlobalConfig(), feeConfig: this.feeConfigEnabled ? pda.feeConfig() : null, tokenProgram: TOKEN_PROGRAM_ID, tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+      } as any)
+      .remainingAccounts(remaining)
+      .instruction();
+  }
+
+  /**
+   * Coin A -> coin B (both SOL-quoted) in one transaction. Graduated legs go through the on-chain
+   * router; curve legs are composed (sell A on its curve, buy B with the proceeds), since the
+   * curve pays SOL straight to the wallet. Returns the instructions + the expected output.
+   */
+  async routeIxs(user: PublicKey, a: { mint: PublicKey; creator: PublicKey; pool: PoolState | null; curve: CurveState | null }, b: { mint: PublicKey; creator: PublicKey; pool: PoolState | null; curve: CurveState | null }, amountIn: bigint, slippageBps: bigint, feeRecipient: PublicKey, protocolFeeRecipient: PublicKey, fees: { feeBasisPoints: bigint; creatorFeeBasisPoints: bigint }, ammFees: { lpFeeBasisPoints: bigint; protocolFeeBasisPoints: bigint; coinCreatorFeeBasisPoints: bigint }) {
+    const { amm: ammMath, curve: curveMath } = await import("./math");
+    const ixs: TransactionInstruction[] = [];
+    if (a.pool && b.pool) {
+      // both graduated: single on-chain route A -> WSOL -> B
+      const ra = await this.fetchPoolReserves(a.pool);
+      const qa = ammMath.quoteSell(amountIn, ra.baseReserve, ra.quoteReserve, ammFees);
+      const rb = await this.fetchPoolReserves(b.pool);
+      const qb = ammMath.quoteBuyWithBudget(qa.userOut, rb.baseReserve, rb.quoteReserve, ammFees);
+      const minOut = (qb.baseOut * (10000n - slippageBps)) / 10000n;
+      const outAta = getAssociatedTokenAddressSync(b.mint, user, false, await this.coinTokenProgram(b.mint));
+      ixs.push(createAssociatedTokenAccountIdempotentInstruction(user, outAta, user, b.mint, await this.coinTokenProgram(b.mint)));
+      ixs.push(await this.multiHopIx(user, a.mint, b.mint, [a.pool, b.pool], amountIn, minOut, protocolFeeRecipient));
+      return { ixs, expectedOut: qb.baseOut };
+    }
+    // sell leg -> SOL in wallet
+    let solOut: bigint;
+    if (a.pool) {
+      const ra = await this.fetchPoolReserves(a.pool);
+      const q = ammMath.quoteSell(amountIn, ra.baseReserve, ra.quoteReserve, ammFees);
+      solOut = (q.userOut * (10000n - slippageBps)) / 10000n;
+      ixs.push(...(await this.ammSellIxs(user, a.mint, a.pool, protocolFeeRecipient, amountIn, solOut)));
+    } else {
+      const q = curveMath.quoteSell(amountIn, a.curve!, fees);
+      solOut = (q.userOut * (10000n - slippageBps)) / 10000n;
+      ixs.push(await this.sellIx(user, a.mint, a.creator, feeRecipient, amountIn, solOut));
+    }
+    // buy leg with the guaranteed minimum proceeds
+    let expectedOut: bigint;
+    if (b.pool) {
+      const rb = await this.fetchPoolReserves(b.pool);
+      const q = ammMath.quoteBuyWithBudget(solOut, rb.baseReserve, rb.quoteReserve, ammFees);
+      expectedOut = q.baseOut;
+      ixs.push(...(await this.ammBuyIxs(user, b.mint, b.pool, protocolFeeRecipient, (q.baseOut * (10000n - slippageBps)) / 10000n, solOut)));
+    } else {
+      const q = curveMath.quoteBuyExactSol(solOut, b.curve!, fees);
+      expectedOut = q.tokensOut;
+      // spend the sell proceeds net of fees so the buy never exceeds what the sell produced
+      const spend = (solOut * 10000n) / (10000n + fees.feeBasisPoints + fees.creatorFeeBasisPoints);
+      ixs.push(await this.buyExactSolIx(user, b.mint, b.creator, feeRecipient, spend, (q.tokensOut * (10000n - slippageBps)) / 10000n));
+    }
+    return { ixs, expectedOut };
   }
 
   // ------------------------------------------------------------- creator management (CTO / creator fee)

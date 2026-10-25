@@ -39,7 +39,9 @@ export interface Coin {
   is_holder_reward: number;
   holder_paid: string;
   creator_kind: "wallet" | "holders" | "sharing" | "social" | "donation" | "pending";
+  token_program: string;
 }
+export const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
 export const WSOL = "So11111111111111111111111111111111111111112";
 export const isV2 = (c: { quote_mint?: string | null }) => !!c.quote_mint && c.quote_mint !== WSOL;

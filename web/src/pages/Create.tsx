@@ -23,6 +23,7 @@ export default function CreatePage() {
   const [busy, setBusy] = useState(false);
   const [pair, setPair] = useState<QuoteMintInfo | null>(null);
   const [dest, setDest] = useState<"you" | "holders" | "social" | "charity">("you");
+  const [standard, setStandard] = useState<"spl" | "token2022">("spl");
   const [handle, setHandle] = useState("");
   const [charity, setCharity] = useState("");
   const holderRewards = dest === "holders";
@@ -99,7 +100,9 @@ export default function CreatePage() {
       ixs.push(
         v2
           ? await client.createV2Ix(publicKey, mintKp.publicKey, new PublicKey(pair.mint), name, symbol, uri, holderRewards, creatorPk)
-          : await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards, creatorPk)
+          : standard === "token2022"
+            ? await client.createV3Ix(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards, creatorPk)
+            : await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards, creatorPk)
       );
       if (quote) {
         const units = BigInt(Math.floor(Number(devBuy) * 10 ** qDec));
@@ -175,6 +178,13 @@ export default function CreatePage() {
           ))}
           {pairs.length <= 1 && <span className="text-[12px] text-dim self-center">No custom pairs enabled on this cluster yet.</span>}
         </div>
+        {!v2 && (
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-[12px] text-mute">Token standard</span>
+            <button onClick={() => setStandard("spl")} className={`pill !h-8 ${standard === "spl" ? "pill-active" : ""}`}>SPL Token <span className="text-dim font-normal">Metaplex metadata</span></button>
+            <button onClick={() => setStandard("token2022")} className={`pill !h-8 ${standard === "token2022" ? "pill-active" : ""}`}>Token-2022 <span className="text-dim font-normal">metadata on the mint</span></button>
+          </div>
+        )}
         {v2 && quoteCfg && (
           <div className="text-[12px] text-mute rounded-xl bg-black/30 border border-line p-3">
             Starts at <b className="text-ink num">{qty(quoteCfg.initialVirtualQuoteReserves, qDec, 0)} {qSym}</b> virtual liquidity · graduates after ~<b className="text-ink num">{qty(curveMath.solInForTokensOut(quoteCfg.initialRealTokenReserves, { ...curveState! }), qDec, 0)} {qSym}</b> is raised.

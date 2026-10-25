@@ -12,6 +12,7 @@ import {
   createMint,
   mintTo,
   getOrCreateAssociatedTokenAccount,
+  TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction } from "@solana/web3.js";
 import { assert } from "chai";
@@ -274,6 +275,7 @@ describe("OpenPump — curve + amm", () => {
         mint,
         bondingCurve,
         associatedBondingCurve,
+        baseTokenProgram: TOKEN_PROGRAM_ID,
         bondingCurveWsol: bcWsol,
         bondingCurveLp: bcLp,
         user: migrator.publicKey,
@@ -317,7 +319,7 @@ describe("OpenPump — curve + amm", () => {
     assert.closeTo(poolPrice / curvePrice, 1, 1e-3); // pump.fun constants: continuous to ~0.007 %
     try {
       await curve.methods.migrate().accounts({
-        global, feeRecipient: feeRecipient.publicKey, mint, bondingCurve, associatedBondingCurve, bondingCurveWsol: bcWsol, bondingCurveLp: bcLp,
+        global, feeRecipient: feeRecipient.publicKey, mint, bondingCurve, associatedBondingCurve, baseTokenProgram: TOKEN_PROGRAM_ID, bondingCurveWsol: bcWsol, bondingCurveLp: bcLp,
         user: migrator.publicKey, wsolMint: NATIVE_MINT, ammProgram: amm.programId, ammGlobalConfig, pool, lpMint, lockedLpTokenAccount: lockedLp,
         poolBaseTokenAccount: poolBase, poolQuoteTokenAccount: poolQuote, coinCreatorVaultAuthority, coinCreatorVaultAta, ammEventAuthority,
         systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -618,7 +620,7 @@ describe("OpenPump — curve + amm", () => {
       await curve.methods
         .migrateV2()
         .accounts({
-          global, feeRecipient: feeRecipient.publicKey, feeRecipientQuote: feeQuote, mint: mint2.publicKey, bondingCurve: bc2, associatedBondingCurve: abc2, bondingCurveQuote: bcQuote,
+          global, feeRecipient: feeRecipient.publicKey, feeRecipientQuote: feeQuote, mint: mint2.publicKey, bondingCurve: bc2, associatedBondingCurve: abc2, baseTokenProgram: TOKEN_PROGRAM_ID, bondingCurveQuote: bcQuote,
           bondingCurveLp: getAssociatedTokenAddressSync(lp2, bc2, true), user: trader.publicKey, quoteMint, quoteConfig: qcfg(),
           ammProgram: amm.programId, ammGlobalConfig, pool: pool2, lpMint: lp2, lockedLpTokenAccount: getAssociatedTokenAddressSync(lp2, pool2, true),
           poolBaseTokenAccount: getAssociatedTokenAddressSync(mint2.publicKey, pool2, true), poolQuoteTokenAccount: getAssociatedTokenAddressSync(quoteMint, pool2, true),
@@ -776,6 +778,7 @@ describe("OpenPump — curve + amm", () => {
     const userB = Keypair.generate();
     const mintV = Keypair.generate();
     let bcV: PublicKey;
+    let start = 0;
 
     before(async () => {
       await Promise.all([airdrop(userA.publicKey, 20), airdrop(userB.publicKey, 20)]);
@@ -797,8 +800,9 @@ describe("OpenPump — curve + amm", () => {
     });
 
     it("admin schedules a campaign and funds the incentive vault", async () => {
-      const now = Math.floor(Date.now() / 1000);
-      const start = now + 3, end = start + DAY * 5;
+      const now = (await conn.getBlockTime(await conn.getSlot("confirmed")))!;
+      start = now + 3;
+      const end = start + DAY * 5;
       await curve.methods
         .adminUpdateTokenIncentives(new BN(start), new BN(end), new BN(DAY), new BN(30), new BN(1_000_000_000)) // 1000 tokens/day for every day
         .accounts({ authority: admin.publicKey, global, globalVolumeAccumulator: gva, mint: incMint, globalIncentiveTokenAccount: getAssociatedTokenAddressSync(incMint, gva, true), tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId })
@@ -815,7 +819,12 @@ describe("OpenPump — curve + amm", () => {
       for (const u of [userA, userB]) {
         await curve.methods.initUserVolumeAccumulator().accounts({ payer: u.publicKey, user: u.publicKey, userVolumeAccumulator: uva(u.publicKey), systemProgram: SystemProgram.programId }).signers([u]).rpc();
       }
-      await sleep(3500); // campaign start
+      // wait until the validator's clock is past the campaign start (wall clock and chain clock drift)
+      for (;;) {
+        const t = await conn.getBlockTime(await conn.getSlot("confirmed"));
+        if (t && t >= start + 1) break;
+        await sleep(500);
+      }
       await curve.methods.buyExactSolIn(new BN(1 * LAMPORTS_PER_SOL), new BN(0)).accounts(buyAccts(userA.publicKey, true)).signers([userA]).rpc();
       await curve.methods.buyExactSolIn(new BN(3 * LAMPORTS_PER_SOL), new BN(0)).accounts(buyAccts(userB.publicKey, true)).signers([userB]).rpc();
       // untracked buy must not count
@@ -831,7 +840,11 @@ describe("OpenPump — curve + amm", () => {
       const claimAccts = (u: PublicKey) => ({ user: u, payer: admin.publicKey, globalVolumeAccumulator: gva, globalIncentiveTokenAccount: getAssociatedTokenAddressSync(incMint, gva, true), userVolumeAccumulator: uva(u), mint: incMint, userAta: getAssociatedTokenAddressSync(incMint, u), tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId });
       await curve.methods.claimTokenIncentives().accounts(claimAccts(userA.publicKey)).rpc();
       assert.equal((await tokenBal(getAssociatedTokenAddressSync(incMint, userA.publicKey))).toString(), "0");
-      await sleep(DAY * 1000 + 500); // cross into day 1
+      for (;;) { // cross into day 1 by chain time
+        const t = await conn.getBlockTime(await conn.getSlot("confirmed"));
+        if (t && t >= start + DAY + 1) break;
+        await sleep(500);
+      }
       await curve.methods.claimTokenIncentives().accounts(claimAccts(userA.publicKey)).rpc();
       await curve.methods.claimTokenIncentives().accounts(claimAccts(userB.publicKey)).rpc();
       assert.equal((await tokenBal(getAssociatedTokenAddressSync(incMint, userA.publicKey))).toString(), "250000000");
@@ -1141,6 +1154,103 @@ describe("OpenPump — curve + amm", () => {
       assert.isFalse(p.canEditCreatorFee);
       // hand it back to the sharing config so later tests keep working
       await amm.methods.adminCtoPool(sharingCreator, false, null).accounts({ authority: admin.publicKey, globalConfig: ammGlobalConfig, pool }).rpc();
+    });
+  });
+
+  // ------------------------------------------------------------------ Token-2022 coins (create_v3)
+  describe("Token-2022 coins", () => {
+    const m = Keypair.generate();
+    let bc: PublicKey;
+    const T22 = TOKEN_2022_PROGRAM_ID;
+    const abc = () => getAssociatedTokenAddressSync(m.publicKey, bc, true, T22);
+    const accts = (user: PublicKey) => ({
+      ...tradeAccounts(user), mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: abc(),
+      associatedUser: getAssociatedTokenAddressSync(m.publicKey, user, false, T22), tokenProgram: T22,
+    });
+
+    before(async () => {
+      // completing a curve costs ~85 SOL; top the trader up after everything above
+      await airdrop(trader.publicKey, 150);
+    });
+
+    it("create_v3 mints a Token-2022 coin with on-mint metadata, no Metaplex", async () => {
+      [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
+      await curve.methods
+        .createV3("Twenty Two", "T22", "https://example.com/t22.json", false, PublicKey.default)
+        .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: abc(), global, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: T22, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID })
+        .signers([creator, m])
+        .rpc();
+      const info = await conn.getAccountInfo(m.publicKey);
+      assert.equal(info!.owner.toBase58(), T22.toBase58());
+      assert.include(info!.data.toString("utf8"), "Twenty Two", "metadata lives in the mint");
+      const mintState = await getMint(conn, m.publicKey, "confirmed", T22);
+      assert.isNull(mintState.mintAuthority);
+      assert.equal((await curve.account.bondingCurve.fetch(bc)).tokenTotalSupply.toString(), PARAMS.tokenTotalSupply.toString());
+    });
+
+    it("trades, completes and migrates a Token-2022 coin into the AMM", async () => {
+      await curve.methods.buyExactSolIn(new BN(1 * LAMPORTS_PER_SOL), new BN(0)).accounts(accts(trader.publicKey)).signers([trader]).rpc();
+      const bal = (await conn.getTokenAccountBalance(getAssociatedTokenAddressSync(m.publicKey, trader.publicKey, false, T22))).value.amount;
+      assert.isAbove(Number(bal), 0);
+      await curve.methods.sell(new BN(bal).divn(2), new BN(0)).accounts(accts(trader.publicKey)).signers([trader]).rpc();
+      await curve.methods.buy(new BN("900000000000000"), new BN(150 * LAMPORTS_PER_SOL)).accounts(accts(trader.publicKey)).signers([trader]).rpc();
+      assert.isTrue((await curve.account.bondingCurve.fetch(bc)).complete);
+      const [pool22] = PublicKey.findProgramAddressSync([Buffer.from("pool"), Buffer.from([0, 0]), bc.toBuffer(), m.publicKey.toBuffer(), NATIVE_MINT.toBuffer()], amm.programId);
+      const [lp22] = PublicKey.findProgramAddressSync([Buffer.from("pool-lp-mint"), pool22.toBuffer()], amm.programId);
+      await curve.methods
+        .migrate()
+        .accounts({
+          global, feeRecipient: feeRecipient.publicKey, mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: abc(), baseTokenProgram: T22,
+          bondingCurveWsol: getAssociatedTokenAddressSync(NATIVE_MINT, bc, true), bondingCurveLp: getAssociatedTokenAddressSync(lp22, bc, true), user: trader.publicKey, wsolMint: NATIVE_MINT,
+          ammProgram: amm.programId, ammGlobalConfig, pool: pool22, lpMint: lp22, lockedLpTokenAccount: getAssociatedTokenAddressSync(lp22, pool22, true),
+          poolBaseTokenAccount: getAssociatedTokenAddressSync(m.publicKey, pool22, true, T22), poolQuoteTokenAccount: getAssociatedTokenAddressSync(NATIVE_MINT, pool22, true),
+          coinCreatorVaultAuthority, coinCreatorVaultAta, ammEventAuthority, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        })
+        .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 })])
+        .signers([trader]).rpc();
+      const p = await amm.account.pool.fetch(pool22);
+      assert.equal(p.baseMint.toBase58(), m.publicKey.toBase58());
+      // AMM buy with a Token-2022 base
+      await amm.methods.buy(new BN("1000000000000"), new BN(10 * LAMPORTS_PER_SOL))
+        .accounts({
+          pool: pool22, user: trader.publicKey, globalConfig: ammGlobalConfig, baseMint: m.publicKey, quoteMint: NATIVE_MINT,
+          userBaseTokenAccount: getAssociatedTokenAddressSync(m.publicKey, trader.publicKey, false, T22), userQuoteTokenAccount: getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey),
+          poolBaseTokenAccount: p.poolBaseTokenAccount, poolQuoteTokenAccount: p.poolQuoteTokenAccount, protocolFeeRecipient: feeRecipient.publicKey,
+          protocolFeeRecipientTokenAccount: getAssociatedTokenAddressSync(NATIVE_MINT, feeRecipient.publicKey), coinCreatorVaultAuthority, coinCreatorVaultAta,
+          baseTokenProgram: T22, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, feeConfig: null,
+        })
+        .signers([trader]).rpc();
+      assert.isAbove(Number((await conn.getTokenAccountBalance(getAssociatedTokenAddressSync(m.publicKey, trader.publicKey, false, T22))).value.amount), 0);
+    });
+
+    it("multi_hop_swap: PEOPLE -> WSOL -> T22 in one instruction, intermediates never touch the wallet", async () => {
+      const [pool22] = PublicKey.findProgramAddressSync([Buffer.from("pool"), Buffer.from([0, 0]), bc.toBuffer(), m.publicKey.toBuffer(), NATIVE_MINT.toBuffer()], amm.programId);
+      const pA = await amm.account.pool.fetch(pool);
+      const pB = await amm.account.pool.fetch(pool22);
+      const leg = (p: any, poolKey: PublicKey) => [
+        { pubkey: poolKey, isSigner: false, isWritable: true },
+        { pubkey: p.poolBaseTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: p.poolQuoteTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: p.baseMint, isSigner: false, isWritable: false },
+        { pubkey: p.quoteMint, isSigner: false, isWritable: false },
+        { pubkey: getAssociatedTokenAddressSync(NATIVE_MINT, feeRecipient.publicKey), isSigner: false, isWritable: true },
+        { pubkey: getAssociatedTokenAddressSync(NATIVE_MINT, PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), p.coinCreator.toBuffer()], amm.programId)[0], true), isSigner: false, isWritable: true },
+      ];
+      const userIn = getAssociatedTokenAddressSync(mint, trader.publicKey);
+      const userOut = getAssociatedTokenAddressSync(m.publicKey, trader.publicKey, false, T22);
+      const inBefore = await tokenBal(userIn);
+      const outBefore = BigInt((await conn.getTokenAccountBalance(userOut)).value.amount);
+      const wsolBefore = await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey)).catch(() => 0n);
+      const amountIn = new BN("500000000000"); // 500k PEOPLE
+      await amm.methods
+        .multiHopSwap(amountIn, new BN(1))
+        .accounts({ user: trader.publicKey, userInTokenAccount: userIn, userOutTokenAccount: userOut, globalConfig: ammGlobalConfig, feeConfig: null, tokenProgram: TOKEN_PROGRAM_ID, tokenProgram2022: T22 })
+        .remainingAccounts([...leg(pA, pool), ...leg(pB, pool22)])
+        .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 })])
+        .signers([trader]).rpc();
+      assert.equal((inBefore - (await tokenBal(userIn))).toString(), amountIn.toString());
+      assert.isAbove(Number(BigInt((await conn.getTokenAccountBalance(userOut)).value.amount) - outBefore), 0);
+      assert.equal((await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey)).catch(() => 0n)).toString(), wsolBefore.toString(), "no WSOL left in the wallet");
     });
   });
 });
