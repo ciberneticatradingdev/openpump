@@ -49,6 +49,9 @@ export const pda = {
 
   ammGlobalConfig: () => PublicKey.findProgramAddressSync([Buffer.from("global-config")], AMM_PROGRAM_ID)[0],
   ammEventAuthority: () => PublicKey.findProgramAddressSync([Buffer.from("__event_authority")], AMM_PROGRAM_ID)[0],
+  ammVolumeTracker: () => PublicKey.findProgramAddressSync([Buffer.from("volume-tracker")], AMM_PROGRAM_ID)[0],
+  boostVaultAuthority: (pool: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("boost-vault"), pool.toBuffer()], AMM_PROGRAM_ID)[0],
+  boostVault: (pool: PublicKey, quoteMint: PublicKey = WSOL_MINT, quoteTokenProgram?: PublicKey) => getAssociatedTokenAddressSync(quoteMint, pda.boostVaultAuthority(pool), true, quoteTokenProgram),
   /** Pool created by migration: index 0, creator = bonding curve PDA, quote = WSOL. */
   migrationPool: (mint: PublicKey) => pda.pool(0, pda.bondingCurve(mint), mint, WSOL_MINT),
   pool: (index: number, creator: PublicKey, baseMint: PublicKey, quoteMint: PublicKey) =>

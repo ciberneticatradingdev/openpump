@@ -389,6 +389,10 @@ pub fn migrate_v2(ctx: Context<MigrateV2>) -> Result<()> {
         base_amount,
         quote_amount,
         bc.creator,
+        bc.is_mayhem_mode,
+        bc.is_holder_reward,
+        bc.creator_fee_bps,
+        bc.can_edit_creator_fee,
     )?;
 
     // 3. burn the LP and close the helper accounts

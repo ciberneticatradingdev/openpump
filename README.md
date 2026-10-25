@@ -5,7 +5,7 @@ Clean-room launchpad shaped like pump.fun + PumpSwap, on Solana. Four Anchor pro
 | Piece | Where | What |
 |---|---|---|
 | Bonding curve | `programs/openpump-curve` | create / buy / buy_exact_sol_in / sell / migrate / collect_creator_fee / set_params · v2 (custom pairs): set_quote_config / create_v2 / buy_v2 / buy_exact_quote_in / sell_v2 / collect_creator_fee_v2 / migrate_v2 · holder rewards: update_holder_reward_config / distribute_fee_to_holders(_v2) |
-| AMM | `programs/openpump-amm` | create_config / create_pool / deposit / withdraw / buy / sell / collect_coin_creator_fee / disable · multi-hop swap (coin → coin in one route) |
+| AMM | `programs/openpump-amm` | create_config / create_pool / deposit / withdraw / buy / buy_exact_quote_in / sell / collect_coin_creator_fee / disable · multi-hop swap (coin → coin in one route) · trade-to-earn volume tracking (CPI into the curve's shared campaign) · buyback share of the protocol fee · boost (init_boost / boost_buy_and_burn: delayed buy-and-burn on graduation) · mayhem pools · extend_account |
 | Fees | `programs/openpump-fees` | fee tiers by market cap, buyback vault, fee-sharing configs (creator splits with shareholders), social fee PDAs, donations, admin CTO |
 | Mayhem | `programs/openpump-mayhem` | protocol market-making vault for `is_mayhem_mode` launches: trader buys/sells through the curve within a reference-price band and per-sweep SOL cap, burns leftovers after the window, admin withdraw/sweep |
 | SDK | `sdk/` | PDAs, exact on-chain math in BigInt, instruction builders, CPI-event decoding |
@@ -23,14 +23,17 @@ Program IDs (same on every cluster): curve `AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4
 - AMM: 0.2 % LP / 0.05 % protocol / 0.05 % creator; anyone can LP; admin kill-switch per instruction.
 - **Custom pairs** (v2 family): coins quoted in any SPL / Token-2022 mint the authority enables, with per-mint virtual reserves; fees and graduation in that token.
 - **Holder rewards**: at launch the creator can route the creator fee to holders. Same pattern as pump.fun (the coin's creator is the `["holder-rewards", mint]` PDA); a configured authority pays the top holders pro-rata via `distribute_fee_to_holders`. The server's crank does this every few minutes (`HOLDER_REWARD_AUTHORITY_KEYPAIR`).
+- **Boost** (PumpSwap's init_boost / boost_buy_and_burn): right after graduation 20 % of the pool's quote moves into a boost vault while the pool keeps pricing it as virtual quote (no price move, LP moves locked). The boost authority then spends it on buy-and-burns; the vault closes when empty.
+- **Trade-to-earn covers the AMM too**: an AMM buy with `track_volume` CPIs into the curve program (signed by the AMM's volume-tracker PDA), so curve and AMM volume share one campaign and one claim. The buyback share of the AMM protocol fee lands in the fees program's vault as quote tokens (`sweep_buyback_quote`).
+- Not cloned on purpose: cashback (pump deprecated it), `sweep_*` / `transfer_creator_fees_to_pump` (our fees leave the pool on every trade instead of accruing inside it), `migrate_pool_coin_creator` (legacy layout), reserved fee recipients (integrator whitelist), the `_v2` instruction family (our single family already reads the fee config and holder-reward flags).
 - **Mayhem mode**: a launch flag (`create` / `create_v3`, not custom pairs) that starts the coin from the mayhem virtual reserves and lets the protocol vault market-make it for a fixed window (`MAYHEM` demo coin in the local seed).
-- Everything verified by tests: `cargo test` (math) + 48 Anchor integration tests covering the full lifecycle, custom pairs, holder rewards, incentives, fee tiers, sharing, Token-2022, multi-hop and mayhem.
+- Everything verified by tests: `cargo test` (math) + 54 Anchor integration tests covering the full lifecycle, custom pairs, holder rewards, incentives (curve + AMM), fee tiers, sharing, Token-2022, multi-hop, mayhem, buyback and boost.
 
 ## Build & test
 
 ```bash
 ./scripts/build.sh            # anchor build with platform-tools v1.54 + IDL/types (see script for why)
-anchor test --skip-build      # 48 integration tests on a local validator (Metaplex preloaded from tests/fixtures)
+anchor test --skip-build      # 54 integration tests on a local validator (Metaplex preloaded from tests/fixtures)
 cargo test --lib              # curve + AMM math unit tests
 ```
 

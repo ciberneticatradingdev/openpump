@@ -21,6 +21,8 @@ pub mod math;
 use math::*;
 pub mod multihop;
 use multihop::*;
+pub mod boost;
+use boost::*;
 use openpump_fee_types::{ConfigStatus, FeeConfig, SharingConfig, FEES_PROGRAM_ID, FEE_CONFIG_SEED, SHARING_CONFIG_SEED};
 
 declare_id!("BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb");
@@ -29,6 +31,14 @@ pub const GLOBAL_CONFIG_SEED: &[u8] = b"global-config";
 pub const POOL_SEED: &[u8] = b"pool";
 pub const LP_MINT_SEED: &[u8] = b"pool-lp-mint";
 pub const CREATOR_VAULT_SEED: &[u8] = b"creator-vault";
+pub const BOOST_VAULT_SEED: &[u8] = b"boost-vault";
+/// PDA that signs the curve's `track_amm_volume` CPI (AMM volume counts toward the shared incentive campaign).
+pub const VOLUME_TRACKER_SEED: &[u8] = b"volume-tracker";
+/// The curve program (owner of the volume accumulators and of migration pools' creator PDA).
+pub const CURVE_PROGRAM_ID: Pubkey = pubkey!("AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB");
+pub const WSOL_MINT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
+/// Hard cap on the share of a migration pool's quote the boost vault may take.
+pub const MAX_BOOST_BPS: u64 = 5_000;
 
 pub const BPS_DENOMINATOR: u64 = 10_000;
 pub const MAX_TOTAL_FEE_BPS: u64 = 1_000; // 10% hard cap on lp + protocol + creator
@@ -69,6 +79,12 @@ pub mod openpump_amm {
         cfg.admin_set_coin_creator_authority = ctx.accounts.admin.key();
         cfg.creator_fee_configurable = true;
         cfg.max_configurable_creator_fee_bps = 100;
+        cfg.mayhem_mode_enabled = false;
+        cfg.buyback_basis_points = 0;
+        cfg.buyback_fee_recipient = Pubkey::default();
+        cfg.boost_authority = Pubkey::default();
+        cfg.boost_enabled = false;
+        cfg.boost_basis_points = 2_000;
         emit_cpi!(UpdateConfigEvent {
             admin: cfg.admin,
             lp_fee_basis_points,
@@ -117,16 +133,97 @@ pub mod openpump_amm {
         Ok(())
     }
 
+    /// Allow pools to be created in mayhem mode (migration pools inherit the curve's flag regardless).
+    pub fn toggle_mayhem_mode(ctx: Context<AdminOnly>, enabled: bool) -> Result<()> {
+        ctx.accounts.global_config.mayhem_mode_enabled = enabled;
+        Ok(())
+    }
+
+    /// Share of the protocol fee (bps) routed to the buyback recipient's quote ATA on every direct swap.
+    pub fn update_buyback_config(ctx: Context<AdminOnly>, buyback_basis_points: u64, buyback_fee_recipient: Pubkey) -> Result<()> {
+        require!(buyback_basis_points <= BPS_DENOMINATOR, AmmError::FeeTooHigh);
+        let cfg = &mut ctx.accounts.global_config;
+        cfg.buyback_basis_points = buyback_basis_points;
+        cfg.buyback_fee_recipient = buyback_fee_recipient;
+        emit_cpi!(UpdateBuybackConfigEvent { admin: cfg.admin, buyback_basis_points, buyback_fee_recipient, timestamp: Clock::get()?.unix_timestamp });
+        Ok(())
+    }
+
+    pub fn set_boost_authority(ctx: Context<AdminOnly>, new_boost_authority: Pubkey) -> Result<()> {
+        let cfg = &mut ctx.accounts.global_config;
+        let old = cfg.boost_authority;
+        cfg.boost_authority = new_boost_authority;
+        emit_cpi!(BoostConfigEvent { admin: cfg.admin, boost_authority: new_boost_authority, old_boost_authority: old, boost_enabled: cfg.boost_enabled, boost_basis_points: cfg.boost_basis_points, timestamp: Clock::get()?.unix_timestamp });
+        Ok(())
+    }
+
+    pub fn toggle_boost(ctx: Context<AdminOnly>, enabled: bool) -> Result<()> {
+        let cfg = &mut ctx.accounts.global_config;
+        cfg.boost_enabled = enabled;
+        emit_cpi!(BoostConfigEvent { admin: cfg.admin, boost_authority: cfg.boost_authority, old_boost_authority: cfg.boost_authority, boost_enabled: enabled, boost_basis_points: cfg.boost_basis_points, timestamp: Clock::get()?.unix_timestamp });
+        Ok(())
+    }
+
+    /// Share of a migration pool's quote (bps) moved into its boost vault by `init_boost`.
+    pub fn update_boost_config(ctx: Context<AdminOnly>, boost_basis_points: u64) -> Result<()> {
+        require!(boost_basis_points <= MAX_BOOST_BPS, AmmError::FeeTooHigh);
+        let cfg = &mut ctx.accounts.global_config;
+        cfg.boost_basis_points = boost_basis_points;
+        emit_cpi!(BoostConfigEvent { admin: cfg.admin, boost_authority: cfg.boost_authority, old_boost_authority: cfg.boost_authority, boost_enabled: cfg.boost_enabled, boost_basis_points, timestamp: Clock::get()?.unix_timestamp });
+        Ok(())
+    }
+
+    /// Grow a GlobalConfig / Pool account created by an older program version to the current layout
+    /// (new fields read as zero). Permissionless; the payer covers the rent delta.
+    pub fn extend_account(ctx: Context<ExtendAccount>) -> Result<()> {
+        let info = ctx.accounts.account.to_account_info();
+        let target = {
+            let data = info.try_borrow_data()?;
+            require!(data.len() >= 8, AmmError::InvalidAccount);
+            if data[..8] == *GlobalConfig::DISCRIMINATOR { 8 + GlobalConfig::INIT_SPACE } else if data[..8] == *Pool::DISCRIMINATOR { 8 + Pool::INIT_SPACE } else { return Err(AmmError::InvalidAccount.into()) }
+        };
+        require!(info.data_len() < target, AmmError::AlreadyExtended);
+        let delta = Rent::get()?.minimum_balance(target).saturating_sub(info.lamports());
+        if delta > 0 {
+            anchor_lang::system_program::transfer(
+                CpiContext::new(ctx.accounts.system_program.to_account_info(), anchor_lang::system_program::Transfer { from: ctx.accounts.payer.to_account_info(), to: info.clone() }),
+                delta,
+            )?;
+        }
+        info.resize(target)?;
+        emit_cpi!(ExtendAccountEvent { account: info.key(), new_size: target as u64, timestamp: Clock::get()?.unix_timestamp });
+        Ok(())
+    }
+
+    /// Move part of a freshly migrated pool's quote into its boost vault without moving the price
+    /// (the pool keeps counting it as virtual quote). Only migration pools with no LP holders.
+    pub fn init_boost(ctx: Context<InitBoost>) -> Result<()> {
+        boost::init_boost(ctx)
+    }
+
+    /// Boost authority: spend vault quote back into the pool and burn the base it buys (price goes up).
+    pub fn boost_buy_and_burn(ctx: Context<BoostBuyAndBurn>, quote_amount_in: u64, min_base_amount_burned: u64) -> Result<()> {
+        boost::boost_buy_and_burn(ctx, quote_amount_in, min_base_amount_burned)
+    }
+
     pub fn create_pool(
         ctx: Context<CreatePool>,
         index: u16,
         base_amount_in: u64,
         quote_amount_in: u64,
         coin_creator: Pubkey,
+        is_mayhem_mode: bool,
+        is_holder_reward: bool,
+        creator_fee_bps: u64,
+        can_edit_creator_fee: bool,
     ) -> Result<()> {
         let cfg = &ctx.accounts.global_config;
         require!(cfg.disable_flags & DISABLE_CREATE_POOL == 0, AmmError::Disabled);
         require!(base_amount_in > 0 && quote_amount_in > 0, AmmError::ZeroAmount);
+        // Migration pools (creator = the coin's bonding-curve PDA) inherit the curve's flags; anyone else needs mayhem enabled here.
+        let migration = ctx.accounts.creator.key() == Pubkey::find_program_address(&[b"bonding-curve", ctx.accounts.base_mint.key().as_ref()], &CURVE_PROGRAM_ID).0;
+        require!(!is_mayhem_mode || cfg.mayhem_mode_enabled || migration, AmmError::MayhemDisabled);
+        require!(creator_fee_bps <= cfg.max_configurable_creator_fee_bps, AmmError::FeeTooHigh);
 
         let lp_total = initial_lp_amount(base_amount_in, quote_amount_in)?;
         require!(lp_total > MINIMUM_LIQUIDITY, AmmError::InsufficientLiquidity);
@@ -163,9 +260,11 @@ pub mod openpump_amm {
         pool.coin_creator = coin_creator;
         pool.protocol_fees = 0;
         pool.creator_fees = 0;
-        pool.is_holder_reward = false;
-        pool.creator_fee_bps = 0;
-        pool.can_edit_creator_fee = true;
+        pool.is_holder_reward = is_holder_reward;
+        pool.creator_fee_bps = creator_fee_bps;
+        pool.can_edit_creator_fee = can_edit_creator_fee && !is_holder_reward;
+        pool.is_mayhem_mode = is_mayhem_mode;
+        pool.virtual_quote_reserves = 0;
 
         // Mint LP: creator share + permanently locked minimum (held by the pool's own ATA).
         let signer_seeds: &[&[&[u8]]] = &[pool_seeds!(pool)];
@@ -205,6 +304,9 @@ pub mod openpump_amm {
             base_amount_in,
             quote_amount_in,
             lp_minted: lp_to_creator,
+            is_mayhem_mode,
+            is_holder_reward,
+            creator_fee_bps,
             timestamp: Clock::get()?.unix_timestamp,
         });
         Ok(())
@@ -218,6 +320,7 @@ pub mod openpump_amm {
     ) -> Result<()> {
         require!(ctx.accounts.global_config.disable_flags & DISABLE_DEPOSIT == 0, AmmError::Disabled);
         require!(lp_token_amount_out > 0, AmmError::ZeroAmount);
+        require!(ctx.accounts.pool.virtual_quote_reserves == 0, AmmError::BoostInProgress);
         let base_reserve = ctx.accounts.pool_base_token_account.amount;
         let quote_reserve = ctx.accounts.pool_quote_token_account.amount;
         let lp_supply = ctx.accounts.pool.lp_supply;
@@ -283,6 +386,7 @@ pub mod openpump_amm {
     ) -> Result<()> {
         require!(ctx.accounts.global_config.disable_flags & DISABLE_WITHDRAW == 0, AmmError::Disabled);
         require!(lp_token_amount_in > 0, AmmError::ZeroAmount);
+        require!(ctx.accounts.pool.virtual_quote_reserves == 0, AmmError::BoostInProgress);
         let base_reserve = ctx.accounts.pool_base_token_account.amount;
         let quote_reserve = ctx.accounts.pool_quote_token_account.amount;
         let lp_supply = ctx.accounts.pool.lp_supply;
@@ -342,85 +446,42 @@ pub mod openpump_amm {
     }
 
     /// Buy an exact amount of base tokens, paying at most `max_quote_amount_in` (fees included).
-    pub fn buy(ctx: Context<Swap>, base_amount_out: u64, max_quote_amount_in: u64) -> Result<()> {
-        let cfg = &ctx.accounts.global_config;
-        require!(cfg.disable_flags & DISABLE_BUY == 0, AmmError::Disabled);
+    /// `track_volume`: count the quote spent toward the shared volume-incentive campaign (SOL pools, both accumulators passed).
+    pub fn buy(ctx: Context<Swap>, base_amount_out: u64, max_quote_amount_in: u64, track_volume: bool) -> Result<()> {
         require!(base_amount_out > 0, AmmError::ZeroAmount);
         let base_reserve = ctx.accounts.pool_base_token_account.amount;
-        let quote_reserve = ctx.accounts.pool_quote_token_account.amount;
+        let quote_reserve = effective_quote(&ctx.accounts.pool, &ctx.accounts.pool_quote_token_account)?;
         require!(base_amount_out < base_reserve, AmmError::InsufficientLiquidity);
-
         let quote_in = quote_in_for_base_out(base_amount_out, base_reserve, quote_reserve)?;
+        execute_buy(ctx, base_amount_out, quote_in, max_quote_amount_in, track_volume)
+    }
+
+    /// Spend up to `spendable_quote_in` (fees included) for as much base as that buys; at least `min_base_amount_out`.
+    pub fn buy_exact_quote_in(ctx: Context<Swap>, spendable_quote_in: u64, min_base_amount_out: u64, track_volume: bool) -> Result<()> {
+        require!(spendable_quote_in > 0, AmmError::ZeroAmount);
+        let base_reserve = ctx.accounts.pool_base_token_account.amount;
+        let quote_reserve = effective_quote(&ctx.accounts.pool, &ctx.accounts.pool_quote_token_account)?;
         let has_creator = ctx.accounts.pool.coin_creator != Pubkey::default();
-        let mut sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
+        let mut sched = schedule(&ctx.accounts.global_config, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
         if ctx.accounts.pool.creator_fee_bps > 0 { sched.creator = ctx.accounts.pool.creator_fee_bps; }
-        let fees = compute_fees(quote_in, &sched, has_creator)?;
-        let total_in = quote_in
-            .checked_add(fees.lp)
-            .and_then(|v| v.checked_add(fees.protocol))
-            .and_then(|v| v.checked_add(fees.creator))
-            .ok_or(AmmError::MathOverflow)?;
-        require!(total_in <= max_quote_amount_in, AmmError::ExceededSlippage);
-
-        // quote in: pool gets swap amount + lp fee; protocol + creator get theirs.
-        transfer_from_user(
-            &ctx.accounts.quote_token_program,
-            &ctx.accounts.user_quote_token_account,
-            &ctx.accounts.quote_mint,
-            &ctx.accounts.pool_quote_token_account,
-            &ctx.accounts.user,
-            quote_in + fees.lp,
-        )?;
-        if fees.protocol > 0 {
-            transfer_from_user(
-                &ctx.accounts.quote_token_program,
-                &ctx.accounts.user_quote_token_account,
-                &ctx.accounts.quote_mint,
-                &ctx.accounts.protocol_fee_recipient_token_account,
-                &ctx.accounts.user,
-                fees.protocol,
-            )?;
+        let total_bps = sched.lp + sched.protocol + if has_creator { sched.creator } else { 0 };
+        // quote_in * (1 + total_bps) <= spendable  =>  quote_in <= spendable * BPS / (BPS + total_bps)
+        let budget = mul_div_floor(spendable_quote_in, BPS_DENOMINATOR, BPS_DENOMINATOR.checked_add(total_bps).ok_or(AmmError::MathOverflow)?)?;
+        let mut base_out = base_out_for_quote_in(budget, base_reserve, quote_reserve)?;
+        // fees round up: shave base_out until the exact total fits the budget
+        let mut quote_in = 0u64;
+        let mut fits = false;
+        for _ in 0..8 {
+            if base_out == 0 { break; }
+            quote_in = quote_in_for_base_out(base_out, base_reserve, quote_reserve)?;
+            let f = compute_fees(quote_in, &sched, has_creator)?;
+            let total = quote_in.checked_add(f.lp).and_then(|v| v.checked_add(f.protocol)).and_then(|v| v.checked_add(f.creator)).ok_or(AmmError::MathOverflow)?;
+            if total <= spendable_quote_in { fits = true; break; }
+            base_out = base_out - base_out / 10_000 - 1;
         }
-        if fees.creator > 0 {
-            transfer_from_user(
-                &ctx.accounts.quote_token_program,
-                &ctx.accounts.user_quote_token_account,
-                &ctx.accounts.quote_mint,
-                &ctx.accounts.coin_creator_vault_ata,
-                &ctx.accounts.user,
-                fees.creator,
-            )?;
-        }
-
-        let pool = &mut ctx.accounts.pool;
-        let signer_seeds: &[&[&[u8]]] = &[pool_seeds!(pool)];
-        transfer_from_pool(
-            &ctx.accounts.base_token_program,
-            &ctx.accounts.pool_base_token_account,
-            &ctx.accounts.base_mint,
-            &ctx.accounts.user_base_token_account,
-            &pool.to_account_info(),
-            signer_seeds,
-            base_amount_out,
-        )?;
-        pool.protocol_fees = pool.protocol_fees.saturating_add(fees.protocol);
-        pool.creator_fees = pool.creator_fees.saturating_add(fees.creator);
-
-        emit_cpi!(BuyEvent {
-            pool: pool.key(),
-            user: ctx.accounts.user.key(),
-            base_amount_out,
-            quote_amount_in: quote_in,
-            lp_fee: fees.lp,
-            protocol_fee: fees.protocol,
-            coin_creator_fee: fees.creator,
-            quote_amount_in_with_fees: total_in,
-            pool_base_reserves: base_reserve - base_amount_out,
-            pool_quote_reserves: quote_reserve + quote_in + fees.lp,
-            coin_creator: pool.coin_creator,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-        Ok(())
+        require!(fits && base_out > 0, AmmError::ZeroAmount);
+        require!(base_out >= min_base_amount_out, AmmError::ExceededSlippage);
+        execute_buy(ctx, base_out, quote_in, spendable_quote_in, track_volume)
     }
 
     /// Sell an exact amount of base tokens, receiving at least `min_quote_amount_out` (after fees).
@@ -429,9 +490,11 @@ pub mod openpump_amm {
         require!(cfg.disable_flags & DISABLE_SELL == 0, AmmError::Disabled);
         require!(base_amount_in > 0, AmmError::ZeroAmount);
         let base_reserve = ctx.accounts.pool_base_token_account.amount;
-        let quote_reserve = ctx.accounts.pool_quote_token_account.amount;
+        let quote_reserve = effective_quote(&ctx.accounts.pool, &ctx.accounts.pool_quote_token_account)?;
 
         let quote_out = quote_out_for_base_in(base_amount_in, base_reserve, quote_reserve)?;
+        // the vault's virtual quote is not in the pool: a sell can only pay out of real reserves
+        require!(quote_out <= ctx.accounts.pool_quote_token_account.amount, AmmError::InsufficientLiquidity);
         let has_creator = ctx.accounts.pool.coin_creator != Pubkey::default();
         let mut sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
         if ctx.accounts.pool.creator_fee_bps > 0 { sched.creator = ctx.accounts.pool.creator_fee_bps; }
@@ -465,7 +528,8 @@ pub mod openpump_amm {
             signer_seeds,
             user_out,
         )?;
-        if fees.protocol > 0 {
+        let buyback_fee = buyback_split(cfg, &ctx.accounts.buyback_fee_recipient_token_account, fees.protocol)?;
+        if fees.protocol - buyback_fee > 0 {
             transfer_from_pool(
                 &ctx.accounts.quote_token_program,
                 &ctx.accounts.pool_quote_token_account,
@@ -473,8 +537,11 @@ pub mod openpump_amm {
                 &ctx.accounts.protocol_fee_recipient_token_account,
                 &pool.to_account_info(),
                 signer_seeds,
-                fees.protocol,
+                fees.protocol - buyback_fee,
             )?;
+        }
+        if let (Some(bb), true) = (&ctx.accounts.buyback_fee_recipient_token_account, buyback_fee > 0) {
+            transfer_from_pool(&ctx.accounts.quote_token_program, &ctx.accounts.pool_quote_token_account, &ctx.accounts.quote_mint, bb, &pool.to_account_info(), signer_seeds, buyback_fee)?;
         }
         if fees.creator > 0 {
             transfer_from_pool(
@@ -501,6 +568,8 @@ pub mod openpump_amm {
             user_quote_amount_out: user_out,
             pool_base_reserves: base_reserve + base_amount_in,
             pool_quote_reserves: quote_reserve - user_out - fees.protocol - fees.creator,
+            virtual_quote_reserves: pool.virtual_quote_reserves,
+            buyback_fee,
             coin_creator: pool.coin_creator,
             timestamp: Clock::get()?.unix_timestamp,
         });
@@ -683,6 +752,106 @@ pub fn compute_fees(amount: u64, s: &Schedule, has_creator: bool) -> Result<Fees
         protocol: fee_ceil(amount, s.protocol)?,
         creator: if has_creator { fee_ceil(amount, s.creator)? } else { 0 },
     })
+}
+
+/// Quote reserve the price is computed against: real tokens in the pool + the boost vault's virtual share.
+pub fn effective_quote(pool: &Pool, quote_account: &InterfaceAccount<TokenAccount>) -> Result<u64> {
+    quote_account.amount.checked_add(pool.virtual_quote_reserves).ok_or(AmmError::MathOverflow.into())
+}
+
+fn buyback_split(cfg: &GlobalConfig, recipient: &Option<Box<InterfaceAccount<TokenAccount>>>, protocol_fee: u64) -> Result<u64> {
+    Ok(match recipient {
+        Some(_) if cfg.buyback_basis_points > 0 => mul_div_floor(protocol_fee, cfg.buyback_basis_points, BPS_DENOMINATOR)?,
+        _ => 0,
+    })
+}
+
+/// Common buy body: `quote_in` is the pool leg already computed against the effective reserves.
+fn execute_buy(ctx: Context<Swap>, base_amount_out: u64, quote_in: u64, max_quote_amount_in: u64, track_volume: bool) -> Result<()> {
+    let cfg = &ctx.accounts.global_config;
+    require!(cfg.disable_flags & DISABLE_BUY == 0, AmmError::Disabled);
+    let base_reserve = ctx.accounts.pool_base_token_account.amount;
+    let quote_reserve = effective_quote(&ctx.accounts.pool, &ctx.accounts.pool_quote_token_account)?;
+    let has_creator = ctx.accounts.pool.coin_creator != Pubkey::default();
+    let mut sched = schedule(cfg, &ctx.accounts.fee_config, base_reserve, quote_reserve, ctx.accounts.base_mint.supply, ctx.accounts.pool.quote_mint);
+    if ctx.accounts.pool.creator_fee_bps > 0 { sched.creator = ctx.accounts.pool.creator_fee_bps; }
+    let fees = compute_fees(quote_in, &sched, has_creator)?;
+    let total_in = quote_in
+        .checked_add(fees.lp)
+        .and_then(|v| v.checked_add(fees.protocol))
+        .and_then(|v| v.checked_add(fees.creator))
+        .ok_or(AmmError::MathOverflow)?;
+    require!(total_in <= max_quote_amount_in, AmmError::ExceededSlippage);
+    let buyback_fee = buyback_split(cfg, &ctx.accounts.buyback_fee_recipient_token_account, fees.protocol)?;
+
+    // quote in: pool gets swap amount + lp fee; protocol (+ buyback) + creator get theirs.
+    transfer_from_user(&ctx.accounts.quote_token_program, &ctx.accounts.user_quote_token_account, &ctx.accounts.quote_mint, &ctx.accounts.pool_quote_token_account, &ctx.accounts.user, quote_in + fees.lp)?;
+    if fees.protocol - buyback_fee > 0 {
+        transfer_from_user(&ctx.accounts.quote_token_program, &ctx.accounts.user_quote_token_account, &ctx.accounts.quote_mint, &ctx.accounts.protocol_fee_recipient_token_account, &ctx.accounts.user, fees.protocol - buyback_fee)?;
+    }
+    if let (Some(bb), true) = (&ctx.accounts.buyback_fee_recipient_token_account, buyback_fee > 0) {
+        transfer_from_user(&ctx.accounts.quote_token_program, &ctx.accounts.user_quote_token_account, &ctx.accounts.quote_mint, bb, &ctx.accounts.user, buyback_fee)?;
+    }
+    if fees.creator > 0 {
+        transfer_from_user(&ctx.accounts.quote_token_program, &ctx.accounts.user_quote_token_account, &ctx.accounts.quote_mint, &ctx.accounts.coin_creator_vault_ata, &ctx.accounts.user, fees.creator)?;
+    }
+
+    {
+        let pool = &mut ctx.accounts.pool;
+        let signer_seeds: &[&[&[u8]]] = &[pool_seeds!(pool)];
+        transfer_from_pool(&ctx.accounts.base_token_program, &ctx.accounts.pool_base_token_account, &ctx.accounts.base_mint, &ctx.accounts.user_base_token_account, &pool.to_account_info(), signer_seeds, base_amount_out)?;
+        pool.protocol_fees = pool.protocol_fees.saturating_add(fees.protocol);
+        pool.creator_fees = pool.creator_fees.saturating_add(fees.creator);
+    }
+
+    // volume incentives: SOL pools only, opt-in, counted in the curve program's shared campaign
+    let tracked = track_volume && ctx.accounts.pool.quote_mint == WSOL_MINT && track_amm_volume(&ctx, quote_in)?;
+    let pool = &ctx.accounts.pool;
+
+    emit_cpi!(BuyEvent {
+        pool: pool.key(),
+        user: ctx.accounts.user.key(),
+        base_amount_out,
+        quote_amount_in: quote_in,
+        lp_fee: fees.lp,
+        protocol_fee: fees.protocol,
+        coin_creator_fee: fees.creator,
+        quote_amount_in_with_fees: total_in,
+        pool_base_reserves: base_reserve - base_amount_out,
+        pool_quote_reserves: quote_reserve + quote_in + fees.lp,
+        virtual_quote_reserves: pool.virtual_quote_reserves,
+        buyback_fee,
+        track_volume: tracked,
+        coin_creator: pool.coin_creator,
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+    Ok(())
+}
+
+/// CPI `openpump_curve::track_amm_volume(sol)` signed by our volume-tracker PDA. Returns false when the
+/// optional accumulator accounts were not passed. (Built by hand: the curve crate depends on this one.)
+fn track_amm_volume(ctx: &Context<Swap>, sol: u64) -> Result<bool> {
+    let (Some(g), Some(u), Some(curve)) = (&ctx.accounts.global_volume_accumulator, &ctx.accounts.user_volume_accumulator, &ctx.accounts.curve_program) else { return Ok(false) };
+    let mut data = anchor_lang::solana_program::hash::hash(b"global:track_amm_volume").to_bytes()[..8].to_vec();
+    data.extend_from_slice(&sol.to_le_bytes());
+    let ix = anchor_lang::solana_program::instruction::Instruction {
+        program_id: CURVE_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(ctx.accounts.user.key(), false),
+            AccountMeta::new(g.key(), false),
+            AccountMeta::new(u.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.volume_tracker.key(), true),
+        ],
+        data,
+    };
+    let bump = [ctx.bumps.volume_tracker];
+    let seeds: &[&[u8]] = &[VOLUME_TRACKER_SEED, &bump];
+    anchor_lang::solana_program::program::invoke_signed(
+        &ix,
+        &[ctx.accounts.user.to_account_info(), g.to_account_info(), u.to_account_info(), ctx.accounts.volume_tracker.to_account_info(), curve.to_account_info()],
+        &[seeds],
+    )?;
+    Ok(true)
 }
 
 fn transfer_from_user<'info>(
@@ -948,6 +1117,32 @@ pub struct Swap<'info> {
     /// Optional: the fees program's tiered schedule (market-cap based).
     #[account(seeds = [FEE_CONFIG_SEED], bump = fee_config.bump, seeds::program = FEES_PROGRAM_ID)]
     pub fee_config: Option<Box<Account<'info, FeeConfig>>>,
+    /// Optional: quote ATA of `global_config.buyback_fee_recipient`; receives the buyback share of the protocol fee.
+    #[account(mut, token::mint = quote_mint, token::token_program = quote_token_program, constraint = buyback_fee_recipient_token_account.owner == global_config.buyback_fee_recipient @ AmmError::InvalidFeeRecipient)]
+    pub buyback_fee_recipient_token_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
+    /// CHECK: optional, the curve program's global volume accumulator (validated by the curve on CPI).
+    #[account(mut)]
+    pub global_volume_accumulator: Option<UncheckedAccount<'info>>,
+    /// CHECK: optional, the user's volume accumulator in the curve program (validated by the curve on CPI).
+    #[account(mut)]
+    pub user_volume_accumulator: Option<UncheckedAccount<'info>>,
+    /// CHECK: PDA signing the volume CPI.
+    #[account(seeds = [VOLUME_TRACKER_SEED], bump)]
+    pub volume_tracker: UncheckedAccount<'info>,
+    /// CHECK: the curve program, required to track volume.
+    #[account(address = CURVE_PROGRAM_ID)]
+    pub curve_program: Option<UncheckedAccount<'info>>,
+}
+
+#[event_cpi]
+#[derive(Accounts)]
+pub struct ExtendAccount<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: a GlobalConfig or Pool owned by this program; discriminator checked in the handler.
+    #[account(mut, owner = crate::ID @ AmmError::InvalidAccount)]
+    pub account: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[event_cpi]
@@ -1034,6 +1229,15 @@ pub struct GlobalConfig {
     pub admin_set_coin_creator_authority: Pubkey,
     pub creator_fee_configurable: bool,
     pub max_configurable_creator_fee_bps: u64,
+    /// Pools may be created in mayhem mode by non-migration callers.
+    pub mayhem_mode_enabled: bool,
+    /// Share of the protocol fee (bps) sent to `buyback_fee_recipient`'s quote ATA on direct swaps.
+    pub buyback_basis_points: u64,
+    pub buyback_fee_recipient: Pubkey,
+    /// Boost: migration pools park `boost_basis_points` of their quote in a vault the authority spends on buy-and-burns.
+    pub boost_authority: Pubkey,
+    pub boost_enabled: bool,
+    pub boost_basis_points: u64,
 }
 
 #[account]
@@ -1056,6 +1260,9 @@ pub struct Pool {
     /// Per-pool creator fee override (bps). 0 = follow the schedule.
     pub creator_fee_bps: u64,
     pub can_edit_creator_fee: bool,
+    pub is_mayhem_mode: bool,
+    /// Quote parked in the boost vault but still priced as if in the pool (see boost.rs).
+    pub virtual_quote_reserves: u64,
 }
 
 // ---------------------------------------------------------------- events
@@ -1083,6 +1290,9 @@ pub struct CreatePoolEvent {
     pub base_amount_in: u64,
     pub quote_amount_in: u64,
     pub lp_minted: u64,
+    pub is_mayhem_mode: bool,
+    pub is_holder_reward: bool,
+    pub creator_fee_bps: u64,
     pub timestamp: i64,
 }
 
@@ -1124,6 +1334,9 @@ pub struct BuyEvent {
     pub quote_amount_in_with_fees: u64,
     pub pool_base_reserves: u64,
     pub pool_quote_reserves: u64,
+    pub virtual_quote_reserves: u64,
+    pub buyback_fee: u64,
+    pub track_volume: bool,
     pub coin_creator: Pubkey,
     pub timestamp: i64,
 }
@@ -1140,9 +1353,18 @@ pub struct SellEvent {
     pub user_quote_amount_out: u64,
     pub pool_base_reserves: u64,
     pub pool_quote_reserves: u64,
+    pub virtual_quote_reserves: u64,
+    pub buyback_fee: u64,
     pub coin_creator: Pubkey,
     pub timestamp: i64,
 }
+
+#[event]
+pub struct UpdateBuybackConfigEvent { pub admin: Pubkey, pub buyback_basis_points: u64, pub buyback_fee_recipient: Pubkey, pub timestamp: i64 }
+#[event]
+pub struct BoostConfigEvent { pub admin: Pubkey, pub boost_authority: Pubkey, pub old_boost_authority: Pubkey, pub boost_enabled: bool, pub boost_basis_points: u64, pub timestamp: i64 }
+#[event]
+pub struct ExtendAccountEvent { pub account: Pubkey, pub new_size: u64, pub timestamp: i64 }
 
 #[event]
 pub struct AdminCtoPoolEvent { pub pool: Pubkey, pub authority: Pubkey, pub old_coin_creator: Pubkey, pub new_coin_creator: Pubkey, pub is_holder_reward: bool, pub creator_fee_bps: u64, pub timestamp: i64 }
@@ -1191,4 +1413,22 @@ pub enum AmmError {
     CreatorFeeNotConfigurable,
     #[msg("Creator fee is locked for this pool")]
     CreatorFeeLocked,
+    #[msg("Mayhem mode is disabled")]
+    MayhemDisabled,
+    #[msg("Boost is disabled")]
+    BoostDisabled,
+    #[msg("Pool already has a boost in flight")]
+    AlreadyBoosted,
+    #[msg("Only migration pools can be boosted")]
+    NotMigrationPool,
+    #[msg("Pool has liquidity providers")]
+    PoolHasLiquidityProviders,
+    #[msg("Liquidity is locked while a boost is in flight")]
+    BoostInProgress,
+    #[msg("Nothing to boost")]
+    NothingToBoost,
+    #[msg("Not an account of this program")]
+    InvalidAccount,
+    #[msg("Account already has the current layout")]
+    AlreadyExtended,
 }

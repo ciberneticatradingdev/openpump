@@ -121,7 +121,7 @@ pub fn multi_hop_swap<'info>(ctx: Context<'_, '_, 'info, 'info, MultiHopSwap<'in
         let base_in = current_mint == st.base_mint;
         require!(base_in || current_mint == st.quote_mint, AmmError::RecipientsMismatch);
         let base_res = token_amount(leg.base_vault)?;
-        let quote_res = token_amount(leg.quote_vault)?;
+        let quote_res = token_amount(leg.quote_vault)?.checked_add(st.virtual_quote_reserves).ok_or(AmmError::MathOverflow)?;
         let has_creator = st.coin_creator != Pubkey::default();
         let mut sched = schedule(cfg, &ctx.accounts.fee_config, base_res, quote_res, mint_supply(leg.base_mint)?, st.quote_mint);
         if st.creator_fee_bps > 0 {

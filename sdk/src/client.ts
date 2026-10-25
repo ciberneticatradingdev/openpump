@@ -72,6 +72,11 @@ export interface PoolState {
   coinCreator: PublicKey;
   protocolFees: bigint;
   creatorFees: bigint;
+  isHolderReward: boolean;
+  creatorFeeBps: bigint;
+  isMayhemMode: boolean;
+  /** Quote parked in the boost vault but still priced as if in the pool. */
+  virtualQuoteReserves: bigint;
 }
 
 export interface AmmConfigState {
@@ -81,6 +86,12 @@ export interface AmmConfigState {
   coinCreatorFeeBasisPoints: bigint;
   protocolFeeRecipient: PublicKey;
   disableFlags: number;
+  mayhemModeEnabled: boolean;
+  buybackBasisPoints: bigint;
+  buybackFeeRecipient: PublicKey;
+  boostAuthority: PublicKey;
+  boostEnabled: boolean;
+  boostBasisPoints: bigint;
 }
 
 /** Read-only provider: instruction building and account fetching never need a real signer. */
@@ -100,6 +111,13 @@ export class OpenpumpClient {
   feeConfigEnabled = false;
   /** Set to Global.buyback_fee_recipient when buybacks are on; buys/sells then route the share. */
   buybackRecipient: PublicKey | null = null;
+  /** AMM-side buyback recipient (quote ATA owner) and boost flag, from `applyAmmConfig`. */
+  ammBuybackRecipient: PublicKey | null = null;
+  ammBoostEnabled = false;
+  applyAmmConfig(c: AmmConfigState) {
+    this.ammBuybackRecipient = c.buybackBasisPoints > 0n && !c.buybackFeeRecipient.equals(PublicKey.default) ? c.buybackFeeRecipient : null;
+    this.ammBoostEnabled = c.boostEnabled && c.boostBasisPoints > 0n;
+  }
 
   constructor(readonly connection: Connection, provider: AnchorProvider = readOnlyProvider(connection)) {
     this.curve = new Program<OpenpumpCurve>(CURVE_IDL, provider);
@@ -110,7 +128,8 @@ export class OpenpumpClient {
 
   /** Detect fee program state so builders include fee_config / buyback automatically. */
   async detectFeeProgram() {
-    const [fc, g] = await Promise.all([this.connection.getAccountInfo(pda.feeConfig(), "confirmed"), this.fetchGlobal().catch(() => null)]);
+    const [fc, g, ac] = await Promise.all([this.connection.getAccountInfo(pda.feeConfig(), "confirmed"), this.fetchGlobal().catch(() => null), this.fetchAmmConfig().catch(() => null)]);
+    if (ac) this.applyAmmConfig(ac);
     this.feeConfigEnabled = !!fc;
     this.buybackRecipient = g && g.buybackBasisPoints > 0n && !g.buybackFeeRecipient.equals(PublicKey.default) ? g.buybackFeeRecipient : null;
     return { feeConfigEnabled: this.feeConfigEnabled, buybackRecipient: this.buybackRecipient };
@@ -185,6 +204,10 @@ export class OpenpumpClient {
       coinCreator: p.coinCreator,
       protocolFees: big(p.protocolFees),
       creatorFees: big(p.creatorFees),
+      isHolderReward: !!p.isHolderReward,
+      creatorFeeBps: big(p.creatorFeeBps),
+      isMayhemMode: !!p.isMayhemMode,
+      virtualQuoteReserves: big(p.virtualQuoteReserves),
     };
   }
 
@@ -194,10 +217,17 @@ export class OpenpumpClient {
     return info ? this.decodePool(addr, info.data) : null;
   }
 
+  /** Reserves the price is computed against: `quoteReserve` includes the boost vault's virtual share. */
   async fetchPoolReserves(pool: PoolState) {
     const [b, q] = await this.connection.getMultipleAccountsInfo([pool.poolBaseTokenAccount, pool.poolQuoteTokenAccount], "confirmed");
     const amount = (info: any) => (info ? info.data.readBigUInt64LE(64) : 0n);
-    return { baseReserve: amount(b), quoteReserve: amount(q) };
+    return { baseReserve: amount(b), quoteReserve: amount(q) + pool.virtualQuoteReserves, realQuoteReserve: amount(q) };
+  }
+
+  /** Quote still sitting in a pool's boost vault (0 when no boost is in flight). */
+  async fetchBoostVault(pool: PoolState) {
+    const info = await this.connection.getAccountInfo(pda.boostVault(pool.address, pool.quoteMint), "confirmed");
+    return info ? info.data.readBigUInt64LE(64) : 0n;
   }
 
   async fetchAmmConfig(): Promise<AmmConfigState> {
@@ -209,6 +239,12 @@ export class OpenpumpClient {
       coinCreatorFeeBasisPoints: big(c.coinCreatorFeeBasisPoints),
       protocolFeeRecipient: c.protocolFeeRecipient,
       disableFlags: c.disableFlags,
+      mayhemModeEnabled: !!c.mayhemModeEnabled,
+      buybackBasisPoints: big(c.buybackBasisPoints),
+      buybackFeeRecipient: c.buybackFeeRecipient,
+      boostAuthority: c.boostAuthority,
+      boostEnabled: !!c.boostEnabled,
+      boostBasisPoints: big(c.boostBasisPoints),
     };
   }
 
@@ -365,10 +401,15 @@ export class OpenpumpClient {
 
   // ------------------------------------------------------------- AMM instructions (quote = WSOL)
 
-  private swapAccounts(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseTokenProgram: PublicKey = TOKEN_PROGRAM_ID) {
+  private swapAccounts(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseTokenProgram: PublicKey = TOKEN_PROGRAM_ID, trackVolume = false) {
     const q = pool.quoteMint;
+    const track = trackVolume && q.equals(WSOL_MINT);
     return {
       feeConfig: this.feeConfigEnabled ? pda.feeConfig() : null,
+      buybackFeeRecipientTokenAccount: this.ammBuybackRecipient ? getAssociatedTokenAddressSync(q, this.ammBuybackRecipient, true) : null,
+      globalVolumeAccumulator: track ? pda.globalVolumeAccumulator() : null,
+      userVolumeAccumulator: track ? pda.userVolumeAccumulator(user) : null,
+      curveProgram: track ? CURVE_PROGRAM_ID : null,
       pool: pool.address,
       user,
       globalConfig: pda.ammGlobalConfig(),
@@ -404,11 +445,75 @@ export class OpenpumpClient {
     return createCloseAccountInstruction(getAssociatedTokenAddressSync(WSOL_MINT, user), user, user);
   }
 
+  /** The buyback recipient's quote ATA must exist when it is passed: create it idempotently (no-op after the first time). */
+  private buybackAtaIxs(user: PublicKey, q: PublicKey) {
+    if (!this.ammBuybackRecipient) return [];
+    return [createAssociatedTokenAccountIdempotentInstruction(user, getAssociatedTokenAddressSync(q, this.ammBuybackRecipient, true), this.ammBuybackRecipient, q)];
+  }
+
   /** Buy on the AMM. WSOL pools: wrap -> buy -> unwrap in one tx. Custom quote: pay from the user's quote ATA. */
-  async ammBuyIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseOut: bigint, maxQuoteIn: bigint) {
-    const buy = await this.amm.methods.buy(bn(baseOut), bn(maxQuoteIn)).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient, await this.coinTokenProgram(mint))).instruction();
-    if (!pool.quoteMint.equals(WSOL_MINT)) return [buy];
-    return [...this.wrapSolIxs(user, maxQuoteIn), buy, this.unwrapSolIx(user)];
+  async ammBuyIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseOut: bigint, maxQuoteIn: bigint, trackVolume = false) {
+    const buy = await this.amm.methods.buy(bn(baseOut), bn(maxQuoteIn), trackVolume).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient, await this.coinTokenProgram(mint), trackVolume)).instruction();
+    const pre = this.buybackAtaIxs(user, pool.quoteMint);
+    if (!pool.quoteMint.equals(WSOL_MINT)) return [...pre, buy];
+    return [...pre, ...this.wrapSolIxs(user, maxQuoteIn), buy, this.unwrapSolIx(user)];
+  }
+
+  /** Spend exactly `spendable` quote (fees included) on the AMM for at least `minBaseOut`. */
+  async ammBuyExactQuoteInIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, spendable: bigint, minBaseOut: bigint, trackVolume = false) {
+    const buy = await this.amm.methods.buyExactQuoteIn(bn(spendable), bn(minBaseOut), trackVolume).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient, await this.coinTokenProgram(mint), trackVolume)).instruction();
+    const pre = this.buybackAtaIxs(user, pool.quoteMint);
+    if (!pool.quoteMint.equals(WSOL_MINT)) return [...pre, buy];
+    return [...pre, ...this.wrapSolIxs(user, spendable), buy, this.unwrapSolIx(user)];
+  }
+
+  // ------------------------------------------------------------- boost (delayed buy-and-burn on migration pools)
+
+  async initBoostIx(payer: PublicKey, pool: PoolState) {
+    return this.amm.methods.initBoost().accounts({
+      pool: pool.address, globalConfig: pda.ammGlobalConfig(), payer, quoteMint: pool.quoteMint, lpMint: pool.lpMint, poolQuoteTokenAccount: pool.poolQuoteTokenAccount,
+      boostVaultAuthority: pda.boostVaultAuthority(pool.address), boostVault: pda.boostVault(pool.address, pool.quoteMint),
+      quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any).instruction();
+  }
+
+  async boostBuyAndBurnIx(authority: PublicKey, pool: PoolState, quoteIn: bigint, minBurned = 0n) {
+    return this.amm.methods.boostBuyAndBurn(bn(quoteIn), bn(minBurned)).accounts({
+      pool: pool.address, globalConfig: pda.ammGlobalConfig(), authority, baseMint: pool.baseMint, quoteMint: pool.quoteMint,
+      poolBaseTokenAccount: pool.poolBaseTokenAccount, poolQuoteTokenAccount: pool.poolQuoteTokenAccount,
+      boostVaultAuthority: pda.boostVaultAuthority(pool.address), boostVault: pda.boostVault(pool.address, pool.quoteMint),
+      baseTokenProgram: await this.coinTokenProgram(pool.baseMint), quoteTokenProgram: TOKEN_PROGRAM_ID,
+    } as any).instruction();
+  }
+
+  /** Base that a boost of `quoteIn` would burn right now (no fees: the vault's quote is already the pool's). */
+  static boostBurnFor(quoteIn: bigint, baseReserve: bigint, effectiveQuoteReserve: bigint) {
+    return (quoteIn * baseReserve) / (effectiveQuoteReserve + quoteIn);
+  }
+
+  // ------------------------------------------------------------- AMM admin
+
+  async ammToggleBoostIx(admin: PublicKey, enabled: boolean) {
+    return this.amm.methods.toggleBoost(enabled).accounts({ admin, globalConfig: pda.ammGlobalConfig() } as any).instruction();
+  }
+  async ammSetBoostAuthorityIx(admin: PublicKey, authority: PublicKey) {
+    return this.amm.methods.setBoostAuthority(authority).accounts({ admin, globalConfig: pda.ammGlobalConfig() } as any).instruction();
+  }
+  async ammUpdateBoostConfigIx(admin: PublicKey, bps: bigint) {
+    return this.amm.methods.updateBoostConfig(bn(bps)).accounts({ admin, globalConfig: pda.ammGlobalConfig() } as any).instruction();
+  }
+  async ammUpdateBuybackConfigIx(admin: PublicKey, bps: bigint, recipient: PublicKey) {
+    return this.amm.methods.updateBuybackConfig(bn(bps), recipient).accounts({ admin, globalConfig: pda.ammGlobalConfig() } as any).instruction();
+  }
+  async ammToggleMayhemModeIx(admin: PublicKey, enabled: boolean) {
+    return this.amm.methods.toggleMayhemMode(enabled).accounts({ admin, globalConfig: pda.ammGlobalConfig() } as any).instruction();
+  }
+  /** Grow an account from an older program layout (AMM GlobalConfig / Pool, curve Global / BondingCurve). */
+  async ammExtendAccountIx(payer: PublicKey, account: PublicKey) {
+    return this.amm.methods.extendAccount().accounts({ payer, account, systemProgram: SystemProgram.programId } as any).instruction();
+  }
+  async curveExtendAccountIx(payer: PublicKey, account: PublicKey) {
+    return this.curve.methods.extendAccount().accounts({ payer, account, systemProgram: SystemProgram.programId } as any).instruction();
   }
 
   async ammSellIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseIn: bigint, minQuoteOut: bigint) {
@@ -755,6 +860,14 @@ export class OpenpumpClient {
   }
   async sweepBuybackIx(authority: PublicKey, index = 0) {
     return this.fees.methods.sweepBuyback(index).accounts({ authority, buybackVault: pda.buybackVault(index) } as any).instruction();
+  }
+  /** Sweep the AMM buyback share (quote tokens, e.g. WSOL) from the vault's ATA to the authority's ATA. */
+  async sweepBuybackQuoteIx(authority: PublicKey, quoteMint: PublicKey = WSOL_MINT, index = 0) {
+    const vault = pda.buybackVault(index);
+    return this.fees.methods.sweepBuybackQuote(index).accounts({
+      authority, buybackVault: vault, quoteMint, vaultQuote: getAssociatedTokenAddressSync(quoteMint, vault, true), authorityQuote: getAssociatedTokenAddressSync(quoteMint, authority, true),
+      quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any).instruction();
   }
 
   // ------------------------------------------------------------- mayhem

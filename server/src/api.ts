@@ -44,6 +44,12 @@ export function apiRouter(db: Db, conn: Connection) {
           coinCreatorFeeBasisPoints: cfg.coinCreatorFeeBasisPoints.toString(),
           protocolFeeRecipient: cfg.protocolFeeRecipient.toBase58(),
           disableFlags: cfg.disableFlags,
+          mayhemModeEnabled: cfg.mayhemModeEnabled,
+          buybackBasisPoints: cfg.buybackBasisPoints.toString(),
+          buybackFeeRecipient: cfg.buybackFeeRecipient.toBase58(),
+          boostEnabled: cfg.boostEnabled,
+          boostAuthority: cfg.boostAuthority.toBase58(),
+          boostBasisPoints: cfg.boostBasisPoints.toString(),
         },
       };
       globalCache = { at: Date.now(), value };

@@ -364,6 +364,30 @@ pub mod openpump_fees {
         Ok(())
     }
 
+    /// The buyback authority takes the quote tokens (AMM buyback share, e.g. WSOL) accrued in the vault's ATA.
+    pub fn sweep_buyback_quote(ctx: Context<SweepBuybackQuote>, _index: u8) -> Result<()> {
+        let ts = now()?;
+        let v = &mut ctx.accounts.buyback_vault;
+        require!(v.last_claimed == 0 || ts - v.last_claimed >= v.claim_rate_limit, FeeError::RateLimited);
+        let amount = ctx.accounts.vault_quote.amount;
+        require!(amount > 0, FeeError::NothingToSweep);
+        let index = [v.index];
+        let bump = [v.bump];
+        let seeds: &[&[u8]] = &[BUYBACK_SEED, &index, &bump];
+        ti::transfer_checked(
+            CpiContext::new_with_signer(
+                ctx.accounts.quote_token_program.to_account_info(),
+                TransferChecked { from: ctx.accounts.vault_quote.to_account_info(), mint: ctx.accounts.quote_mint.to_account_info(), to: ctx.accounts.authority_quote.to_account_info(), authority: v.to_account_info() },
+                &[seeds],
+            ),
+            amount,
+            ctx.accounts.quote_mint.decimals,
+        )?;
+        v.last_claimed = ts;
+        emit_cpi!(SweepBuybackQuoteEvent { timestamp: ts, index: v.index, authority: v.authority, quote_mint: ctx.accounts.quote_mint.key(), amount });
+        Ok(())
+    }
+
     /// Authority withdraws stray SOL sent to the fee config PDA.
     pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
         let info = ctx.accounts.fee_config.to_account_info();
@@ -659,6 +683,24 @@ pub struct SweepBuyback<'info> {
 
 #[event_cpi]
 #[derive(Accounts)]
+#[instruction(index: u8)]
+pub struct SweepBuybackQuote<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(mut, seeds = [BUYBACK_SEED, &[index]], bump = buyback_vault.bump, has_one = authority @ FeeError::NotAuthorized)]
+    pub buyback_vault: Account<'info, BuybackVault>,
+    pub quote_mint: Box<InterfaceAccount<'info, MintI>>,
+    #[account(mut, associated_token::mint = quote_mint, associated_token::authority = buyback_vault, associated_token::token_program = quote_token_program)]
+    pub vault_quote: Box<InterfaceAccount<'info, TokenAccountI>>,
+    #[account(init_if_needed, payer = authority, associated_token::mint = quote_mint, associated_token::authority = authority, associated_token::token_program = quote_token_program)]
+    pub authority_quote: Box<InterfaceAccount<'info, TokenAccountI>>,
+    pub quote_token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[event_cpi]
+#[derive(Accounts)]
 pub struct Withdraw<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -702,6 +744,8 @@ pub struct DonationFeePdaCreated { pub timestamp: i64, pub created_by: Pubkey, p
 pub struct DonationFeePdaCranked { pub timestamp: i64, pub signer: Pubkey, pub donation_fee_pda: Pubkey, pub beneficiary: Pubkey, pub base_mint: Pubkey, pub amount: u64 }
 #[event]
 pub struct SweepBuybackEvent { pub timestamp: i64, pub index: u8, pub authority: Pubkey, pub amount: u64, pub total_claimed: u64 }
+#[event]
+pub struct SweepBuybackQuoteEvent { pub timestamp: i64, pub index: u8, pub authority: Pubkey, pub quote_mint: Pubkey, pub amount: u64 }
 
 #[error_code]
 pub enum FeeError {

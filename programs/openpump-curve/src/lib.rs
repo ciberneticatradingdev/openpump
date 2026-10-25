@@ -403,6 +403,10 @@ pub mod openpump_curve {
             base_amount,
             quote_amount,
             bc.creator,
+            bc.is_mayhem_mode,
+            bc.is_holder_reward,
+            bc.creator_fee_bps,
+            bc.can_edit_creator_fee,
         )?;
 
         // 4. burn every LP token the curve received, then close the empty helper accounts
@@ -478,6 +482,31 @@ pub mod openpump_curve {
     pub fn set_admin_set_creator_authority(ctx: Context<AuthorityOnly>, authority: Pubkey) -> Result<()> {
         admin::set_admin_set_creator_authority(ctx, authority)
     }
+    /// AMM buys count toward the shared volume-incentive campaign: the AMM program's volume-tracker PDA
+    /// signs this CPI with the SOL amount of the swap.
+    pub fn track_amm_volume(ctx: Context<TrackAmmVolume>, sol_amount: u64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        incentives::track(&mut ctx.accounts.global_volume_accumulator, &mut ctx.accounts.user_volume_accumulator, now, sol_amount)
+    }
+
+    /// Grow a Global / BondingCurve account created by an older program version to the current layout
+    /// (new fields read as zero / false). Permissionless; the payer covers the rent delta.
+    pub fn extend_account(ctx: Context<ExtendAccount>) -> Result<()> {
+        let info = ctx.accounts.account.to_account_info();
+        let target = {
+            let data = info.try_borrow_data()?;
+            require!(data.len() >= 8, CurveError::InvalidParams);
+            if data[..8] == *Global::DISCRIMINATOR { 8 + Global::INIT_SPACE } else if data[..8] == *BondingCurve::DISCRIMINATOR { 8 + BondingCurve::INIT_SPACE } else { return Err(CurveError::InvalidParams.into()) }
+        };
+        require!(info.data_len() < target, CurveError::InvalidParams);
+        let delta = Rent::get()?.minimum_balance(target).saturating_sub(info.lamports());
+        if delta > 0 {
+            system_program::transfer(CpiContext::new(ctx.accounts.system_program.to_account_info(), system_program::Transfer { from: ctx.accounts.payer.to_account_info(), to: info.clone() }), delta)?;
+        }
+        info.resize(target)?;
+        Ok(())
+    }
+
     pub fn toggle_mayhem_mode(ctx: Context<AuthorityOnly>, enabled: bool) -> Result<()> {
         ctx.accounts.global.mayhem_mode_enabled = enabled;
         Ok(())
@@ -775,6 +804,29 @@ pub struct Create<'info> {
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct TrackAmmVolume<'info> {
+    /// CHECK: the trader; only used as the user accumulator's seed.
+    pub user: UncheckedAccount<'info>,
+    #[account(mut, seeds = [GLOBAL_VOLUME_SEED], bump = global_volume_accumulator.bump)]
+    pub global_volume_accumulator: Box<Account<'info, GlobalVolumeAccumulator>>,
+    #[account(mut, seeds = [USER_VOLUME_SEED, user.key().as_ref()], bump = user_volume_accumulator.bump)]
+    pub user_volume_accumulator: Box<Account<'info, UserVolumeAccumulator>>,
+    /// Only the AMM program, through its volume-tracker PDA, may record AMM volume.
+    #[account(seeds = [b"volume-tracker"], bump, seeds::program = openpump_amm::ID)]
+    pub volume_tracker: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ExtendAccount<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: a Global or BondingCurve owned by this program; discriminator checked in the handler.
+    #[account(mut, owner = crate::ID @ CurveError::InvalidParams)]
+    pub account: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[event_cpi]

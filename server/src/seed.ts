@@ -68,6 +68,19 @@ async function main() {
     await send([await client.setParamsIx(admin.publicKey, { feeRecipient: admin.publicKey, ...DEFAULT_PARAMS, antiSnipeSlots: 0n, buybackBasisPoints: 2000n, buybackFeeRecipient: pda.buybackVault(0) })]);
     console.log("fees program initialized: tiers + buyback vault (20 % of protocol fee)");
   }
+  {
+    // AMM extras: boost (delayed buy-and-burn on graduation), buyback share to the fees vault, mayhem pools
+    const ac = await client.fetchAmmConfig();
+    if (!ac.boostEnabled || ac.buybackBasisPoints === 0n) {
+      await send([
+        await client.ammToggleBoostIx(admin.publicKey, true),
+        await client.ammSetBoostAuthorityIx(admin.publicKey, admin.publicKey),
+        await client.ammUpdateBuybackConfigIx(admin.publicKey, 2000n, pda.buybackVault(0)),
+        await client.ammToggleMayhemModeIx(admin.publicKey, true),
+      ]);
+      console.log("amm: boost on (20 % of quote at graduation, authority = admin), buyback 20 % of protocol fee → fees vault, mayhem pools on");
+    }
+  }
   await client.detectFeeProgram();
   const global = await client.fetchGlobal();
 
@@ -126,8 +139,16 @@ async function main() {
     if (bc.complete) {
       await send(await client.migrateIxs(admin.publicKey, mint.publicKey, admin.publicKey, global.feeRecipient));
       console.log(`  migrated → pool ${pda.migrationPool(mint.publicKey).toBase58()}`);
-      const pool = (await client.fetchPool(mint.publicKey))!;
+      let pool = (await client.fetchPool(mint.publicKey))!;
       const cfg = await client.fetchAmmConfig();
+      if (client.ammBoostEnabled) {
+        await send([await client.initBoostIx(admin.publicKey, pool)]);
+        pool = (await client.fetchPool(mint.publicKey))!;
+        const vault = await client.fetchBoostVault(pool);
+        await send([await client.boostBuyAndBurnIx(admin.publicKey, pool, vault / 2n)]);
+        pool = (await client.fetchPool(mint.publicKey))!;
+        console.log(`  boost: vault ${Number(vault) / 1e9} SOL, half spent on buy-and-burn, ${Number(pool.virtualQuoteReserves) / 1e9} SOL still to burn`);
+      }
       const t = traders[0];
       const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });
       const tc = new OpenpumpClient(conn, tp);

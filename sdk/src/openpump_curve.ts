@@ -4762,6 +4762,39 @@ export type OpenpumpCurve = {
       ]
     },
     {
+      "name": "extendAccount",
+      "docs": [
+        "Grow a Global / BondingCurve account created by an older program version to the current layout",
+        "(new fields read as zero / false). Permissionless; the payer covers the rent delta."
+      ],
+      "discriminator": [
+        234,
+        102,
+        194,
+        203,
+        150,
+        72,
+        62,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "account",
+          "writable": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initUserVolumeAccumulator",
       "discriminator": [
         94,
@@ -7305,6 +7338,179 @@ export type OpenpumpCurve = {
         {
           "name": "enabled",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "trackAmmVolume",
+      "docs": [
+        "AMM buys count toward the shared volume-incentive campaign: the AMM program's volume-tracker PDA",
+        "signs this CPI with the SOL amount of the swap."
+      ],
+      "discriminator": [
+        129,
+        65,
+        215,
+        176,
+        191,
+        12,
+        132,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "user"
+        },
+        {
+          "name": "globalVolumeAccumulator",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  118,
+                  111,
+                  108,
+                  117,
+                  109,
+                  101,
+                  95,
+                  97,
+                  99,
+                  99,
+                  117,
+                  109,
+                  117,
+                  108,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "userVolumeAccumulator",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  118,
+                  111,
+                  108,
+                  117,
+                  109,
+                  101,
+                  95,
+                  97,
+                  99,
+                  99,
+                  117,
+                  109,
+                  117,
+                  108,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "volumeTracker",
+          "docs": [
+            "Only the AMM program, through its volume-tracker PDA, may record AMM volume."
+          ],
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  108,
+                  117,
+                  109,
+                  101,
+                  45,
+                  116,
+                  114,
+                  97,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                154,
+                140,
+                95,
+                222,
+                237,
+                199,
+                64,
+                165,
+                139,
+                53,
+                15,
+                229,
+                238,
+                5,
+                58,
+                248,
+                191,
+                182,
+                111,
+                64,
+                143,
+                152,
+                173,
+                253,
+                99,
+                184,
+                132,
+                247,
+                169,
+                124,
+                191,
+                116
+              ]
+            }
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "solAmount",
+          "type": "u64"
         }
       ]
     },

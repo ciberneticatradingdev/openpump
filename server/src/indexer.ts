@@ -215,6 +215,18 @@ export class Indexer {
       "amm:CreatePoolEvent": () => {
         this.db.prepare("INSERT OR IGNORE INTO pools(pool,mint) VALUES(?,?)").run(toStr(d.pool), toStr(d.baseMint));
       },
+      "amm:InitBoostEvent": () => {
+        this.db.prepare("UPDATE pools SET virtual_quote=? WHERE pool=?").run(toStr(d.virtualQuoteReserves), toStr(d.pool));
+        this.db.prepare("UPDATE coins SET boost_pending=? WHERE mint=?").run(toStr(d.virtualQuoteReserves), toStr(d.mint));
+        this.broadcast({ type: "boost_init", mint: toStr(d.mint), amount: toStr(d.virtualQuoteReserves), ts });
+      },
+      "amm:BoostBuyAndBurnEvent": () => {
+        this.db.prepare("UPDATE pools SET virtual_quote=? WHERE pool=?").run(toStr(d.virtualQuoteReserves), toStr(d.pool));
+        // burned base leaves the supply (market cap = price x supply)
+        this.db.prepare("UPDATE coins SET supply = CAST(supply AS INTEGER) - CAST(? AS INTEGER), boost_burned = CAST(boost_burned AS INTEGER) + CAST(? AS INTEGER), boost_pending=? WHERE mint=?")
+          .run(toStr(d.baseAmountBurned), toStr(d.baseAmountBurned), toStr(d.boostVaultRemaining), toStr(d.mint));
+        this.broadcast({ type: "boost_burn", mint: toStr(d.mint), burned: toStr(d.baseAmountBurned), quote: toStr(d.quoteAmountInUsed), remaining: toStr(d.boostVaultRemaining), ts });
+      },
     };
     handlers[`${ev.program}:${ev.name}`]?.();
   }

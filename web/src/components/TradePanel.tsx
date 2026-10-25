@@ -131,8 +131,12 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
             ixs.push(await client.buyExactSolIx(publicKey, mint, creator, feeRecipient, units, minOut, track));
           }
         } else {
-          const maxIn = (quote.cost * (10000n + slipBps)) / 10000n;
-          ixs = await client.ammBuyIxs(publicKey, mint, pool!, new PublicKey(g.amm!.protocolFeeRecipient), quote.out, maxIn > units ? units : maxIn);
+          // spend exactly what was typed (fees included); trade-to-earn on SOL pools when a campaign is live
+          const inc = cfg.incentives;
+          const track = !v2 && !!inc && incMath.active({ ...inc, totalTokenSupply: [], solVolumes: [] });
+          ixs = [];
+          if (track && !(await connection.getAccountInfo(pda.userVolumeAccumulator(publicKey), "confirmed"))) ixs.push(await client.initUserVolumeIx(publicKey));
+          ixs.push(...(await client.ammBuyExactQuoteInIxs(publicKey, mint, pool!, new PublicKey(g.amm!.protocolFeeRecipient), units, minOut, track)));
         }
       } else {
         const units = toUnits(Number(amt), 6);

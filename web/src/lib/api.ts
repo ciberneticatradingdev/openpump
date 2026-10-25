@@ -42,6 +42,8 @@ export interface Coin {
   token_program: string;
   is_mayhem_mode: number;
   mayhem_end: number | null;
+  boost_burned: string;
+  boost_pending: string;
 }
 export const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
@@ -99,7 +101,7 @@ export interface Config {
     antiSnipeSlots: string;
     antiSnipeMaxBps: string;
     paused: boolean;
-    amm?: { lpFeeBasisPoints: string; protocolFeeBasisPoints: string; coinCreatorFeeBasisPoints: string; protocolFeeRecipient: string; disableFlags: number } | null;
+    amm?: { lpFeeBasisPoints: string; protocolFeeBasisPoints: string; coinCreatorFeeBasisPoints: string; protocolFeeRecipient: string; disableFlags: number; mayhemModeEnabled?: boolean; buybackBasisPoints?: string; buybackFeeRecipient?: string; boostEnabled?: boolean; boostAuthority?: string; boostBasisPoints?: string } | null;
   };
 }
 

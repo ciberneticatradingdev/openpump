@@ -2076,6 +2076,202 @@ export type OpenpumpFees = {
       ]
     },
     {
+      "name": "sweepBuybackQuote",
+      "docs": [
+        "The buyback authority takes the quote tokens (AMM buyback share, e.g. WSOL) accrued in the vault's ATA."
+      ],
+      "discriminator": [
+        234,
+        118,
+        61,
+        145,
+        160,
+        233,
+        233,
+        114
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "buybackVault"
+          ]
+        },
+        {
+          "name": "buybackVault",
+          "writable": true
+        },
+        {
+          "name": "quoteMint"
+        },
+        {
+          "name": "vaultQuote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "buybackVault"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "authorityQuote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "quoteTokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "transferFeeSharingAuthority",
       "discriminator": [
         202,
@@ -3280,6 +3476,19 @@ export type OpenpumpFees = {
       ]
     },
     {
+      "name": "sweepBuybackQuoteEvent",
+      "discriminator": [
+        153,
+        109,
+        52,
+        30,
+        152,
+        156,
+        44,
+        175
+      ]
+    },
+    {
       "name": "updateFeeConfigEvent",
       "discriminator": [
         90,
@@ -3904,6 +4113,17 @@ export type OpenpumpFees = {
           {
             "name": "canEditCreatorFee",
             "type": "bool"
+          },
+          {
+            "name": "isMayhemMode",
+            "type": "bool"
+          },
+          {
+            "name": "virtualQuoteReserves",
+            "docs": [
+              "Quote parked in the boost vault but still priced as if in the pool (see boost.rs)."
+            ],
+            "type": "u64"
           }
         ]
       }
@@ -4245,6 +4465,34 @@ export type OpenpumpFees = {
           },
           {
             "name": "totalClaimed",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sweepBuybackQuoteEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "index",
+            "type": "u8"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
             "type": "u64"
           }
         ]

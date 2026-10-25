@@ -146,9 +146,254 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "boostBuyAndBurn",
+      "docs": [
+        "Boost authority: spend vault quote back into the pool and burn the base it buys (price goes up)."
+      ],
+      "discriminator": [
+        105,
+        68,
+        6,
+        175,
+        0,
+        7,
+        35,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.index",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.creator",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.base_mint",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.quote_mint",
+                "account": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "globalConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "baseMint",
+          "writable": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "quoteMint",
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "poolBaseTokenAccount",
+          "writable": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "poolQuoteTokenAccount",
+          "writable": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "boostVaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  111,
+                  115,
+                  116,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "boostVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "boostVaultAuthority"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "baseTokenProgram"
+        },
+        {
+          "name": "quoteTokenProgram"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "quoteAmountIn",
+          "type": "u64"
+        },
+        {
+          "name": "minBaseAmountBurned",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "buy",
       "docs": [
-        "Buy an exact amount of base tokens, paying at most `max_quote_amount_in` (fees included)."
+        "Buy an exact amount of base tokens, paying at most `max_quote_amount_in` (fees included).",
+        "`track_volume`: count the quote spent toward the shared volume-incentive campaign (SOL pools, both accumulators passed)."
       ],
       "discriminator": [
         102,
@@ -540,6 +785,55 @@ export type OpenpumpAmm = {
           }
         },
         {
+          "name": "buybackFeeRecipientTokenAccount",
+          "docs": [
+            "Optional: quote ATA of `global_config.buyback_fee_recipient`; receives the buyback share of the protocol fee."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "globalVolumeAccumulator",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "userVolumeAccumulator",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "volumeTracker",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  108,
+                  117,
+                  109,
+                  101,
+                  45,
+                  116,
+                  114,
+                  97,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "curveProgram",
+          "optional": true,
+          "address": "AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB"
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -580,6 +874,501 @@ export type OpenpumpAmm = {
         {
           "name": "maxQuoteAmountIn",
           "type": "u64"
+        },
+        {
+          "name": "trackVolume",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "buyExactQuoteIn",
+      "docs": [
+        "Spend up to `spendable_quote_in` (fees included) for as much base as that buys; at least `min_base_amount_out`."
+      ],
+      "discriminator": [
+        198,
+        46,
+        21,
+        82,
+        180,
+        217,
+        232,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.index",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.creator",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.base_mint",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.quote_mint",
+                "account": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "globalConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "baseMint",
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "quoteMint",
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "userBaseTokenAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "account",
+                "path": "baseTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "baseMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "userQuoteTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "poolBaseTokenAccount",
+          "writable": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "poolQuoteTokenAccount",
+          "writable": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "protocolFeeRecipient"
+        },
+        {
+          "name": "protocolFeeRecipientTokenAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "protocolFeeRecipient"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "coinCreatorVaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  97,
+                  116,
+                  111,
+                  114,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.coin_creator",
+                "account": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "coinCreatorVaultAta",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "coinCreatorVaultAuthority"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "baseTokenProgram"
+        },
+        {
+          "name": "quoteTokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "feeConfig",
+          "docs": [
+            "Optional: the fees program's tiered schedule (market-cap based)."
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "buybackFeeRecipientTokenAccount",
+          "docs": [
+            "Optional: quote ATA of `global_config.buyback_fee_recipient`; receives the buyback share of the protocol fee."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "globalVolumeAccumulator",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "userVolumeAccumulator",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "volumeTracker",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  108,
+                  117,
+                  109,
+                  101,
+                  45,
+                  116,
+                  114,
+                  97,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "curveProgram",
+          "optional": true,
+          "address": "AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "spendableQuoteIn",
+          "type": "u64"
+        },
+        {
+          "name": "minBaseAmountOut",
+          "type": "u64"
+        },
+        {
+          "name": "trackVolume",
+          "type": "bool"
         }
       ]
     },
@@ -1414,6 +2203,22 @@ export type OpenpumpAmm = {
         {
           "name": "coinCreator",
           "type": "pubkey"
+        },
+        {
+          "name": "isMayhemMode",
+          "type": "bool"
+        },
+        {
+          "name": "isHolderReward",
+          "type": "bool"
+        },
+        {
+          "name": "creatorFeeBps",
+          "type": "u64"
+        },
+        {
+          "name": "canEditCreatorFee",
+          "type": "bool"
         }
       ]
     },
@@ -2019,6 +2824,307 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "extendAccount",
+      "docs": [
+        "Grow a GlobalConfig / Pool account created by an older program version to the current layout",
+        "(new fields read as zero). Permissionless; the payer covers the rent delta."
+      ],
+      "discriminator": [
+        234,
+        102,
+        194,
+        203,
+        150,
+        72,
+        62,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "account",
+          "writable": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initBoost",
+      "docs": [
+        "Move part of a freshly migrated pool's quote into its boost vault without moving the price",
+        "(the pool keeps counting it as virtual quote). Only migration pools with no LP holders."
+      ],
+      "discriminator": [
+        140,
+        233,
+        33,
+        94,
+        132,
+        90,
+        194,
+        143
+      ],
+      "accounts": [
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.index",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.creator",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.base_mint",
+                "account": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.quote_mint",
+                "account": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "globalConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Pays the vault's rent."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "quoteMint",
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "lpMint",
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "poolQuoteTokenAccount",
+          "writable": true,
+          "relations": [
+            "pool"
+          ]
+        },
+        {
+          "name": "boostVaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  111,
+                  115,
+                  116,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "boostVault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "boostVaultAuthority"
+              },
+              {
+                "kind": "account",
+                "path": "quoteTokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "quoteMint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "quoteTokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "multiHopSwap",
       "docs": [
         "Route through up to 4 pools in one instruction (see multihop.rs for the remaining-accounts layout)."
@@ -2579,6 +3685,55 @@ export type OpenpumpAmm = {
           }
         },
         {
+          "name": "buybackFeeRecipientTokenAccount",
+          "docs": [
+            "Optional: quote ATA of `global_config.buyback_fee_recipient`; receives the buyback share of the protocol fee."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "globalVolumeAccumulator",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "userVolumeAccumulator",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "volumeTracker",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  108,
+                  117,
+                  109,
+                  101,
+                  45,
+                  116,
+                  114,
+                  97,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "curveProgram",
+          "optional": true,
+          "address": "AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB"
+        },
+        {
           "name": "eventAuthority",
           "pda": {
             "seeds": [
@@ -2619,6 +3774,92 @@ export type OpenpumpAmm = {
         {
           "name": "minQuoteAmountOut",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "setBoostAuthority",
+      "discriminator": [
+        227,
+        149,
+        76,
+        42,
+        130,
+        39,
+        234,
+        205
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "globalConfig"
+          ]
+        },
+        {
+          "name": "globalConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "newBoostAuthority",
+          "type": "pubkey"
         }
       ]
     },
@@ -2877,6 +4118,181 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "toggleBoost",
+      "discriminator": [
+        117,
+        161,
+        160,
+        74,
+        223,
+        137,
+        118,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "globalConfig"
+          ]
+        },
+        {
+          "name": "globalConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "toggleMayhemMode",
+      "docs": [
+        "Allow pools to be created in mayhem mode (migration pools inherit the curve's flag regardless)."
+      ],
+      "discriminator": [
+        1,
+        9,
+        111,
+        208,
+        100,
+        31,
+        255,
+        163
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "globalConfig"
+          ]
+        },
+        {
+          "name": "globalConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "updateAdmin",
       "discriminator": [
         161,
@@ -2958,6 +4374,188 @@ export type OpenpumpAmm = {
       "args": [
         {
           "name": "newAdmin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "updateBoostConfig",
+      "docs": [
+        "Share of a migration pool's quote (bps) moved into its boost vault by `init_boost`."
+      ],
+      "discriminator": [
+        60,
+        36,
+        79,
+        238,
+        182,
+        143,
+        245,
+        1
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "globalConfig"
+          ]
+        },
+        {
+          "name": "globalConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "boostBasisPoints",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "updateBuybackConfig",
+      "docs": [
+        "Share of the protocol fee (bps) routed to the buyback recipient's quote ATA on every direct swap."
+      ],
+      "discriminator": [
+        251,
+        224,
+        171,
+        146,
+        160,
+        26,
+        113,
+        233
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "globalConfig"
+          ]
+        },
+        {
+          "name": "globalConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "buybackBasisPoints",
+          "type": "u64"
+        },
+        {
+          "name": "buybackFeeRecipient",
           "type": "pubkey"
         }
       ]
@@ -3467,6 +5065,32 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "boostBuyAndBurnEvent",
+      "discriminator": [
+        63,
+        69,
+        28,
+        22,
+        48,
+        92,
+        194,
+        185
+      ]
+    },
+    {
+      "name": "boostConfigEvent",
+      "discriminator": [
+        229,
+        41,
+        179,
+        196,
+        150,
+        35,
+        160,
+        113
+      ]
+    },
+    {
       "name": "buyEvent",
       "discriminator": [
         103,
@@ -3532,6 +5156,32 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "extendAccountEvent",
+      "discriminator": [
+        97,
+        97,
+        215,
+        144,
+        93,
+        146,
+        22,
+        124
+      ]
+    },
+    {
+      "name": "initBoostEvent",
+      "discriminator": [
+        174,
+        124,
+        74,
+        249,
+        4,
+        81,
+        246,
+        17
+      ]
+    },
+    {
       "name": "multiHopSwapEvent",
       "discriminator": [
         234,
@@ -3568,6 +5218,19 @@ export type OpenpumpAmm = {
         88,
         194,
         78
+      ]
+    },
+    {
+      "name": "updateBuybackConfigEvent",
+      "discriminator": [
+        249,
+        82,
+        149,
+        32,
+        89,
+        203,
+        211,
+        130
       ]
     },
     {
@@ -3667,6 +5330,51 @@ export type OpenpumpAmm = {
       "code": 6013,
       "name": "creatorFeeLocked",
       "msg": "Creator fee is locked for this pool"
+    },
+    {
+      "code": 6014,
+      "name": "mayhemDisabled",
+      "msg": "Mayhem mode is disabled"
+    },
+    {
+      "code": 6015,
+      "name": "boostDisabled",
+      "msg": "Boost is disabled"
+    },
+    {
+      "code": 6016,
+      "name": "alreadyBoosted",
+      "msg": "Pool already has a boost in flight"
+    },
+    {
+      "code": 6017,
+      "name": "notMigrationPool",
+      "msg": "Only migration pools can be boosted"
+    },
+    {
+      "code": 6018,
+      "name": "poolHasLiquidityProviders",
+      "msg": "Pool has liquidity providers"
+    },
+    {
+      "code": 6019,
+      "name": "boostInProgress",
+      "msg": "Liquidity is locked while a boost is in flight"
+    },
+    {
+      "code": 6020,
+      "name": "nothingToBoost",
+      "msg": "Nothing to boost"
+    },
+    {
+      "code": 6021,
+      "name": "invalidAccount",
+      "msg": "Not an account of this program"
+    },
+    {
+      "code": 6022,
+      "name": "alreadyExtended",
+      "msg": "Account already has the current layout"
     }
   ],
   "types": [
@@ -3697,6 +5405,90 @@ export type OpenpumpAmm = {
           },
           {
             "name": "creatorFeeBps",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "boostBuyAndBurnEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteAmountInRequested",
+            "type": "u64"
+          },
+          {
+            "name": "quoteAmountInUsed",
+            "type": "u64"
+          },
+          {
+            "name": "baseAmountBurned",
+            "type": "u64"
+          },
+          {
+            "name": "virtualQuoteReserves",
+            "type": "u64"
+          },
+          {
+            "name": "realQuoteReservesAfter",
+            "type": "u64"
+          },
+          {
+            "name": "baseReservesAfter",
+            "type": "u64"
+          },
+          {
+            "name": "boostVaultRemaining",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "boostConfigEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "boostAuthority",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldBoostAuthority",
+            "type": "pubkey"
+          },
+          {
+            "name": "boostEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "boostBasisPoints",
             "type": "u64"
           },
           {
@@ -3750,6 +5542,18 @@ export type OpenpumpAmm = {
           {
             "name": "poolQuoteReserves",
             "type": "u64"
+          },
+          {
+            "name": "virtualQuoteReserves",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFee",
+            "type": "u64"
+          },
+          {
+            "name": "trackVolume",
+            "type": "bool"
           },
           {
             "name": "coinCreator",
@@ -3846,6 +5650,18 @@ export type OpenpumpAmm = {
             "type": "u64"
           },
           {
+            "name": "isMayhemMode",
+            "type": "bool"
+          },
+          {
+            "name": "isHolderReward",
+            "type": "bool"
+          },
+          {
+            "name": "creatorFeeBps",
+            "type": "u64"
+          },
+          {
             "name": "timestamp",
             "type": "i64"
           }
@@ -3919,6 +5735,26 @@ export type OpenpumpAmm = {
           },
           {
             "name": "recipients",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "extendAccountEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "newSize",
             "type": "u64"
           },
           {
@@ -4085,6 +5921,71 @@ export type OpenpumpAmm = {
           {
             "name": "maxConfigurableCreatorFeeBps",
             "type": "u64"
+          },
+          {
+            "name": "mayhemModeEnabled",
+            "docs": [
+              "Pools may be created in mayhem mode by non-migration callers."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "buybackBasisPoints",
+            "docs": [
+              "Share of the protocol fee (bps) sent to `buyback_fee_recipient`'s quote ATA on direct swaps."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeeRecipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "boostAuthority",
+            "docs": [
+              "Boost: migration pools park `boost_basis_points` of their quote in a vault the authority spends on buy-and-burns."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "boostEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "boostBasisPoints",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "initBoostEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quoteMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "virtualQuoteReserves",
+            "type": "u64"
+          },
+          {
+            "name": "realQuoteReservesAfter",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -4195,6 +6096,17 @@ export type OpenpumpAmm = {
           {
             "name": "canEditCreatorFee",
             "type": "bool"
+          },
+          {
+            "name": "isMayhemMode",
+            "type": "bool"
+          },
+          {
+            "name": "virtualQuoteReserves",
+            "docs": [
+              "Quote parked in the boost vault but still priced as if in the pool (see boost.rs)."
+            ],
+            "type": "u64"
           }
         ]
       }
@@ -4242,6 +6154,14 @@ export type OpenpumpAmm = {
           },
           {
             "name": "poolQuoteReserves",
+            "type": "u64"
+          },
+          {
+            "name": "virtualQuoteReserves",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFee",
             "type": "u64"
           },
           {
@@ -4341,6 +6261,30 @@ export type OpenpumpAmm = {
                 }
               }
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "updateBuybackConfigEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "buybackBasisPoints",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeeRecipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

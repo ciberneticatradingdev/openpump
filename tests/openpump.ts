@@ -350,7 +350,7 @@ describe("OpenPump — curve + amm", () => {
     quoteTokenProgram: TOKEN_PROGRAM_ID,
     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     systemProgram: SystemProgram.programId,
-    feeConfig: null,
+    feeConfig: null, buybackFeeRecipientTokenAccount: null, globalVolumeAccumulator: null, userVolumeAccumulator: null, curveProgram: null,
   });
 
   const wrapSol = async (user: Keypair, sol: number) => {
@@ -375,7 +375,7 @@ describe("OpenPump — curve + amm", () => {
 
     const userBaseBefore = await tokenBal(getAssociatedTokenAddressSync(mint, trader.publicKey));
     const userQuoteBefore = await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey));
-    await amm.methods.buy(baseOut, new BN(total.toString())).accounts(swapAccounts(trader.publicKey)).signers([trader]).rpc();
+    await amm.methods.buy(baseOut, new BN(total.toString()), false).accounts(swapAccounts(trader.publicKey)).signers([trader]).rpc();
     const userBaseAfter = await tokenBal(getAssociatedTokenAddressSync(mint, trader.publicKey));
     const userQuoteAfter = await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey));
     assert.equal((userBaseAfter - userBaseBefore).toString(), baseOut.toString());
@@ -455,7 +455,7 @@ describe("OpenPump — curve + amm", () => {
   it("kill switch: disable buy on the AMM, then re-enable", async () => {
     await amm.methods.disable(8).accounts({ admin: admin.publicKey, globalConfig: ammGlobalConfig }).rpc();
     try {
-      await amm.methods.buy(new BN(1000), new BN("100000000")).accounts(swapAccounts(trader.publicKey)).signers([trader]).rpc();
+      await amm.methods.buy(new BN(1000), new BN("100000000"), false).accounts(swapAccounts(trader.publicKey)).signers([trader]).rpc();
       assert.fail("disabled");
     } catch (e) {
       assert.include(String(e), "Disabled");
@@ -643,14 +643,14 @@ describe("OpenPump — curve + amm", () => {
       // trade on the AMM in the custom quote
       const p = await amm.account.pool.fetch(pool2);
       await amm.methods
-        .buy(new BN("1000000000000"), Q(1_000_000))
+        .buy(new BN("1000000000000"), Q(1_000_000), false)
         .accounts({
           pool: pool2, user: trader.publicKey, globalConfig: ammGlobalConfig, baseMint: mint2.publicKey, quoteMint,
           userBaseTokenAccount: getAssociatedTokenAddressSync(mint2.publicKey, trader.publicKey), userQuoteTokenAccount: getAssociatedTokenAddressSync(quoteMint, trader.publicKey),
           poolBaseTokenAccount: p.poolBaseTokenAccount, poolQuoteTokenAccount: p.poolQuoteTokenAccount,
           protocolFeeRecipient: feeRecipient.publicKey, protocolFeeRecipientTokenAccount: feeQuote,
           coinCreatorVaultAuthority, coinCreatorVaultAta: getAssociatedTokenAddressSync(quoteMint, coinCreatorVaultAuthority, true),
-          baseTokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, feeConfig: null,
+          baseTokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, feeConfig: null, buybackFeeRecipientTokenAccount: null, globalVolumeAccumulator: null, userVolumeAccumulator: null, curveProgram: null,
         })
         .signers([trader])
         .rpc();
@@ -857,6 +857,27 @@ describe("OpenPump — curve + amm", () => {
       assert.isFalse(a.needsClaim);
     });
 
+    it("an AMM buy with track_volume counts toward the same campaign (CPI from the AMM's tracker PDA)", async () => {
+      await wrapSol(userB, 3);
+      const before = (await curve.account.userVolumeAccumulator.fetch(uva(userB.publicKey))).currentSolVolume.toNumber();
+      const sumDays = (g: any) => g.solVolumes.reduce((a: number, v: any) => a + v.toNumber(), 0);
+      const gBefore = sumDays(await curve.account.globalVolumeAccumulator.fetch(gva));
+      await amm.methods.buyExactQuoteIn(new BN(1 * LAMPORTS_PER_SOL), new BN(0), true)
+        .accounts({ ...swapAccounts(userB.publicKey), globalVolumeAccumulator: gva, userVolumeAccumulator: uva(userB.publicKey), curveProgram: curve.programId })
+        .signers([userB]).rpc();
+      const after = (await curve.account.userVolumeAccumulator.fetch(uva(userB.publicKey))).currentSolVolume.toNumber();
+      const gAfter = sumDays(await curve.account.globalVolumeAccumulator.fetch(gva));
+      // the pool leg of a 1 SOL budget (fees excluded) is counted, for the user and for the day
+      assert.isAbove(after - before, 0.99 * LAMPORTS_PER_SOL);
+      assert.isBelow(after - before, 1 * LAMPORTS_PER_SOL);
+      assert.equal(gAfter - gBefore, after - before);
+      // a stranger cannot call the curve's tracker directly
+      try {
+        await curve.methods.trackAmmVolume(new BN(1)).accounts({ user: userB.publicKey, globalVolumeAccumulator: gva, userVolumeAccumulator: uva(userB.publicKey), volumeTracker: userB.publicKey }).signers([userB]).rpc();
+        assert.fail("tracker must be the AMM PDA");
+      } catch (e) { assert.include(String(e), "ConstraintSeeds"); }
+    });
+
     it("a stranger cannot change the schedule; user can close the accumulator", async () => {
       try {
         await curve.methods.adminUpdateTokenIncentives(new BN(0), new BN(0), new BN(DAY), new BN(0), new BN(1)).accounts({ authority: trader.publicKey, global, globalVolumeAccumulator: gva, mint: incMint, globalIncentiveTokenAccount: getAssociatedTokenAddressSync(incMint, gva, true), tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId }).signers([trader]).rpc();
@@ -1051,7 +1072,7 @@ describe("OpenPump — curve + amm", () => {
       // AMM buy now credits the sharing config's AMM vault
       const [vaultAuth] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), sharing.toBuffer()], amm.programId);
       const vaultAta = getAssociatedTokenAddressSync(NATIVE_MINT, vaultAuth, true);
-      await amm.methods.buy(new BN("1000000000000"), new BN(10 * LAMPORTS_PER_SOL))
+      await amm.methods.buy(new BN("1000000000000"), new BN(10 * LAMPORTS_PER_SOL), false)
         .accounts({ ...swapAccounts(trader.publicKey), coinCreatorVaultAuthority: vaultAuth, coinCreatorVaultAta: vaultAta, feeConfig: null })
         .preInstructions([createAssociatedTokenAccountIdempotentInstruction(trader.publicKey, vaultAta, vaultAuth, NATIVE_MINT)])
         .signers([trader]).rpc();
@@ -1213,13 +1234,13 @@ describe("OpenPump — curve + amm", () => {
       const p = await amm.account.pool.fetch(pool22);
       assert.equal(p.baseMint.toBase58(), m.publicKey.toBase58());
       // AMM buy with a Token-2022 base
-      await amm.methods.buy(new BN("1000000000000"), new BN(10 * LAMPORTS_PER_SOL))
+      await amm.methods.buy(new BN("1000000000000"), new BN(10 * LAMPORTS_PER_SOL), false)
         .accounts({
           pool: pool22, user: trader.publicKey, globalConfig: ammGlobalConfig, baseMint: m.publicKey, quoteMint: NATIVE_MINT,
           userBaseTokenAccount: getAssociatedTokenAddressSync(m.publicKey, trader.publicKey, false, T22), userQuoteTokenAccount: getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey),
           poolBaseTokenAccount: p.poolBaseTokenAccount, poolQuoteTokenAccount: p.poolQuoteTokenAccount, protocolFeeRecipient: feeRecipient.publicKey,
           protocolFeeRecipientTokenAccount: getAssociatedTokenAddressSync(NATIVE_MINT, feeRecipient.publicKey), coinCreatorVaultAuthority, coinCreatorVaultAta,
-          baseTokenProgram: T22, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, feeConfig: null,
+          baseTokenProgram: T22, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId, feeConfig: null, buybackFeeRecipientTokenAccount: null, globalVolumeAccumulator: null, userVolumeAccumulator: null, curveProgram: null,
         })
         .signers([trader]).rpc();
       assert.isAbove(Number((await conn.getTokenAccountBalance(getAssociatedTokenAddressSync(m.publicKey, trader.publicKey, false, T22))).value.amount), 0);
@@ -1343,6 +1364,121 @@ describe("OpenPump — curve + amm", () => {
       await mayhem.methods.withdrawAdmin(new BN(1 * LAMPORTS_PER_SOL)).accounts({ admin: admin.publicKey, globalParams: gp, solVault: vault, systemProgram: SystemProgram.programId }).rpc();
       assert.isAbove(await lamports(admin.publicKey), a0 + 0.9 * LAMPORTS_PER_SOL);
       await curve.methods.toggleMayhemMode(false).accounts({ authority: admin.publicKey, global }).rpc();
+    });
+  });
+
+  // ------------------------------------------------------------------ AMM extras (pump.fun PumpSwap parity)
+  describe("AMM extras: exact-quote-in, buyback split, boost buy-and-burn, extend_account", () => {
+    const bbRecipient = Keypair.generate();
+    const bbAta = () => getAssociatedTokenAddressSync(NATIVE_MINT, bbRecipient.publicKey);
+    const effQuote = async () => { const p = await amm.account.pool.fetch(pool); return (await tokenBal(poolQuote)) + BigInt(p.virtualQuoteReserves.toString()); };
+    // earlier tests reassigned the pool's coin creator (sharing / CTO): derive the current vault
+    const swapNow = async (u: PublicKey) => {
+      const p = await amm.account.pool.fetch(pool);
+      const [va] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), p.coinCreator.toBuffer()], amm.programId);
+      return { ...swapAccounts(u), coinCreatorVaultAuthority: va, coinCreatorVaultAta: getAssociatedTokenAddressSync(NATIVE_MINT, va, true) };
+    };
+    const ensureVault = async (u: PublicKey) => { const a = await swapNow(u); return [createAssociatedTokenAccountIdempotentInstruction(u, a.coinCreatorVaultAta, a.coinCreatorVaultAuthority, NATIVE_MINT)]; };
+
+    it("buy_exact_quote_in spends at most the budget and respects min_base_amount_out", async () => {
+      await wrapSol(trader, 5);
+      const before = await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey));
+      const baseBefore = await tokenBal(getAssociatedTokenAddressSync(mint, trader.publicKey));
+      const budget = 2n * BigInt(LAMPORTS_PER_SOL);
+      await amm.methods.buyExactQuoteIn(new BN(budget.toString()), new BN(0), false).accounts(await swapNow(trader.publicKey)).preInstructions(await ensureVault(trader.publicKey)).signers([trader]).rpc();
+      const spent = before - (await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey)));
+      const got = (await tokenBal(getAssociatedTokenAddressSync(mint, trader.publicKey))) - baseBefore;
+      assert.isTrue(spent <= budget && spent > (budget * 9990n) / 10000n, `spent ${spent} of ${budget}`);
+      assert.isAbove(Number(got), 0);
+      try {
+        await amm.methods.buyExactQuoteIn(new BN(budget.toString()), new BN((got * 2n).toString()), false).accounts(await swapNow(trader.publicKey)).preInstructions(await ensureVault(trader.publicKey)).signers([trader]).rpc();
+        assert.fail("min out");
+      } catch (e) { assert.include(String(e), "ExceededSlippage"); }
+    });
+
+    it("buyback: half of the protocol fee lands in the buyback recipient's WSOL ATA when it is passed", async () => {
+      await amm.methods.updateBuybackConfig(new BN(5000), bbRecipient.publicKey).accounts({ admin: admin.publicKey, globalConfig: ammGlobalConfig }).rpc();
+      await provider.sendAndConfirm(new Transaction().add(createAssociatedTokenAccountIdempotentInstruction(admin.publicKey, bbAta(), bbRecipient.publicKey, NATIVE_MINT)));
+      const protoAta = getAssociatedTokenAddressSync(NATIVE_MINT, feeRecipient.publicKey);
+      const p0 = await tokenBal(protoAta);
+      const baseOut = new BN("1000000000000");
+      await amm.methods.buy(baseOut, new BN(5 * LAMPORTS_PER_SOL), false).accounts({ ...(await swapNow(trader.publicKey)), buybackFeeRecipientTokenAccount: bbAta() }).preInstructions(await ensureVault(trader.publicKey)).signers([trader]).rpc();
+      const bb = await tokenBal(bbAta());
+      const p1 = await tokenBal(protoAta);
+      assert.isAbove(Number(bb), 0);
+      assert.isTrue(bb === p1 - p0 || bb === p1 - p0 + 1n, `buyback ${bb} vs protocol ${p1 - p0}`); // floor on the buyback side
+      // a wrong ATA (not owned by the configured recipient) is rejected
+      try {
+        await amm.methods.buy(baseOut, new BN(5 * LAMPORTS_PER_SOL), false).accounts({ ...(await swapNow(trader.publicKey)), buybackFeeRecipientTokenAccount: protoAta }).signers([trader]).rpc();
+        assert.fail("wrong buyback ata");
+      } catch (e) { assert.include(String(e), "InvalidFeeRecipient"); }
+      await amm.methods.updateBuybackConfig(new BN(0), PublicKey.default).accounts({ admin: admin.publicKey, globalConfig: ammGlobalConfig }).rpc();
+    });
+
+    it("init_boost parks 20 % of the quote in the vault without moving the price; LP moves are locked", async () => {
+      const [boostAuth] = PublicKey.findProgramAddressSync([Buffer.from("boost-vault"), pool.toBuffer()], amm.programId);
+      const vault = getAssociatedTokenAddressSync(NATIVE_MINT, boostAuth, true);
+      const boostAccts = { pool, globalConfig: ammGlobalConfig, payer: admin.publicKey, quoteMint: NATIVE_MINT, lpMint, poolQuoteTokenAccount: poolQuote, boostVaultAuthority: boostAuth, boostVault: vault, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId };
+      try { await amm.methods.initBoost().accounts(boostAccts).rpc(); assert.fail("disabled"); } catch (e) { assert.include(String(e), "BoostDisabled"); }
+      await amm.methods.toggleBoost(true).accounts({ admin: admin.publicKey, globalConfig: ammGlobalConfig }).rpc();
+      await amm.methods.setBoostAuthority(admin.publicKey).accounts({ admin: admin.publicKey, globalConfig: ammGlobalConfig }).rpc();
+      const base = await tokenBal(poolBase);
+      const quoteBefore = await tokenBal(poolQuote);
+      const priceBefore = Number(await effQuote()) / Number(base);
+      await amm.methods.initBoost().accounts(boostAccts).rpc();
+      const p = await amm.account.pool.fetch(pool);
+      assert.equal(p.virtualQuoteReserves.toString(), (quoteBefore / 5n).toString());
+      assert.equal((await tokenBal(vault)).toString(), (quoteBefore / 5n).toString());
+      assert.equal((await tokenBal(poolQuote)).toString(), (quoteBefore - quoteBefore / 5n).toString());
+      assert.closeTo(Number(await effQuote()) / Number(base), priceBefore, 1e-12);
+      try { await amm.methods.initBoost().accounts(boostAccts).rpc(); assert.fail("twice"); } catch (e) { assert.include(String(e), "AlreadyBoosted"); }
+      // a trader's quote for 1M tokens is the same as before the boost
+      const q = await tokenBal(poolQuote); const v = BigInt(p.virtualQuoteReserves.toString());
+      const baseOut = 1_000_000_000_000n;
+      const quoteIn = (baseOut * (q + v) + (base - baseOut) - 1n) / (base - baseOut);
+      const quoteBefore2 = await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey));
+      await amm.methods.buy(new BN(baseOut.toString()), new BN((quoteIn * 101n / 100n).toString()), false).accounts(await swapNow(trader.publicKey)).preInstructions(await ensureVault(trader.publicKey)).signers([trader]).rpc();
+      const spent = quoteBefore2 - (await tokenBal(getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey)));
+      assert.isTrue(spent >= quoteIn && spent <= (quoteIn * 101n) / 100n, `spent ${spent} for quoteIn ${quoteIn}`); // pool leg priced on effective reserves + up to 1 % fees
+      // deposits are locked while the boost is in flight
+      try {
+        await amm.methods.deposit(new BN(1_000_000_000), new BN("1000000000000000"), new BN(10 * LAMPORTS_PER_SOL)).accounts({ pool, globalConfig: ammGlobalConfig, user: trader.publicKey, baseMint: mint, quoteMint: NATIVE_MINT, lpMint, userBaseTokenAccount: getAssociatedTokenAddressSync(mint, trader.publicKey), userQuoteTokenAccount: getAssociatedTokenAddressSync(NATIVE_MINT, trader.publicKey), userPoolTokenAccount: getAssociatedTokenAddressSync(lpMint, trader.publicKey), poolBaseTokenAccount: poolBase, poolQuoteTokenAccount: poolQuote, tokenProgram: TOKEN_PROGRAM_ID, baseTokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId }).signers([trader]).rpc();
+        assert.fail("locked");
+      } catch (e) { assert.include(String(e), "BoostInProgress"); }
+    });
+
+    it("boost_buy_and_burn: the authority spends the vault, base is burned, price rises, vault closes when empty", async () => {
+      const [boostAuth] = PublicKey.findProgramAddressSync([Buffer.from("boost-vault"), pool.toBuffer()], amm.programId);
+      const vault = getAssociatedTokenAddressSync(NATIVE_MINT, boostAuth, true);
+      const accts = (a: PublicKey) => ({ pool, globalConfig: ammGlobalConfig, authority: a, baseMint: mint, quoteMint: NATIVE_MINT, poolBaseTokenAccount: poolBase, poolQuoteTokenAccount: poolQuote, boostVaultAuthority: boostAuth, boostVault: vault, baseTokenProgram: TOKEN_PROGRAM_ID, quoteTokenProgram: TOKEN_PROGRAM_ID });
+      try { await amm.methods.boostBuyAndBurn(new BN(1), new BN(0)).accounts(accts(trader.publicKey)).signers([trader]).rpc(); assert.fail("not the authority"); } catch (e) { assert.include(String(e), "Unauthorized"); }
+      const vaultAmt = await tokenBal(vault);
+      const base0 = await tokenBal(poolBase);
+      const supply0 = (await getMint(conn, mint)).supply;
+      const eff0 = await effQuote();
+      const half = vaultAmt / 2n;
+      const expectBurn = (half * base0) / (eff0 + half);
+      await amm.methods.boostBuyAndBurn(new BN(half.toString()), new BN(expectBurn.toString())).accounts(accts(admin.publicKey)).rpc();
+      const base1 = await tokenBal(poolBase);
+      assert.equal((base0 - base1).toString(), expectBurn.toString());
+      assert.equal((supply0 - (await getMint(conn, mint)).supply).toString(), expectBurn.toString());
+      const p1 = await amm.account.pool.fetch(pool);
+      assert.equal(p1.virtualQuoteReserves.toString(), (vaultAmt - half).toString());
+      assert.equal((await effQuote()).toString(), eff0.toString(), "effective quote unchanged by the burn");
+      assert.isAbove(Number(eff0) / Number(base1), Number(eff0) / Number(base0), "price up");
+      // drain the rest (request more than the vault holds: clamps), vault closes, pool unlocks
+      await amm.methods.boostBuyAndBurn(new BN(vaultAmt.toString()), new BN(0)).accounts(accts(admin.publicKey)).rpc();
+      assert.isNull(await conn.getAccountInfo(vault));
+      const p2 = await amm.account.pool.fetch(pool);
+      assert.equal(p2.virtualQuoteReserves.toString(), "0");
+      assert.equal((await tokenBal(poolQuote)).toString(), eff0.toString());
+      await amm.methods.toggleBoost(false).accounts({ admin: admin.publicKey, globalConfig: ammGlobalConfig }).rpc();
+    });
+
+    it("extend_account refuses accounts that already have the current layout", async () => {
+      try { await amm.methods.extendAccount().accounts({ payer: admin.publicKey, account: ammGlobalConfig, systemProgram: SystemProgram.programId }).rpc(); assert.fail("current"); } catch (e) { assert.include(String(e), "AlreadyExtended"); }
+      try { await amm.methods.extendAccount().accounts({ payer: admin.publicKey, account: poolQuote, systemProgram: SystemProgram.programId }).rpc(); assert.fail("foreign"); } catch (e) { assert.include(String(e), "InvalidAccount"); }
+      try { await curve.methods.extendAccount().accounts({ payer: admin.publicKey, account: global, systemProgram: SystemProgram.programId }).rpc(); assert.fail("current"); } catch (e) { assert.include(String(e), "InvalidParams"); }
     });
   });
 });
