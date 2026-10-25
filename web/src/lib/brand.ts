@@ -2,7 +2,7 @@
 export const BRAND = {
   name: "OpenPump",
   short: "OP",
-  tagline: "pump.fun, open and better",
+  tagline: "The open-source launchpad.",
   ticker: "$OPENPUMP",
   x: "https://x.com/",
   docs: "/how-it-works",

@@ -3,23 +3,27 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OpenPump — pump.fun, open and better</title>
-<meta name="description" content="OpenPump is an open-source launchpad for Solana: bonding curve, AMM, fee engine and market-making vault, built from scratch to match pump.fun and go further. Community token: $OPENPUMP." />
-<meta property="og:title" content="OpenPump — pump.fun, open and better" />
+<title>OpenPump — The open-source launchpad</title>
+<meta name="description" content="OpenPump is the open-source launchpad for Solana: bonding curve, AMM, fee engine and market-making vault, built from scratch to match pump.fun and go further. Community token: $OPENPUMP." />
+<meta property="og:title" content="OpenPump — The open-source launchpad" />
 <meta property="og:description" content="The full pump.fun + PumpSwap stack, open source, owned by the people using it. $OPENPUMP funds the build." />
 <meta property="og:type" content="website" />
+<meta property="og:image" content="https://openpump-site.vercel.app/assets/banner.webp" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#e5fdf0" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #050806; --bg2: #090e0a; --panel: rgba(255,255,255,0.035); --panel2: rgba(255,255,255,0.06);
-    --line: rgba(255,255,255,0.07); --line2: rgba(255,255,255,0.13);
-    --ink: #ecf2ed; --mute: rgba(236,242,237,0.58); --dim: rgba(236,242,237,0.34);
-    --acc: #79ff77; --acc2: #4cd964; --red: #ff5c7a; --gold: #ffd166;
-    --head: "Poppins", "Inter", system-ui, sans-serif; --sans: "Inter", system-ui, sans-serif;
+    --bg: #e5fdf0; --bg2: #d9f8e8; --card: #ffffff; --card2: #f3fdf8;
+    --line: rgba(2,65,48,0.10); --line2: rgba(2,65,48,0.18);
+    --ink: #024130; --ink2: #044f36; --mute: rgba(2,65,48,0.66); --dim: rgba(2,65,48,0.42);
+    --acc: #02d086; --acc2: #02b874; --accsoft: rgba(2,208,134,0.14);
+    --head: "Outfit", "Inter", system-ui, sans-serif; --sans: "Inter", system-ui, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --shadow: 0 1px 2px rgba(2,65,48,0.05), 0 10px 30px rgba(2,65,48,0.07);
     --max: 1120px; --gutter: 16px;
   }
   * { box-sizing: border-box; }
@@ -30,110 +34,110 @@
   p { margin: 0; }
   .wrap { max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter); }
   .mono { font-family: var(--mono); font-size: 0.86em; }
-  .acc { color: var(--acc); }
   .mute { color: var(--mute); }
 
   /* nav */
-  nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); background: rgba(5,8,6,0.72); border-bottom: 1px solid var(--line); }
-  nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
-  .logo { display: flex; align-items: center; gap: 10px; font-family: var(--head); font-weight: 700; font-size: 17px; }
-  .logo svg { width: 28px; height: 28px; }
-  nav .links { display: none; gap: 22px; font-size: 14px; color: var(--mute); margin-left: 8px; }
+  nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); background: rgba(229,253,240,0.8); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-family: var(--head); font-weight: 800; font-size: 20px; color: var(--ink); letter-spacing: -0.02em; }
+  .logo svg { width: 34px; height: 34px; }
+  nav .links { display: none; gap: 22px; font-size: 14px; font-weight: 500; color: var(--mute); margin-left: 8px; }
   nav .links a:hover { color: var(--ink); }
   nav .spacer { flex: 1; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 12px; font-weight: 600; font-size: 14px; border: 1px solid var(--line2); background: var(--panel2); transition: transform .12s ease, background .12s ease; white-space: nowrap; }
-  .btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
-  .btn.acc { background: var(--acc); color: #06110a; border-color: transparent; box-shadow: 0 0 0 1px rgba(121,255,119,0.25), 0 8px 32px rgba(121,255,119,0.14); }
-  .btn.acc:hover { background: #8dff8b; }
-  .btn.sm { height: 34px; padding: 0 12px; font-size: 13px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: 12px; font-weight: 600; font-size: 14px; border: 1px solid var(--line2); background: var(--card); color: var(--ink); transition: transform .12s ease, background .12s ease, box-shadow .12s ease; white-space: nowrap; box-shadow: 0 1px 2px rgba(2,65,48,0.06); }
+  .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn.dark { background: var(--ink); color: #e5fdf0; border-color: transparent; }
+  .btn.dark:hover { background: #063f2f; }
+  .btn.acc { background: var(--acc); color: var(--ink); border-color: transparent; box-shadow: 0 8px 24px rgba(2,208,134,0.28); }
+  .btn.acc:hover { background: #12dc92; }
+  .btn.sm { height: 36px; padding: 0 13px; font-size: 13px; }
 
   /* hero */
   .hero { position: relative; padding: 72px 0 56px; overflow: hidden; }
-  .hero::before { content: ""; position: absolute; inset: -40% -20% auto; height: 120%; background: radial-gradient(60% 50% at 70% 30%, rgba(121,255,119,0.13), transparent 60%), radial-gradient(40% 40% at 20% 80%, rgba(76,217,100,0.08), transparent 60%); pointer-events: none; }
+  .deco { position: absolute; top: 50%; transform: translateY(-50%); width: 320px; height: 420px; opacity: .9; pointer-events: none; }
+  .deco.l { left: -200px; } .deco.r { right: -200px; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(50% 45% at 72% 35%, rgba(2,208,134,0.18), transparent 65%); pointer-events: none; }
   .hero .wrap { position: relative; display: grid; gap: 40px; }
-  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--acc); border: 1px solid rgba(121,255,119,0.3); background: rgba(121,255,119,0.08); border-radius: 999px; padding: 6px 12px; }
-  .eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 10px var(--acc); animation: pulse 1.8s infinite; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); border: 1px solid rgba(2,208,134,0.5); background: var(--accsoft); border-radius: 999px; padding: 7px 13px; }
+  .eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 10px var(--acc); animation: pulse 1.8s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
-  h1 { font-size: clamp(40px, 7vw, 68px); line-height: 1.02; font-weight: 800; margin-top: 20px; }
+  h1 { font-size: clamp(42px, 7vw, 72px); line-height: 1.0; font-weight: 800; margin-top: 22px; color: var(--ink); }
   h1 span { color: var(--acc); }
   .lead { font-size: clamp(16px, 2vw, 19px); color: var(--mute); max-width: 560px; margin-top: 20px; }
   .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
-  .chip { font-size: 12.5px; font-weight: 500; color: var(--mute); border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 11px; }
-  .chip b { color: var(--ink); font-weight: 600; }
+  .chip { font-size: 12.5px; font-weight: 500; color: var(--mute); border: 1px solid var(--line); background: rgba(255,255,255,0.6); border-radius: 999px; padding: 6px 11px; }
+  .chip b { color: var(--ink); font-weight: 700; }
 
-  /* curve card */
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; }
+  /* cards */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
   .curvecard { padding: 18px; position: relative; }
   .curvecard .top { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--mute); margin-bottom: 10px; }
   .curvecard .top b { color: var(--ink); font-weight: 600; }
+  .curvecard .top .mono { white-space: nowrap; margin-left: 10px; }
   .curvecard svg { width: 100%; height: auto; display: block; }
   .curvecard .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--mute); margin-top: 12px; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
   .dot { animation: ride 6s linear infinite; }
   @keyframes ride { from { offset-distance: 0% } to { offset-distance: 100% } }
 
-  /* stats */
-  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; }
-  .stat { padding: 18px; }
-  .stat .n { font-family: var(--head); font-weight: 700; font-size: 30px; line-height: 1; }
-  .stat .l { font-size: 13px; color: var(--mute); margin-top: 6px; }
-
   section { padding: 64px 0; }
   section + section { border-top: 1px solid var(--line); }
   .sec-head { max-width: 640px; margin-bottom: 32px; }
-  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--acc); }
-  h2 { font-size: clamp(28px, 4vw, 40px); margin-top: 10px; font-weight: 700; }
+  .kicker { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--acc2); }
+  h2 { font-size: clamp(28px, 4vw, 42px); margin-top: 10px; font-weight: 800; color: var(--ink); }
   .sec-head p { color: var(--mute); margin-top: 12px; font-size: 16.5px; }
 
   .grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
   .feat { padding: 22px; display: flex; flex-direction: column; gap: 10px; }
-  .feat .ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: rgba(121,255,119,0.1); border: 1px solid rgba(121,255,119,0.25); color: var(--acc); font-family: var(--head); font-weight: 700; font-size: 14px; }
-  .feat h3 { font-size: 18px; }
+  .feat .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--accsoft); color: var(--ink); font-family: var(--head); font-weight: 800; font-size: 13px; }
+  .feat h3 { font-size: 18px; font-weight: 700; }
   .feat p { color: var(--mute); font-size: 14.5px; }
   .feat .id { font-size: 11px; color: var(--dim); word-break: break-all; }
 
   .taglist { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
-  .tag { font-size: 13px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); }
-  .tag.off { color: var(--dim); text-decoration: line-through; }
+  .tag { font-size: 13px; font-weight: 500; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
+  .tag.off { color: var(--dim); text-decoration: line-through; background: transparent; }
 
   /* token */
   .token { display: grid; gap: 16px; grid-template-columns: 1fr; }
-  .token .big { padding: 26px; background: linear-gradient(160deg, rgba(121,255,119,0.12), rgba(121,255,119,0.02)); border-color: rgba(121,255,119,0.25); }
-  .token .big .t { font-family: var(--head); font-weight: 800; font-size: clamp(32px, 5vw, 46px); color: var(--acc); }
+  .token .big { padding: 28px; background: var(--ink); color: #e5fdf0; border-color: transparent; }
+  .token .big .t { font-family: var(--head); font-weight: 800; font-size: clamp(34px, 5vw, 50px); color: var(--acc); letter-spacing: -0.02em; }
+  .token .big p { color: rgba(229,253,240,0.72); }
   .ca { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .ca code { font-family: var(--mono); font-size: 13px; padding: 9px 12px; border-radius: 10px; background: rgba(0,0,0,0.35); border: 1px solid var(--line2); color: var(--mute); }
+  .ca code { font-family: var(--mono); font-size: 13px; padding: 9px 12px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: rgba(229,253,240,0.8); }
+  .token .big .btn { background: var(--acc); color: var(--ink); border-color: transparent; }
   .hooks { display: grid; gap: 12px; }
   .hook { padding: 18px 20px; display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: start; }
-  .hook .k { font-family: var(--head); font-weight: 700; color: var(--acc); font-size: 20px; line-height: 1; margin-top: 2px; }
-  .hook h3 { font-size: 16px; }
+  .hook .k { font-family: var(--head); font-weight: 800; color: var(--acc2); font-size: 22px; line-height: 1; margin-top: 2px; }
+  .hook h3 { font-size: 16px; font-weight: 700; }
   .hook p { color: var(--mute); font-size: 14px; margin-top: 4px; }
 
   /* roadmap */
-  .phases { display: grid; gap: 0; position: relative; }
-  .phase { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 20px 0; border-top: 1px solid var(--line); }
+  .phases { display: grid; }
+  .phase { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 22px 0; border-top: 1px solid var(--line); }
   .phase:first-child { border-top: 0; }
-  .ph-n { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font-family: var(--head); font-weight: 700; font-size: 14px; border: 1px solid var(--line2); background: var(--panel2); color: var(--mute); }
-  .phase.done .ph-n { background: var(--acc); color: #06110a; border-color: transparent; }
-  .phase.now .ph-n { border-color: var(--acc); color: var(--acc); box-shadow: 0 0 0 4px rgba(121,255,119,0.12); }
+  .ph-n { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-family: var(--head); font-weight: 800; font-size: 14px; border: 1px solid var(--line2); background: var(--card); color: var(--mute); }
+  .phase.done .ph-n { background: var(--acc); color: var(--ink); border-color: transparent; }
+  .phase.now .ph-n { background: var(--ink); color: #e5fdf0; border-color: transparent; box-shadow: 0 0 0 4px rgba(2,208,134,0.25); }
   .ph-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .ph-head h3 { font-size: 18px; }
+  .ph-head h3 { font-size: 19px; font-weight: 700; }
   .status { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line2); color: var(--mute); }
-  .phase.done .status { color: #06110a; background: var(--acc); border-color: transparent; }
-  .phase.now .status { color: var(--acc); border-color: rgba(121,255,119,0.45); background: rgba(121,255,119,0.08); }
+  .phase.done .status { color: var(--ink); background: var(--acc); border-color: transparent; }
+  .phase.now .status { color: #e5fdf0; background: var(--ink); border-color: transparent; }
   .phase p { color: var(--mute); font-size: 14.5px; margin-top: 6px; max-width: 680px; }
   .phase ul { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
-  .phase li { font-size: 12.5px; color: var(--mute); padding: 4px 9px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); }
+  .phase li { font-size: 12.5px; color: var(--mute); padding: 4px 9px; border-radius: 8px; background: var(--card); border: 1px solid var(--line); }
   .phase.done li { color: var(--ink); }
-  .phase.done li::before { content: "✓ "; color: var(--acc); }
+  .phase.done li::before { content: "✓ "; color: var(--acc2); font-weight: 700; }
   .dod { margin-top: 10px; font-size: 13px; color: var(--dim); }
   .dod b { color: var(--mute); font-weight: 600; }
 
   /* open by design */
   .pillars { display: grid; gap: 12px; grid-template-columns: 1fr; }
   .pillar { padding: 20px; }
-  .pillar h3 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
-  .pillar h3::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--acc); }
+  .pillar h3 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .pillar h3::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--acc); }
   .pillar p { color: var(--mute); font-size: 14px; margin-top: 8px; }
 
   /* faq */
@@ -141,28 +145,26 @@
   details:last-child { border-bottom: 1px solid var(--line); }
   summary { cursor: pointer; font-weight: 600; font-size: 16px; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   summary::-webkit-details-marker { display: none; }
-  summary::after { content: "+"; color: var(--acc); font-family: var(--head); font-size: 20px; }
+  summary::after { content: "+"; color: var(--acc2); font-family: var(--head); font-size: 22px; font-weight: 700; }
   details[open] summary::after { content: "–"; }
   details p { color: var(--mute); font-size: 14.5px; margin-top: 10px; max-width: 720px; }
 
   /* cta + footer */
   .final { text-align: center; padding: 72px 0; }
-  .final h2 { font-size: clamp(30px, 5vw, 48px); }
+  .final h2 { font-size: clamp(30px, 5vw, 50px); }
   .final p { color: var(--mute); margin: 14px auto 0; max-width: 520px; }
   .final .ctas { justify-content: center; }
-  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; font-size: 13px; color: var(--dim); }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; font-size: 13px; color: var(--dim); background: var(--bg2); }
   footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
   footer a:hover { color: var(--ink); }
   footer .spacer { flex: 1; }
 
   @media (max-width: 519px) {
-    nav .btn:not(.acc) { display: none; }
+    nav .btn:not(.dark) { display: none; }
     nav .wrap { gap: 12px; }
   }
-  .curvecard .top .mono { white-space: nowrap; margin-left: 10px; }
   @media (min-width: 720px) {
     nav .links { display: flex; }
-    .stats { grid-template-columns: repeat(4, 1fr); }
     .grid { grid-template-columns: repeat(2, 1fr); }
     .pillars { grid-template-columns: repeat(2, 1fr); }
     .token { grid-template-columns: 1.1fr 1fr; align-items: start; }
@@ -181,7 +183,7 @@
 <nav>
   <div class="wrap">
     <a class="logo" href="#top" aria-label="OpenPump">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0b120d"/><path d="M14 46V18h14a9 9 0 0 1 0 18h-7v10z" fill="#79ff77"/><circle cx="46" cy="40" r="6" fill="#79ff77"/></svg>
+      <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M43 24 L17 50 L43 76" fill="none" stroke="#02d086" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M57 24 L83 50 L57 76" fill="none" stroke="#024130" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M50 36 Q52.5 47.5 64 50 Q52.5 52.5 50 64 Q47.5 52.5 36 50 Q47.5 47.5 50 36 Z" fill="#02d086"/></svg>
       OpenPump
     </a>
     <div class="links">
@@ -193,18 +195,20 @@
     </div>
     <div class="spacer"></div>
     <a class="btn sm" href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">GitHub</a>
-    <a class="btn sm acc" href="https://peoplespad.vercel.app" target="_blank" rel="noopener">Devnet playground</a>
+    <a class="btn sm dark" href="https://peoplespad.vercel.app" target="_blank" rel="noopener">Devnet playground</a>
   </div>
 </nav>
 
 <header class="hero" id="top">
+  <svg class="deco l" viewBox="0 0 100 130" aria-hidden="true"><path d="M70 10 L25 65 L70 120" fill="none" stroke="#02d086" stroke-opacity=".16" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg class="deco r" viewBox="0 0 100 130" aria-hidden="true"><path d="M30 10 L75 65 L30 120" fill="none" stroke="#024130" stroke-opacity=".12" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/></svg>
   <div class="wrap">
     <div>
-      <span class="eyebrow"><i></i> Open-source launchpad on Solana</span>
+      <span class="eyebrow"><i></i> The open-source launchpad</span>
       <h1>pump.fun,<br/><span>open</span> and better.</h1>
       <p class="lead">The whole stack, rebuilt from scratch and published: bonding curve, AMM, fee engine, market-making vault. Same mechanics traders already know, with the keys in a multisig and the fees flowing back to the people who use it.</p>
       <div class="ctas">
-        <a class="btn acc" href="#roadmap">Read the roadmap</a>
+        <a class="btn dark" href="#roadmap">Read the roadmap</a>
         <a class="btn" href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">View the code</a>
       </div>
       <div class="chips">
@@ -220,25 +224,26 @@
       <div class="top"><span><b>Bonding curve</b> → graduation → <b>OpenSwap AMM</b></span><span class="mono">85 SOL</span></div>
       <svg viewBox="0 0 520 260" role="img" aria-label="Price curve rising along the bonding curve, graduating into the AMM at 85 SOL">
         <defs>
-          <linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#79ff77" stop-opacity=".28"/><stop offset="1" stop-color="#79ff77" stop-opacity="0"/></linearGradient>
-          <linearGradient id="g2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffd166" stop-opacity=".22"/><stop offset="1" stop-color="#ffd166" stop-opacity="0"/></linearGradient>
+          <linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#02d086" stop-opacity=".3"/><stop offset="1" stop-color="#02d086" stop-opacity="0"/></linearGradient>
+          <linearGradient id="g2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#024130" stop-opacity=".18"/><stop offset="1" stop-color="#024130" stop-opacity="0"/></linearGradient>
         </defs>
-        <g stroke="rgba(255,255,255,0.06)" stroke-width="1">
+        <g stroke="rgba(2,65,48,0.08)" stroke-width="1">
           <line x1="0" y1="60" x2="520" y2="60"/><line x1="0" y1="120" x2="520" y2="120"/><line x1="0" y1="180" x2="520" y2="180"/>
         </g>
         <path d="M20 230 C 120 226, 220 200, 330 110 L330 240 L20 240 Z" fill="url(#g)"/>
         <path d="M330 110 C 370 90, 400 120, 430 95 C 460 72, 480 80, 500 60 L500 240 L330 240 Z" fill="url(#g2)"/>
-        <path id="curve" d="M20 230 C 120 226, 220 200, 330 110 C 370 90, 400 120, 430 95 C 460 72, 480 80, 500 60" fill="none" stroke="#79ff77" stroke-width="3" stroke-linecap="round"/>
-        <line x1="330" y1="40" x2="330" y2="240" stroke="rgba(255,209,102,0.5)" stroke-dasharray="4 5"/>
-        <rect x="262" y="26" width="136" height="24" rx="12" fill="rgba(255,209,102,0.12)" stroke="rgba(255,209,102,0.4)"/>
-        <text x="330" y="42" text-anchor="middle" font-family="Inter, system-ui" font-size="11.5" font-weight="600" fill="#ffd166">graduation · LP burned</text>
-        <text x="30" y="214" font-family="Inter, system-ui" font-size="11" fill="rgba(236,242,237,0.5)">30 SOL virtual reserves</text>
-        <text x="496" y="52" text-anchor="end" font-family="Inter, system-ui" font-size="11" fill="rgba(236,242,237,0.5)">constant product</text>
-        <circle class="dot" r="6" fill="#79ff77" style="offset-path: path('M20 230 C 120 226, 220 200, 330 110 C 370 90, 400 120, 430 95 C 460 72, 480 80, 500 60')"><animate attributeName="opacity" values="1;1" dur="1s"/></circle>
+        <path d="M20 230 C 120 226, 220 200, 330 110" fill="none" stroke="#02d086" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M330 110 C 370 90, 400 120, 430 95 C 460 72, 480 80, 500 60" fill="none" stroke="#024130" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="330" y1="40" x2="330" y2="240" stroke="rgba(2,65,48,0.35)" stroke-dasharray="4 5"/>
+        <rect x="262" y="26" width="136" height="24" rx="12" fill="#024130"/>
+        <text x="330" y="42" text-anchor="middle" font-family="Inter, system-ui" font-size="11.5" font-weight="600" fill="#e5fdf0">graduation · LP burned</text>
+        <text x="30" y="214" font-family="Inter, system-ui" font-size="11" fill="rgba(2,65,48,0.55)">30 SOL virtual reserves</text>
+        <text x="496" y="52" text-anchor="end" font-family="Inter, system-ui" font-size="11" fill="rgba(2,65,48,0.55)">constant product</text>
+        <circle class="dot" r="6" fill="#02d086" stroke="#fff" stroke-width="2" style="offset-path: path('M20 230 C 120 226, 220 200, 330 110 C 370 90, 400 120, 430 95 C 460 72, 480 80, 500 60')"></circle>
       </svg>
       <div class="legend">
-        <span><i style="background:#79ff77"></i>curve: 0.5 % protocol + 0.5 % creator</span>
-        <span><i style="background:#ffd166"></i>AMM: 0.20 % LP · 0.05 % protocol · 0.05 % creator</span>
+        <span><i style="background:#02d086"></i>curve: 0.5 % protocol + 0.5 % creator</span>
+        <span><i style="background:#024130"></i>AMM: 0.20 % LP · 0.05 % protocol · 0.05 % creator</span>
       </div>
     </div>
   </div>
@@ -293,9 +298,9 @@
     <div class="token">
       <div class="card big">
         <div class="t">$OPENPUMP</div>
-        <p class="mute" style="margin-top:8px">Launching on pump.fun. The contract address will be posted here and on X at launch. Anything else claiming to be $OPENPUMP is not.</p>
+        <p style="margin-top:8px">Launching on pump.fun. The contract address will be posted here and on X at launch. Anything else claiming to be $OPENPUMP is not.</p>
         <div class="ca"><code id="ca">CA: not launched yet</code><a class="btn sm" href="#" id="xlink">Follow on X</a></div>
-        <p class="mute" style="margin-top:18px;font-size:13.5px">Treasury wallet, every outflow and the multisig signers get published in the repo before mainnet.</p>
+        <p style="margin-top:18px;font-size:13.5px">Treasury wallet, every outflow and the multisig signers get published in the repo before mainnet.</p>
       </div>
       <div class="hooks">
         <div class="card hook"><div class="k">1</div><div><h3>Buyback share</h3><p>The curve and the AMM route a configurable share of the protocol fee into buyback vaults. The vault authority spends it on $OPENPUMP. The hook is already in the code; the parameter is set on-chain.</p></div></div>
@@ -430,7 +435,7 @@
     <h2>Build it with us.</h2>
     <p>Read the code, run the devnet playground, break things and file issues. The launch of $OPENPUMP is where it starts.</p>
     <div class="ctas">
-      <a class="btn acc" href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn dark" href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">GitHub</a>
       <a class="btn" href="https://peoplespad.vercel.app" target="_blank" rel="noopener">Devnet playground</a>
       <a class="btn" href="#" id="xlink2">X</a>
     </div>
@@ -439,7 +444,7 @@
 
 <footer>
   <div class="wrap">
-    <span>© OpenPump · open source, pre-mainnet, not audited</span>
+    <span>© OpenPump · The open-source launchpad · pre-mainnet, not audited</span>
     <span class="spacer"></span>
     <a href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">GitHub</a>
     <a href="https://github.com/ciberneticatradingdev/openpump/blob/main/ROADMAP.md" target="_blank" rel="noopener">Roadmap</a>
@@ -452,11 +457,11 @@
   // Single place to flip once the token is live: set CA and the X handle here.
   const LAUNCH = { ca: "", x: "" };
   if (LAUNCH.ca) {
-    const el = document.getElementById("ca"); el.textContent = LAUNCH.ca; el.style.color = "#ecf2ed";
+    const el = document.getElementById("ca"); el.textContent = LAUNCH.ca; el.style.color = "#e5fdf0";
     el.style.cursor = "pointer"; el.title = "Copy";
     el.onclick = () => navigator.clipboard?.writeText(LAUNCH.ca).then(() => { el.textContent = "copied"; setTimeout(() => (el.textContent = LAUNCH.ca), 900); });
   }
-  for (const id of ["xlink", "xlink2"]) { const a = document.getElementById(id); if (LAUNCH.x) { a.href = LAUNCH.x; a.target = "_blank"; a.rel = "noopener"; } else { a.textContent = a.id === "xlink" ? "X: announced at launch" : "X (soon)"; a.style.opacity = ".6"; a.onclick = (e) => e.preventDefault(); } }
+  for (const id of ["xlink", "xlink2"]) { const a = document.getElementById(id); if (LAUNCH.x) { a.href = LAUNCH.x; a.target = "_blank"; a.rel = "noopener"; } else { a.textContent = a.id === "xlink" ? "X: announced at launch" : "X (soon)"; a.style.opacity = ".7"; a.onclick = (e) => e.preventDefault(); } }
 </script>
 </body>
 </html>
