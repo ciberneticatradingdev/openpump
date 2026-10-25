@@ -168,11 +168,11 @@ export class Indexer {
         this.db
           .prepare(
             `UPDATE coins SET v_sol=?, v_tok=?, r_sol=?, r_tok=?, price=?, mcap=?, trades=trades+1, last_trade_at=?,
-             volume_sol=CAST(CAST(volume_sol AS INTEGER)+? AS TEXT),
-             creator_fees=CAST(CAST(creator_fees AS INTEGER)+? AS TEXT), protocol_fees=CAST(CAST(protocol_fees AS INTEGER)+? AS TEXT)
+             volume_sol=CAST(CAST(volume_sol AS INTEGER)+CAST(? AS INTEGER) AS TEXT),
+             creator_fees=CAST(CAST(creator_fees AS INTEGER)+CAST(? AS INTEGER) AS TEXT), protocol_fees=CAST(CAST(protocol_fees AS INTEGER)+CAST(? AS INTEGER) AS TEXT)
              WHERE mint=?`
           )
-          .run(toStr(d.virtualSolReserves), toStr(d.virtualTokenReserves), toStr(d.realSolReserves), toStr(d.realTokenReserves), price, mcap, ts, num(d.solAmount), num(d.creatorFee), num(d.protocolFee), mint);
+          .run(toStr(d.virtualSolReserves), toStr(d.virtualTokenReserves), toStr(d.realSolReserves), toStr(d.realTokenReserves), price, mcap, ts, toStr(d.solAmount), toStr(d.creatorFee), toStr(d.protocolFee), mint);
         this.broadcast({ type: "trade", venue: "curve", mint, user: toStr(d.user), isBuy: d.isBuy, sol: toStr(d.solAmount), tokens: toStr(d.tokenAmount), price, mcap, ts, sig: ev.signature });
       },
       "curve:CompleteEvent": () => {
@@ -188,7 +188,8 @@ export class Indexer {
         const mint = toStr(d.mint)!;
         const ins = this.db.prepare("INSERT INTO distributions(sig,mint,total,recipients,ts) VALUES(?,?,?,?,?) ON CONFLICT(sig) DO NOTHING").run(ev.signature, mint, toStr(d.total), num(d.recipients), ts);
         if (!ins.changes) return;
-        this.db.prepare("UPDATE coins SET holder_paid=CAST(CAST(holder_paid AS INTEGER)+? AS TEXT) WHERE mint=?").run(num(d.total), mint);
+        // keep big sums exact: bind as integer, not JS number (SQLite would promote to REAL)
+        this.db.prepare("UPDATE coins SET holder_paid=CAST(CAST(holder_paid AS INTEGER)+CAST(? AS INTEGER) AS TEXT) WHERE mint=?").run(toStr(d.total), mint);
         this.broadcast({ type: "holder_rewards", mint, total: toStr(d.total), recipients: num(d.recipients), sig: ev.signature, ts });
       },
       "amm:BuyEvent": () => this.ammTrade(ev, idx, true, ts),
@@ -219,10 +220,10 @@ export class Indexer {
     this.db
       .prepare(
         `UPDATE coins SET pool_base=?, pool_quote=?, price=?, mcap=?, trades=trades+1, last_trade_at=?,
-         volume_sol=CAST(CAST(volume_sol AS INTEGER)+? AS TEXT),
-         creator_fees=CAST(CAST(creator_fees AS INTEGER)+? AS TEXT), protocol_fees=CAST(CAST(protocol_fees AS INTEGER)+? AS TEXT) WHERE mint=?`
+         volume_sol=CAST(CAST(volume_sol AS INTEGER)+CAST(? AS INTEGER) AS TEXT),
+         creator_fees=CAST(CAST(creator_fees AS INTEGER)+CAST(? AS INTEGER) AS TEXT), protocol_fees=CAST(CAST(protocol_fees AS INTEGER)+CAST(? AS INTEGER) AS TEXT) WHERE mint=?`
       )
-      .run(toStr(d.poolBaseReserves), toStr(d.poolQuoteReserves), price, mcap, ts, Number(sol), num(d.coinCreatorFee), num(d.protocolFee), mint);
+      .run(toStr(d.poolBaseReserves), toStr(d.poolQuoteReserves), price, mcap, ts, sol, toStr(d.coinCreatorFee), toStr(d.protocolFee), mint);
     this.broadcast({ type: "trade", venue: "amm", mint, user: toStr(d.user), isBuy, sol, tokens, price, mcap, ts, sig: ev.signature });
   }
 

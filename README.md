@@ -4,7 +4,7 @@ Clean-room launchpad shaped like pump.fun + PumpSwap, on Solana. Two Anchor prog
 
 | Piece | Where | What |
 |---|---|---|
-| Bonding curve | `programs/openpump-curve` | create / buy / buy_exact_sol_in / sell / migrate / collect_creator_fee / set_params |
+| Bonding curve | `programs/openpump-curve` | create / buy / buy_exact_sol_in / sell / migrate / collect_creator_fee / set_params · v2 (custom pairs): set_quote_config / create_v2 / buy_v2 / buy_exact_quote_in / sell_v2 / collect_creator_fee_v2 / migrate_v2 · holder rewards: update_holder_reward_config / distribute_fee_to_holders(_v2) |
 | AMM | `programs/openpump-amm` | create_config / create_pool / deposit / withdraw / buy / sell / collect_coin_creator_fee / disable |
 | SDK | `sdk/` | PDAs, exact on-chain math in BigInt, instruction builders, CPI-event decoding |
 | Server | `server/` | SQLite indexer (polls program signatures, decodes `emit_cpi!` events), REST + WebSocket, metadata uploads (Pinata or local) |
@@ -19,7 +19,9 @@ Program IDs (same on every cluster): curve `AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4
 - Anti-snipe window: per-buy cap (1 % of supply) during the first 15 slots after launch.
 - Graduation is permissionless, atomic (curve → AMM pool in one tx), **LP burned**, price continuous.
 - AMM: 0.2 % LP / 0.05 % protocol / 0.05 % creator; anyone can LP; admin kill-switch per instruction.
-- Everything verified by tests: `cargo test` (math) + 15 Anchor integration tests covering the full lifecycle.
+- **Custom pairs** (v2 family): coins quoted in any SPL / Token-2022 mint the authority enables, with per-mint virtual reserves; fees and graduation in that token.
+- **Holder rewards**: at launch the creator can route the creator fee to holders. Same pattern as pump.fun (the coin's creator is the `["holder-rewards", mint]` PDA); a configured authority pays the top holders pro-rata via `distribute_fee_to_holders`. The server's crank does this every few minutes (`HOLDER_REWARD_AUTHORITY_KEYPAIR`).
+- Everything verified by tests: `cargo test` (math) + 27 Anchor integration tests covering the full lifecycle, custom pairs and holder rewards.
 
 ## Build & test
 
@@ -46,3 +48,7 @@ pnpm --filter @openpump/web dev                          # http://localhost:5173
 3. Server → Railway (root `railway.json`, volume at `/data`, env from `server/.env.example`). Web → Vercel (`web/vercel.json`, env `VITE_API_URL`).
 
 Before mainnet: move upgrade authority + `INITIAL_AUTHORITY` to a Squads multisig, run `solana-verify`, external audit. See `PROMPT.md` for the full plan and `evidence/` for the pump.fun bytecode + IDLs this was shaped after.
+
+## Reference
+
+`../pumpfun-source-ref` (lalalune/pumpfun-source, sparse clone) holds the community's bytecode-level recovery of pump.fun's programs. We use it as the behavioural spec for parity work and never copy its code (it has no license and is reconstructed from pump's binary).
