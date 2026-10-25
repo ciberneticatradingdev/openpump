@@ -110,7 +110,7 @@ export default function SwapPage() {
             ))}
           </div>
         </div>
-        <div className="rounded-xl bg-black/30 border border-line p-3 text-[12px] text-mute space-y-1">
+        <div className="rounded-xl bg-panel2 border border-line p-3 text-[12px] text-mute space-y-1">
           <div className="flex justify-between"><span>You receive (est.)</span><span className="text-ink num font-semibold">{quote ? `${fmtTokens(quote.out)} ${to?.symbol}` : "–"}</span></div>
           <div className="flex justify-between"><span>Route</span><span className="text-ink">{quote?.legs || "–"}</span></div>
           <div className="flex justify-between"><span>Slippage</span><span className="text-ink">2%</span></div>

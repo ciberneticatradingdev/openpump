@@ -21,7 +21,7 @@ export default function Ticker() {
       <div className="flex-1 overflow-hidden relative">
         <div className="flex items-center gap-2 px-2 whitespace-nowrap animate-[tape_60s_linear_infinite] hover:[animation-play-state:paused]" style={{ width: "max-content" }}>
           {[...items, ...items].map((t, i) => (
-            <Link key={t.key + i} to={`/coin/${t.mint}`} className="flex items-center gap-2 pl-1 pr-2.5 h-7 rounded-full border border-line bg-black/20 hover:bg-panel2 text-[12px]">
+            <Link key={t.key + i} to={`/coin/${t.mint}`} className="flex items-center gap-2 pl-1 pr-2.5 h-7 rounded-full border border-line bg-white hover:bg-panel2 text-[12px]">
               <Avatar src={t.image} name={t.symbol || t.mint} size={18} />
               <span className="text-mute">{short(t.user, 3)}</span>
               <span className={`font-semibold ${t.isBuy ? "text-acc" : "text-red"}`}>{t.isBuy ? "bought" : "sold"}</span>

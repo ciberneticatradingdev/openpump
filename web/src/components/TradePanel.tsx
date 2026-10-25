@@ -176,9 +176,9 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
 
   return (
     <div className="panel p-3 space-y-3">
-      <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-black/30 border border-line">
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-panel2 border border-line">
         {(["buy", "sell"] as const).map((s) => (
-          <button key={s} onClick={() => { setSide(s); setAmt(""); }} className={`h-9 rounded-lg font-head font-semibold text-[13px] capitalize transition ${side === s ? (s === "buy" ? "bg-acc text-bg" : "bg-red text-bg") : "text-mute hover:text-ink"}`}>{s}</button>
+          <button key={s} onClick={() => { setSide(s); setAmt(""); }} className={`h-9 rounded-lg font-head font-semibold text-[13px] capitalize transition ${side === s ? (s === "buy" ? "bg-acc text-ink" : "bg-red text-ink") : "text-mute hover:text-ink"}`}>{s}</button>
         ))}
       </div>
 
@@ -215,7 +215,7 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
             </div>
           </div>
 
-          <div className="rounded-xl bg-black/30 border border-line p-3 text-[12px] space-y-1.5">
+          <div className="rounded-xl bg-panel2 border border-line p-3 text-[12px] space-y-1.5">
             <Row k="You receive" v={quote ? (side === "buy" ? `${fmtTokens(quote.out)} ${coin.symbol}` : `${qty(quote.out, qDec, 4)} ${qSym}`) : "–"} strong />
             <Row k="Price" v={quote ? `${(quote.pricePer * 1e6 / 10 ** qDec).toPrecision(4)} ${qSym}` : "–"} />
             <Row k={`Fees (${feePct}%${tierNow ? ", tiered" : ""})`} v={quote ? `${qty(quote.fee, qDec, 5)} ${qSym}` : "–"} hint={quote ? `${qty(quote.creatorFee, qDec, 5)} to ${coin.is_holder_reward ? "holders" : "creator"}` : undefined} />

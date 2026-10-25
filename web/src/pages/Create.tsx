@@ -134,7 +134,7 @@ export default function CreatePage() {
 
       <div className="panel p-4 space-y-4">
         <div className="grid grid-cols-[112px_1fr] gap-4">
-          <label className="relative w-28 h-28 rounded-2xl border border-dashed border-line2 bg-black/30 grid place-items-center cursor-pointer overflow-hidden hover:border-acc/50">
+          <label className="relative w-28 h-28 rounded-2xl border border-dashed border-line2 bg-panel2 grid place-items-center cursor-pointer overflow-hidden hover:border-acc/50">
             {preview ? <img src={preview} className="w-full h-full object-cover" /> : <span className="text-[11px] text-dim text-center px-2">drop image<br />png / jpg / gif</span>}
             <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0] || null)} />
           </label>
@@ -186,7 +186,7 @@ export default function CreatePage() {
           </div>
         )}
         {v2 && quoteCfg && (
-          <div className="text-[12px] text-mute rounded-xl bg-black/30 border border-line p-3">
+          <div className="text-[12px] text-mute rounded-xl bg-panel2 border border-line p-3">
             Starts at <b className="text-ink num">{qty(quoteCfg.initialVirtualQuoteReserves, qDec, 0)} {qSym}</b> virtual liquidity · graduates after ~<b className="text-ink num">{qty(curveMath.solInForTokensOut(quoteCfg.initialRealTokenReserves, { ...curveState! }), qDec, 0)} {qSym}</b> is raised.
           </div>
         )}
@@ -241,7 +241,7 @@ export default function CreatePage() {
           {(v2 ? [100, 1000, 10000] : [0.5, 1, 2]).map((q) => <button key={q} onClick={() => setDevBuy(String(q))} className="pill !h-11 !px-3">{q >= 1000 ? `${q / 1000}K` : q}</button>)}
         </div>
         {quote && (
-          <div className="text-[12px] text-mute rounded-xl bg-black/30 border border-line p-3 flex justify-between">
+          <div className="text-[12px] text-mute rounded-xl bg-panel2 border border-line p-3 flex justify-between">
             <span>You receive <b className="text-ink num">{fmtTokens(quote.tokensOut)}</b> tokens (<span className="num">{quote.pct.toFixed(2)}%</span> of supply)</span>
             <span>Total <b className="text-ink num">{qty(quote.totalCost, qDec, 4)} {qSym}</b></span>
           </div>

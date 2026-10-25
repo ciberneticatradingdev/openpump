@@ -2,6 +2,8 @@
 
 **pump.fun, open and better.** A clean-room, open-source launchpad for Solana: bonding curve, AMM and fee engine, written from scratch to match what pump.fun and PumpSwap do today, then go further.
 
+> **Site:** [openpump.trade](https://openpump.trade) · **Devnet playground:** [app.openpump.trade](https://app.openpump.trade)
+>
 > Status: **code complete, pre-mainnet.** Three Anchor programs, a TypeScript SDK, an indexer/API and a web app. 50 integration tests pass on a local validator. Nothing is on mainnet yet. See the [roadmap](ROADMAP.md) for how we get there, and [docs/PARITY.md](docs/PARITY.md) for a feature-by-feature comparison with pump.fun.
 
 ---

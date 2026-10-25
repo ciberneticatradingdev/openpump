@@ -6,7 +6,7 @@ const Item = ({ to, label, children, accent }: any) => (
     to={to}
     end={to === "/"}
     className={({ isActive }) =>
-      `flex flex-col items-center justify-center w-14 h-11 rounded-xl transition ${accent ? "bg-acc text-bg" : isActive ? "bg-panel2 text-ink" : "text-mute hover:text-ink"}`
+      `flex flex-col items-center justify-center w-14 h-11 rounded-xl transition ${accent ? "bg-acc2 text-ink" : isActive ? "bg-panel2 text-ink" : "text-mute hover:text-ink"}`
     }
     aria-label={label}
     title={label}
@@ -19,7 +19,7 @@ export default function Dock() {
   const { publicKey } = useWallet();
   return (
     <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
-      <div className="flex items-center gap-1 p-1.5 rounded-2xl bg-[#0b100c]/90 backdrop-blur-xl border border-line2 shadow-dock">
+      <div className="flex items-center gap-1 p-1.5 rounded-2xl bg-white/90 backdrop-blur-xl border border-line2 shadow-dock">
         <Item to="/" label="Board">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /></svg>
         </Item>

@@ -23,15 +23,15 @@ export default function Chart({ mint, height = 380, qSym = "SOL", qDec = 9 }: { 
     if (!box.current) return;
     const c = createChart(box.current, {
       height,
-      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "rgba(236,242,237,0.55)", fontFamily: "Inter, system-ui, sans-serif", fontSize: 11 },
-      grid: { vertLines: { color: "rgba(255,255,255,0.04)" }, horzLines: { color: "rgba(255,255,255,0.04)" } },
-      rightPriceScale: { borderColor: "rgba(255,255,255,0.08)", scaleMargins: { top: 0.1, bottom: 0.25 } },
-      timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: res < 60 },
+      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "rgba(2,65,48,0.6)", fontFamily: "Inter, system-ui, sans-serif", fontSize: 11 },
+      grid: { vertLines: { color: "rgba(2,65,48,0.06)" }, horzLines: { color: "rgba(2,65,48,0.06)" } },
+      rightPriceScale: { borderColor: "rgba(2,65,48,0.12)", scaleMargins: { top: 0.1, bottom: 0.25 } },
+      timeScale: { borderColor: "rgba(2,65,48,0.12)", timeVisible: true, secondsVisible: res < 60 },
       crosshair: { mode: CrosshairMode.Normal },
       localization: { priceFormatter: (p: number) => (p >= 1e6 ? (p / 1e6).toFixed(2) + "M" : p >= 1e3 ? (p / 1e3).toFixed(1) + "K" : p.toFixed(p < 10 ? 2 : 1)) },
     });
     series.current = c.addCandlestickSeries({
-      upColor: "#79ff77", downColor: "#ff5c7a", borderVisible: false, wickUpColor: "#79ff77", wickDownColor: "#ff5c7a",
+      upColor: "#02b874", downColor: "#e0245e", borderVisible: false, wickUpColor: "#02b874", wickDownColor: "#e0245e",
       priceFormat: { type: "price", precision: 2, minMove: 0.01 },
     });
     vol.current = c.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "" });
@@ -48,7 +48,7 @@ export default function Chart({ mint, height = 380, qSym = "SOL", qDec = 9 }: { 
     const f = 1e9 / 10 ** qDec; // price is quote-units/token; ×1e9 tokens supply ÷ quote decimals = mcap in quote
     const cs = data.map((k) => ({ time: k.time as any, open: k.open * f, high: k.high * f, low: k.low * f, close: k.close * f }));
     series.current.setData(cs);
-    vol.current?.setData(data.map((k) => ({ time: k.time as any, value: k.volume, color: k.close >= k.open ? "rgba(121,255,119,0.25)" : "rgba(255,92,122,0.25)" })));
+    vol.current?.setData(data.map((k) => ({ time: k.time as any, value: k.volume, color: k.close >= k.open ? "rgba(2,184,116,0.3)" : "rgba(224,36,94,0.25)" })));
     chart.current?.timeScale().fitContent();
   }, [data, qDec]);
 

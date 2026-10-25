@@ -58,7 +58,7 @@ export default function CoinPage() {
               {coin.creator_kind === "social" && <Badge color="acc">fees → X account</Badge>}
               {coin.creator_kind === "donation" && <Badge color="acc">fees → charity</Badge>}
               {BigInt(coin.boost_pending || "0") > 0n && <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border text-acc bg-acc/10 border-acc/30" title="Quote parked in the boost vault, to be spent on buy-and-burns">boost · {(Number(coin.boost_pending) / 1e9).toFixed(2)} {coin.quote_symbol || "SOL"} to burn</span>}
-              {BigInt(coin.boost_burned || "0") > 0n && <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border text-mute bg-white/5 border-line">{(Number(coin.boost_burned) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 0 })} burned</span>}
+              {BigInt(coin.boost_burned || "0") > 0n && <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border text-mute bg-ink/5 border-line">{(Number(coin.boost_burned) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 0 })} burned</span>}
             </div>
             <div className="flex items-center gap-2 flex-wrap text-[12px] text-mute mt-1">
               <button onClick={() => copy(coin.mint)} className="pill !h-7 num hover:border-line2" title="Copy contract address">{short(coin.mint, 5)} <span className="text-dim">⧉</span></button>
@@ -213,7 +213,7 @@ function Holders({ mint, cluster }: { mint: string; cluster: string }) {
           <a href={ex(h.owner, "address")} target="_blank" rel="noreferrer" className="hover:text-acc">{short(h.owner, 5)}</a>
           {h.label && <span className="pill !h-6 !text-[10px]">{h.label}</span>}
           <span className="ml-auto text-mute">{h.pct?.toFixed(2)}%</span>
-          <div className="w-24 h-1.5 bg-white/[0.06] rounded-full overflow-hidden"><div className="h-full bg-acc" style={{ width: `${Math.min(100, h.pct || 0)}%` }} /></div>
+          <div className="w-24 h-1.5 bg-ink/10 rounded-full overflow-hidden"><div className="h-full bg-acc" style={{ width: `${Math.min(100, h.pct || 0)}%` }} /></div>
         </div>
       ))}
     </div>

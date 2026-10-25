@@ -5,7 +5,7 @@ export default function Toasts() {
   return (
     <div className="fixed top-16 right-3 sm:right-5 z-50 flex flex-col gap-2 w-[320px] max-w-[calc(100vw-24px)]">
       {toasts.map((t) => (
-        <div key={t.id} className={`panel bg-[#0b100c] p-3 shadow-dock border-l-4 ${t.kind === "ok" ? "border-l-acc" : t.kind === "err" ? "border-l-red" : "border-l-line2"}`}>
+        <div key={t.id} className={`panel bg-white p-3 shadow-dock border-l-4 ${t.kind === "ok" ? "border-l-acc" : t.kind === "err" ? "border-l-red" : "border-l-line2"}`}>
           <div className="flex items-start gap-2">
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold">{t.title}</div>

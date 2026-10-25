@@ -2,32 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+:root { color-scheme: light; }
 html, body, #root { height: 100%; }
-body { @apply bg-bg text-ink font-sans antialiased; background-image: radial-gradient(1200px 600px at 50% -200px, rgba(121,255,119,0.07), transparent 60%); }
-* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
+body { @apply bg-bg text-ink font-sans antialiased; background-image: radial-gradient(1200px 600px at 50% -200px, rgba(2,208,134,0.16), transparent 60%); }
+* { scrollbar-width: thin; scrollbar-color: rgba(2,65,48,0.18) transparent; }
 *::-webkit-scrollbar { width: 6px; height: 6px; }
-*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; }
+*::-webkit-scrollbar-thumb { background: rgba(2,65,48,0.18); border-radius: 999px; }
 .num { font-variant-numeric: tabular-nums; }
-.panel { @apply bg-panel border border-line rounded-xl2; }
+.panel { @apply bg-panel border border-line rounded-xl2 shadow-[0_1px_2px_rgba(2,65,48,0.04)]; }
 .panel-hover { @apply transition-colors hover:bg-panel2 hover:border-line2; }
 .pill { @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-panel px-3 h-8 text-[12px] font-semibold text-ink whitespace-nowrap; }
 .pill-active { @apply border-acc/40 bg-acc/10 text-acc; }
 .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl font-head font-semibold text-[13px] h-10 px-4 transition-all disabled:opacity-40 disabled:cursor-not-allowed; }
-.btn-acc { @apply bg-acc text-bg hover:brightness-110 active:scale-[0.99]; }
-.btn-red { @apply bg-red text-bg hover:brightness-110 active:scale-[0.99]; }
+.btn-acc { @apply bg-acc2 text-ink hover:brightness-105 active:scale-[0.99] shadow-glow; }
+.btn-red { @apply bg-red text-white hover:brightness-110 active:scale-[0.99]; }
 .btn-ghost { @apply border border-line2 text-ink hover:bg-panel2; }
-.input { @apply w-full bg-black/30 border border-line rounded-xl px-3 h-11 text-[14px] text-ink placeholder:text-dim outline-none focus:border-acc/50 focus:ring-2 focus:ring-acc/10 transition; }
+.input { @apply w-full bg-white border border-line rounded-xl px-3 h-11 text-[14px] text-ink placeholder:text-dim outline-none focus:border-acc/50 focus:ring-2 focus:ring-acc/10 transition; }
 .label { @apply text-[11px] uppercase tracking-[0.08em] text-dim font-semibold; }
 .kpi { @apply text-[15px] font-semibold num; }
-.wallet-adapter-button-trigger { @apply !bg-acc !text-bg !rounded-full !h-9 !px-4 !font-head !font-semibold !text-[13px] hover:!brightness-110; }
+.wallet-adapter-button-trigger { @apply !bg-ink !text-bg !rounded-full !h-9 !px-4 !font-head !font-semibold !text-[13px] hover:!brightness-110; }
 .wallet-adapter-button { @apply !font-sans; }
-.wallet-adapter-modal-wrapper { @apply !bg-[#0b100c] !border !border-line2 !rounded-xl3; }
+.wallet-adapter-modal-wrapper { @apply !bg-white !text-ink !border !border-line2 !rounded-xl3 !shadow-dock; }
+.wallet-adapter-modal-title, .wallet-adapter-modal-list li button { @apply !text-ink; }
 .wallet-adapter-modal-button-close { @apply !bg-panel2; }
 .wallet-adapter-modal-list li button { @apply !rounded-xl hover:!bg-panel2; }
-@keyframes flash-up { from { background: rgba(121,255,119,0.25);} to { background: transparent; } }
-@keyframes flash-down { from { background: rgba(255,92,122,0.25);} to { background: transparent; } }
+@keyframes flash-up { from { background: rgba(2,208,134,0.3);} to { background: transparent; } }
+@keyframes flash-down { from { background: rgba(224,36,94,0.2);} to { background: transparent; } }
 .flash-up { animation: flash-up 1.2s ease-out; }
 .flash-down { animation: flash-down 1.2s ease-out; }
-.shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+.shimmer { background: linear-gradient(90deg, rgba(2,65,48,0.04) 25%, rgba(2,65,48,0.09) 50%, rgba(2,65,48,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
