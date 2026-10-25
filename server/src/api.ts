@@ -1,6 +1,6 @@
 import express from "express";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, DEFAULT_PARAMS, OpenpumpClient, incentives as incMath, pda } from "@openpump/sdk";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, DEFAULT_PARAMS, FEES_PROGRAM_ID, OpenpumpClient, incentives as incMath, pda } from "@openpump/sdk";
 import type { Db } from "./db";
 
 const SORTS: Record<string, string> = {
@@ -32,6 +32,8 @@ export function apiRouter(db: Db, conn: Connection) {
         initialRealTokenReserves: g.initialRealTokenReserves.toString(),
         tokenTotalSupply: g.tokenTotalSupply.toString(),
         migrationFeeLamports: g.migrationFeeLamports.toString(),
+        buybackBasisPoints: g.buybackBasisPoints.toString(),
+        buybackFeeRecipient: g.buybackFeeRecipient.toBase58(),
         antiSnipeSlots: g.antiSnipeSlots.toString(),
         antiSnipeMaxBps: g.antiSnipeMaxBps.toString(),
         paused: g.paused,
@@ -85,6 +87,85 @@ export function apiRouter(db: Db, conn: Connection) {
     }
   });
 
+  let feeCache: { at: number; value: any } | null = null;
+  const getFeeConfig = async () => {
+    if (feeCache && Date.now() - feeCache.at < 60_000) return feeCache.value;
+    let value: any = null;
+    try {
+      const c = await client.fetchFeeConfig();
+      if (c) {
+        const f = (x: any) => ({ lpFeeBps: x.lpFeeBps.toString(), protocolFeeBps: x.protocolFeeBps.toString(), creatorFeeBps: x.creatorFeeBps.toString() });
+        value = { flatFees: f(c.flatFees), feeTiers: c.feeTiers.map((t) => ({ marketCapLamportsThreshold: t.marketCapLamportsThreshold.toString(), fees: f(t.fees) })), stableFeeTiers: c.stableFeeTiers.map((t) => ({ marketCapLamportsThreshold: t.marketCapLamportsThreshold.toString(), fees: f(t.fees) })), exoticFlatFees: f(c.exoticFlatFees), stableMints: c.stableMints };
+      }
+    } catch {}
+    feeCache = { at: Date.now(), value };
+    return value;
+  };
+
+  /** Sharing config + pending (unsplit) creator fees for a coin. */
+  r.get("/api/coins/:mint/sharing", async (req, res) => {
+    try {
+      const mint = new PublicKey(req.params.mint);
+      const cfg = await client.fetchSharingConfig(mint);
+      if (!cfg) return res.json({ exists: false });
+      const sharing = pda.sharingConfig(mint);
+      const coin = db.prepare("SELECT quote_mint, migrated FROM coins WHERE mint=?").get(req.params.mint) as any;
+      const quote = new PublicKey(coin?.quote_mint || "So11111111111111111111111111111111111111112");
+      const pending = await client.creatorClaimable(sharing).catch(() => ({ curveLamports: 0n, ammWsolLamports: 0n }));
+      const pendingQuote = quote.toBase58() !== "So11111111111111111111111111111111111111112" ? await client.creatorClaimableQuote(sharing, quote).catch(() => ({ curve: 0n, amm: 0n })) : null;
+      res.json({
+        exists: true, admin: cfg.admin.toBase58(), adminRevoked: cfg.adminRevoked, active: cfg.active,
+        shareholders: cfg.shareholders.map((s) => ({ address: s.address.toBase58(), shareBps: s.shareBps })),
+        pendingCurve: (pendingQuote ? pendingQuote.curve : pending.curveLamports).toString(), pendingAmm: (pendingQuote ? pendingQuote.amm : pending.ammWsolLamports).toString(),
+      });
+    } catch (e) {
+      res.status(400).json({ error: (e as Error).message });
+    }
+  });
+
+  /** Social fee PDA: address + what it has earned (vault pending + PDA balance). */
+  r.get("/api/social/:platform/:userId", async (req, res) => {
+    try {
+      const platform = Number(req.params.platform);
+      const userId = String(req.params.userId).toLowerCase();
+      const social = pda.socialFeePda(userId, platform);
+      const [info, vault] = await Promise.all([conn.getAccountInfo(social, "confirmed"), client.creatorClaimable(social)]);
+      const rentPda = info ? await conn.getMinimumBalanceForRentExemption(info.data.length) : 0;
+      const coins = db.prepare("SELECT mint, name, symbol, image FROM coins WHERE creator=?").all(social.toBase58());
+      res.json({ address: social.toBase58(), exists: !!info, pendingVault: vault.curveLamports.toString(), claimable: info ? String(Math.max(0, info.lamports - rentPda)) : "0", coins });
+    } catch (e) {
+      res.status(400).json({ error: (e as Error).message });
+    }
+  });
+
+  /**
+   * Social claims. The social-claim authority signs after the X login is verified.
+   * Today the verification is operator-side (X-Admin-Token); OAuth with X plugs in here later.
+   */
+  r.post("/api/social/claim", express.json(), async (req, res) => {
+    try {
+      const token = process.env.ADMIN_TOKEN;
+      if (!token || req.header("x-admin-token") !== token) return res.status(401).json({ error: "unauthorized" });
+      const raw = process.env.SOCIAL_CLAIM_AUTHORITY_KEYPAIR;
+      if (!raw) return res.status(500).json({ error: "SOCIAL_CLAIM_AUTHORITY_KEYPAIR not set" });
+      const { Keypair, Transaction } = await import("@solana/web3.js");
+      const { bs58decode } = await import("@openpump/sdk");
+      const kp = raw.trim().startsWith("[") ? Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw))) : Keypair.fromSecretKey(bs58decode(raw.trim()));
+      const { platform, userId, recipient } = req.body as { platform: number; userId: string; recipient: string };
+      const social = pda.socialFeePda(String(userId).toLowerCase(), Number(platform));
+      const tx = new Transaction().add(await client.collectForCreatorIx(social), await client.claimSocialFeePdaIx(kp.publicKey, String(userId).toLowerCase(), Number(platform), new PublicKey(recipient)));
+      tx.feePayer = kp.publicKey;
+      const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.sign(kp);
+      const sig = await conn.sendRawTransaction(tx.serialize());
+      await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      res.json({ ok: true, sig });
+    } catch (e) {
+      res.status(400).json({ error: (e as Error).message });
+    }
+  });
+
   r.get("/api/config", async (_req, res) => {
     const quoteMints = [{ mint: "So11111111111111111111111111111111111111112", symbol: "SOL", decimals: 9 }];
     for (const entry of (process.env.QUOTE_MINTS || "").split(",").filter(Boolean)) {
@@ -94,6 +175,8 @@ export function apiRouter(db: Db, conn: Connection) {
     res.json({
       quoteMints,
       incentives: await getIncentives(),
+      feeConfig: await getFeeConfig(),
+      feesProgram: FEES_PROGRAM_ID.toBase58(),
       curveProgram: CURVE_PROGRAM_ID.toBase58(),
       ammProgram: AMM_PROGRAM_ID.toBase58(),
       rpc: process.env.PUBLIC_RPC_URL || process.env.RPC_URL,

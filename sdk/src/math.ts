@@ -162,3 +162,24 @@ export const incentives = {
     return (u.currentSolVolume * g.totalTokenSupply[today]) / g.solVolumes[today];
   },
 };
+
+/** Mirrors crates/openpump-fee-types fee selection. */
+export interface TierFees { lpFeeBps: bigint; protocolFeeBps: bigint; creatorFeeBps: bigint }
+export interface FeeTierT { marketCapLamportsThreshold: bigint; fees: TierFees }
+export interface FeeConfigT { flatFees: TierFees; feeTiers: FeeTierT[]; stableFeeTiers: FeeTierT[]; exoticFlatFees: TierFees; stableMints: string[] }
+export const tiers = {
+  select(list: FeeTierT[], mcap: bigint): TierFees | null {
+    if (!list.length) return null;
+    if (mcap < list[0].marketCapLamportsThreshold) return list[0].fees;
+    for (let i = list.length - 1; i >= 0; i--) if (mcap >= list[i].marketCapLamportsThreshold) return list[i].fees;
+    return list[0].fees;
+  },
+  feesFor(cfg: FeeConfigT, mcap: bigint, quoteMint: string): TierFees {
+    const WSOL = "So11111111111111111111111111111111111111112";
+    if (!quoteMint || quoteMint === WSOL || quoteMint === "11111111111111111111111111111111") return tiers.select(cfg.feeTiers, mcap) ?? cfg.flatFees;
+    if (cfg.stableMints.includes(quoteMint)) return tiers.select(cfg.stableFeeTiers, mcap) ?? cfg.flatFees;
+    const e = cfg.exoticFlatFees;
+    return e.lpFeeBps + e.protocolFeeBps + e.creatorFeeBps === 0n ? cfg.flatFees : e;
+  },
+  marketCap: (virtualQuote: bigint, virtualToken: bigint, supply: bigint) => (virtualToken === 0n ? 0n : (virtualQuote * supply) / virtualToken),
+};

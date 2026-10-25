@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { curve as curveMath } from "@openpump/sdk";
+import { SOCIAL_PLATFORM, curve as curveMath, pda } from "@openpump/sdk";
 import { API, WSOL, useConfig, type QuoteMintInfo } from "../lib/api";
 import { useClient, useSendTx, useToast } from "../lib/solana";
 import { qty, tokens as fmtTokens } from "../lib/format";
@@ -22,7 +22,12 @@ export default function CreatePage() {
   const [devBuy, setDevBuy] = useState("");
   const [busy, setBusy] = useState(false);
   const [pair, setPair] = useState<QuoteMintInfo | null>(null);
-  const [holderRewards, setHolderRewards] = useState(false);
+  const [dest, setDest] = useState<"you" | "holders" | "social" | "charity">("you");
+  const [handle, setHandle] = useState("");
+  const [charity, setCharity] = useState("");
+  const holderRewards = dest === "holders";
+  const handleId = handle.trim().replace(/^@/, "").toLowerCase();
+  const charityOk = (() => { try { return charity ? !!new PublicKey(charity.trim()) : false; } catch { return false; } })();
   const [quoteCfg, setQuoteCfg] = useState<{ initialVirtualQuoteReserves: bigint; initialVirtualTokenReserves: bigint; initialRealTokenReserves: bigint; enabled: boolean } | null>(null);
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value }));
 
@@ -61,7 +66,8 @@ export default function CreatePage() {
     setPreview(file ? URL.createObjectURL(file) : null);
   };
 
-  const valid = f.name.trim().length > 0 && f.name.length <= 32 && /^[A-Za-z0-9$._-]{1,10}$/.test(f.symbol) && !!file && (!v2 || !!quoteCfg?.enabled);
+  const destOk = dest === "social" ? /^[a-z0-9_]{1,15}$/.test(handleId) : dest === "charity" ? charityOk : true;
+  const valid = f.name.trim().length > 0 && f.name.length <= 32 && /^[A-Za-z0-9$._-]{1,10}$/.test(f.symbol) && !!file && (!v2 || !!quoteCfg?.enabled) && destOk;
 
   const submit = async () => {
     if (!publicKey) return setVisible(true);
@@ -79,9 +85,22 @@ export default function CreatePage() {
       const name = f.name.trim();
       const symbol = f.symbol.trim().toUpperCase();
       const feeRecipient = new PublicKey(cfg.global.feeRecipient!);
-      const ixs = v2
-        ? [await client.createV2Ix(publicKey, mintKp.publicKey, new PublicKey(pair.mint), name, symbol, uri, holderRewards)]
-        : [await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards)];
+      // creator destination: a fees-program PDA created in the same transaction when needed
+      let creatorPk = PublicKey.default;
+      const ixs = [];
+      if (dest === "social") {
+        creatorPk = pda.socialFeePda(handleId, SOCIAL_PLATFORM.x);
+        ixs.push(await client.createSocialFeePdaIx(publicKey, handleId, SOCIAL_PLATFORM.x));
+      } else if (dest === "charity") {
+        const ben = new PublicKey(charity.trim());
+        creatorPk = pda.donationFeePda(mintKp.publicKey, ben);
+        ixs.push(await client.createDonationFeePdaIx(publicKey, mintKp.publicKey, ben));
+      }
+      ixs.push(
+        v2
+          ? await client.createV2Ix(publicKey, mintKp.publicKey, new PublicKey(pair.mint), name, symbol, uri, holderRewards, creatorPk)
+          : await client.createIx(publicKey, mintKp.publicKey, name, symbol, uri, holderRewards, creatorPk)
+      );
       if (quote) {
         const units = BigInt(Math.floor(Number(devBuy) * 10 ** qDec));
         const minOut = (quote.tokensOut * 97n) / 100n;
@@ -171,15 +190,32 @@ export default function CreatePage() {
           <div className="text-[12px] text-mute">{g ? Number(g.creatorFeeBasisPoints) / 100 : 0.5}% of every trade, on the curve and on the AMM. Choose who receives it; this cannot be changed later.</div>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => setHolderRewards(false)} className={`rounded-xl border p-3 text-left transition ${!holderRewards ? "border-acc/50 bg-acc/10" : "border-line hover:border-line2"}`}>
-            <div className="font-semibold text-[13px]">You (the creator)</div>
-            <div className="text-[11px] text-mute mt-0.5">Claim any time from your profile.</div>
-          </button>
-          <button onClick={() => setHolderRewards(true)} className={`rounded-xl border p-3 text-left transition ${holderRewards ? "border-acc/50 bg-acc/10" : "border-line hover:border-line2"}`}>
-            <div className="font-semibold text-[13px]">Holders <span className="text-[10px] font-bold uppercase tracking-wider text-acc bg-acc/10 border border-acc/30 rounded-full px-1.5 py-0.5 ml-1">rewards → holders</span></div>
-            <div className="text-[11px] text-mute mt-0.5">Paid out pro-rata to the top holders every few minutes. You earn nothing as creator.</div>
-          </button>
+          {([
+            ["you", "You (the creator)", "Claim any time from your profile. You can split it with partners later."],
+            ["holders", "Holders", "Paid pro-rata to the top holders every few minutes. You earn nothing as creator."],
+            ["social", "An X account", "Fees accrue to the handle. Whoever verifies that X login claims them, wallet or not."],
+            ["charity", "A wallet / charity", "Fees are forwarded to any address you choose. Anyone can trigger the payout."],
+          ] as const).map(([k, title, desc]) => (
+            <button key={k} onClick={() => setDest(k)} className={`rounded-xl border p-3 text-left transition ${dest === k ? "border-acc/50 bg-acc/10" : "border-line hover:border-line2"}`}>
+              <div className="font-semibold text-[13px]">{title}</div>
+              <div className="text-[11px] text-mute mt-0.5">{desc}</div>
+            </button>
+          ))}
         </div>
+        {dest === "social" && (
+          <div>
+            <div className="label mb-1">X handle</div>
+            <input className="input" placeholder="@handle" value={handle} onChange={(e) => setHandle(e.target.value)} />
+            {handleId && <div className="text-[11px] text-dim mt-1 num">fees go to {pda.socialFeePda(handleId, SOCIAL_PLATFORM.x).toBase58()}</div>}
+          </div>
+        )}
+        {dest === "charity" && (
+          <div>
+            <div className="label mb-1">Beneficiary wallet</div>
+            <input className="input num" placeholder="Solana address" value={charity} onChange={(e) => setCharity(e.target.value)} />
+            {charity && !charityOk && <div className="text-[11px] text-red mt-1">Not a valid address.</div>}
+          </div>
+        )}
       </div>
 
       <div className="panel p-4 space-y-3">

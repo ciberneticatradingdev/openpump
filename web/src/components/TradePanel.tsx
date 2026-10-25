@@ -3,7 +3,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { amm as ammMath, curve as curveMath, incentives as incMath, pda, type PoolState } from "@openpump/sdk";
+import { amm as ammMath, curve as curveMath, incentives as incMath, pda, tiers, type PoolState } from "@openpump/sdk";
 import { isV2, type Coin, type Config } from "../lib/api";
 import { useClient, useSendTx } from "../lib/solana";
 import { qty, tokens as fmtTokens } from "../lib/format";
@@ -70,8 +70,12 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
   }, [graduated, client, mint, quoteMint, coin.trades]);
 
   const g = cfg.global;
-  const fees = { feeBasisPoints: BigInt(g.feeBasisPoints), creatorFeeBasisPoints: BigInt(g.creatorFeeBasisPoints) };
-  const ammFees = g.amm ? { lpFeeBasisPoints: BigInt(g.amm.lpFeeBasisPoints), protocolFeeBasisPoints: BigInt(g.amm.protocolFeeBasisPoints), coinCreatorFeeBasisPoints: BigInt(g.amm.coinCreatorFeeBasisPoints) } : null;
+  const tierNow = currentTier(cfg, coin, reserves);
+  const fees = tierNow ? { feeBasisPoints: tierNow.protocolFeeBps, creatorFeeBasisPoints: tierNow.creatorFeeBps } : { feeBasisPoints: BigInt(g.feeBasisPoints), creatorFeeBasisPoints: BigInt(g.creatorFeeBasisPoints) };
+  const ammFees = tierNow
+    ? { lpFeeBasisPoints: tierNow.lpFeeBps, protocolFeeBasisPoints: tierNow.protocolFeeBps, coinCreatorFeeBasisPoints: tierNow.creatorFeeBps }
+    : g.amm ? { lpFeeBasisPoints: BigInt(g.amm.lpFeeBasisPoints), protocolFeeBasisPoints: BigInt(g.amm.protocolFeeBasisPoints), coinCreatorFeeBasisPoints: BigInt(g.amm.coinCreatorFeeBasisPoints) } : null;
+  const feePct = (Number(fees.feeBasisPoints) + Number(fees.creatorFeeBasisPoints)) / 100;
   const curveState = { virtualSolReserves: BigInt(coin.v_sol), virtualTokenReserves: BigInt(coin.v_tok), realSolReserves: BigInt(coin.r_sol), realTokenReserves: BigInt(coin.r_tok), tokenTotalSupply: BigInt(coin.supply), complete: !!coin.complete };
   const toUnits = (n: number, dec: number) => BigInt(Math.floor(n * 10 ** dec));
 
@@ -208,7 +212,7 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
           <div className="rounded-xl bg-black/30 border border-line p-3 text-[12px] space-y-1.5">
             <Row k="You receive" v={quote ? (side === "buy" ? `${fmtTokens(quote.out)} ${coin.symbol}` : `${qty(quote.out, qDec, 4)} ${qSym}`) : "–"} strong />
             <Row k="Price" v={quote ? `${(quote.pricePer * 1e6 / 10 ** qDec).toPrecision(4)} ${qSym}` : "–"} />
-            <Row k={`Fees (${(Number(g.feeBasisPoints) + Number(g.creatorFeeBasisPoints)) / 100}%)`} v={quote ? `${qty(quote.fee, qDec, 5)} ${qSym}` : "–"} hint={quote ? `${qty(quote.creatorFee, qDec, 5)} to creator` : undefined} />
+            <Row k={`Fees (${feePct}%${tierNow ? ", tiered" : ""})`} v={quote ? `${qty(quote.fee, qDec, 5)} ${qSym}` : "–"} hint={quote ? `${qty(quote.creatorFee, qDec, 5)} to ${coin.is_holder_reward ? "holders" : "creator"}` : undefined} />
             <Row k="Slippage" v={<span className="flex gap-1">{[0.5, 1, 2, 5].map((s) => <button key={s} onClick={() => setSlip(s)} className={`px-1.5 rounded ${slip === s ? "bg-acc/15 text-acc" : "text-mute hover:text-ink"}`}>{s}%</button>)}</span>} />
             {quote?.completes && <div className="text-gold text-[11px] pt-1">This buy completes the curve. You get everything that is left and pay only for that.</div>}
           </div>
@@ -236,4 +240,15 @@ function Row({ k, v, strong, hint }: { k: string; v: any; strong?: boolean; hint
       </span>
     </div>
   );
+}
+
+/** Tier fees for the coin's current market cap (curve: virtual reserves; AMM: pool reserves × mint supply). */
+export function currentTier(cfg: Config, coin: Coin, reserves: { baseReserve: bigint; quoteReserve: bigint } | null) {
+  const fc = cfg.feeConfig;
+  if (!fc) return null;
+  const supply = BigInt(coin.supply);
+  const mcap = coin.migrated && reserves ? tiers.marketCap(reserves.quoteReserve, reserves.baseReserve, supply) : tiers.marketCap(BigInt(coin.v_sol), BigInt(coin.v_tok), supply);
+  const b = (x: { lpFeeBps: string; protocolFeeBps: string; creatorFeeBps: string }) => ({ lpFeeBps: BigInt(x.lpFeeBps), protocolFeeBps: BigInt(x.protocolFeeBps), creatorFeeBps: BigInt(x.creatorFeeBps) });
+  const t = (x: { marketCapLamportsThreshold: string; fees: any }) => ({ marketCapLamportsThreshold: BigInt(x.marketCapLamportsThreshold), fees: b(x.fees) });
+  return tiers.feesFor({ flatFees: b(fc.flatFees), feeTiers: fc.feeTiers.map(t), stableFeeTiers: fc.stableFeeTiers.map(t), exoticFlatFees: b(fc.exoticFlatFees), stableMints: fc.stableMints }, mcap, coin.quote_mint);
 }

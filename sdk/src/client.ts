@@ -17,7 +17,8 @@ import {
   SYSVAR_RENT_PUBKEY,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { AMM_IDL, AMM_PROGRAM_ID, CURVE_IDL, CURVE_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
+import { AMM_IDL, AMM_PROGRAM_ID, CURVE_IDL, CURVE_PROGRAM_ID, FEES_IDL, FEES_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
+import type { OpenpumpFees } from "./openpump_fees";
 import { pda } from "./pda";
 import type { OpenpumpAmm } from "./openpump_amm";
 import type { OpenpumpCurve } from "./openpump_curve";
@@ -40,6 +41,9 @@ export interface GlobalState {
   antiSnipeSlots: bigint;
   antiSnipeMaxBps: bigint;
   paused: boolean;
+  buybackBasisPoints: bigint;
+  buybackFeeRecipient: PublicKey;
+  holderRewardAuthority: PublicKey;
 }
 
 export interface BondingCurveState extends CurveState {
@@ -49,6 +53,8 @@ export interface BondingCurveState extends CurveState {
   createdSlot: bigint;
   creatorFeesTotal: bigint;
   protocolFeesTotal: bigint;
+  quoteMint: PublicKey;
+  isHolderReward: boolean;
 }
 
 export interface PoolState {
@@ -85,10 +91,24 @@ export function readOnlyProvider(connection: Connection) {
 export class OpenpumpClient {
   readonly curve: Program<OpenpumpCurve>;
   readonly amm: Program<OpenpumpAmm>;
+  readonly fees: Program<OpenpumpFees>;
+  /** Set once the fees program is initialised; trade builders then pass the tiered schedule. */
+  feeConfigEnabled = false;
+  /** Set to Global.buyback_fee_recipient when buybacks are on; buys/sells then route the share. */
+  buybackRecipient: PublicKey | null = null;
 
   constructor(readonly connection: Connection, provider: AnchorProvider = readOnlyProvider(connection)) {
     this.curve = new Program<OpenpumpCurve>(CURVE_IDL, provider);
     this.amm = new Program<OpenpumpAmm>(AMM_IDL, provider);
+    this.fees = new Program<OpenpumpFees>(FEES_IDL, provider);
+  }
+
+  /** Detect fee program state so builders include fee_config / buyback automatically. */
+  async detectFeeProgram() {
+    const [fc, g] = await Promise.all([this.connection.getAccountInfo(pda.feeConfig(), "confirmed"), this.fetchGlobal().catch(() => null)]);
+    this.feeConfigEnabled = !!fc;
+    this.buybackRecipient = g && g.buybackBasisPoints > 0n && !g.buybackFeeRecipient.equals(PublicKey.default) ? g.buybackFeeRecipient : null;
+    return { feeConfigEnabled: this.feeConfigEnabled, buybackRecipient: this.buybackRecipient };
   }
 
   // ------------------------------------------------------------- reads
@@ -109,6 +129,9 @@ export class OpenpumpClient {
       antiSnipeSlots: big(g.antiSnipeSlots),
       antiSnipeMaxBps: big(g.antiSnipeMaxBps),
       paused: g.paused,
+      buybackBasisPoints: big(g.buybackBasisPoints),
+      buybackFeeRecipient: g.buybackFeeRecipient,
+      holderRewardAuthority: g.holderRewardAuthority,
     };
   }
 
@@ -127,6 +150,8 @@ export class OpenpumpClient {
       createdSlot: big(b.createdSlot),
       creatorFeesTotal: big(b.creatorFeesTotal),
       protocolFeesTotal: big(b.protocolFeesTotal),
+      quoteMint: b.quoteMint,
+      isHolderReward: b.isHolderReward,
     };
   }
 
@@ -202,9 +227,9 @@ export class OpenpumpClient {
 
   // ------------------------------------------------------------- curve instructions
 
-  async createIx(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false) {
+  async createIx(user: PublicKey, mint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, creator: PublicKey = PublicKey.default) {
     return this.curve.methods
-      .create(name, symbol, uri, isHolderReward)
+      .create(name, symbol, uri, isHolderReward, creator)
       .accounts({
         mint,
         mintAuthority: pda.mintAuthority(),
@@ -226,6 +251,8 @@ export class OpenpumpClient {
     return {
       globalVolumeAccumulator: trackVolume ? pda.globalVolumeAccumulator() : null,
       userVolumeAccumulator: trackVolume ? pda.userVolumeAccumulator(user) : null,
+      feeConfig: this.feeConfigEnabled ? pda.feeConfig() : null,
+      buybackFeeRecipient: this.buybackRecipient,
       global: pda.global(),
       feeRecipient,
       mint,
@@ -302,6 +329,7 @@ export class OpenpumpClient {
   private swapAccounts(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey) {
     const q = pool.quoteMint;
     return {
+      feeConfig: this.feeConfigEnabled ? pda.feeConfig() : null,
       pool: pool.address,
       user,
       globalConfig: pda.ammGlobalConfig(),
@@ -393,9 +421,9 @@ export class OpenpumpClient {
     return this.curve.methods.setQuoteConfig(p).accounts({ authority, global: pda.global(), quoteMint, quoteConfig: pda.quoteConfig(quoteMint), systemProgram: SystemProgram.programId } as any).instruction();
   }
 
-  async createV2Ix(user: PublicKey, mint: PublicKey, quoteMint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+  async createV2Ix(user: PublicKey, mint: PublicKey, quoteMint: PublicKey, name: string, symbol: string, uri: string, isHolderReward = false, creator: PublicKey = PublicKey.default, quoteTokenProgram = TOKEN_PROGRAM_ID) {
     return this.curve.methods
-      .createV2(name, symbol, uri, isHolderReward)
+      .createV2(name, symbol, uri, isHolderReward, creator)
       .accounts({
         mint,
         mintAuthority: pda.mintAuthority(),
@@ -419,6 +447,7 @@ export class OpenpumpClient {
 
   private tradeV2Accounts(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, quoteTokenProgram: PublicKey) {
     return {
+      feeConfig: this.feeConfigEnabled ? pda.feeConfig() : null,
       global: pda.global(),
       feeRecipient,
       mint,
@@ -448,10 +477,11 @@ export class OpenpumpClient {
   async sellV2Ix(user: PublicKey, mint: PublicKey, creator: PublicKey, feeRecipient: PublicKey, quoteMint: PublicKey, tokensIn: bigint, minQuoteOut: bigint, quoteTokenProgram = TOKEN_PROGRAM_ID) {
     return this.curve.methods.sellV2(bn(tokensIn), bn(minQuoteOut)).accounts(this.tradeV2Accounts(user, mint, creator, feeRecipient, quoteMint, quoteTokenProgram)).instruction();
   }
-  async collectCreatorFeeV2Ix(creator: PublicKey, quoteMint: PublicKey, quoteTokenProgram = TOKEN_PROGRAM_ID) {
+  async collectCreatorFeeV2Ix(creator: PublicKey, quoteMint: PublicKey, quoteTokenProgram = TOKEN_PROGRAM_ID, payer: PublicKey = creator) {
     return this.curve.methods
       .collectCreatorFeeV2()
       .accounts({
+        payer,
         creator,
         quoteMint,
         creatorVault: pda.creatorVault(creator),
@@ -578,6 +608,113 @@ export class OpenpumpClient {
       } as any)
       .remainingAccounts(remaining)
       .instruction();
+  }
+
+  // ------------------------------------------------------------- fees program
+
+  async fetchFeeConfig() {
+    const info = await this.connection.getAccountInfo(pda.feeConfig(), "confirmed");
+    if (!info) return null;
+    const c = this.fees.coder.accounts.decode("feeConfig", info.data);
+    const f = (x: any) => ({ lpFeeBps: big(x.lpFeeBps), protocolFeeBps: big(x.protocolFeeBps), creatorFeeBps: big(x.creatorFeeBps) });
+    const t = (x: any) => ({ marketCapLamportsThreshold: big(x.marketCapLamportsThreshold), fees: f(x.fees) });
+    return { admin: c.admin as PublicKey, flatFees: f(c.flatFees), feeTiers: (c.feeTiers as any[]).map(t), stableFeeTiers: (c.stableFeeTiers as any[]).map(t), exoticFlatFees: f(c.exoticFlatFees), stableMints: (c.stableMints as PublicKey[]).map((m) => m.toBase58()) };
+  }
+
+  async fetchSharingConfig(mint: PublicKey) {
+    const info = await this.connection.getAccountInfo(pda.sharingConfig(mint), "confirmed");
+    if (!info) return null;
+    const c = this.fees.coder.accounts.decode("sharingConfig", info.data);
+    return { admin: c.admin as PublicKey, adminRevoked: c.adminRevoked as boolean, active: !!c.status.active, shareholders: (c.shareholders as any[]).map((s) => ({ address: s.address as PublicKey, shareBps: Number(s.shareBps) })) };
+  }
+
+  /** What kind of account earns this coin's creator fee. */
+  async creatorKind(creator: PublicKey, mint: PublicKey): Promise<"wallet" | "holders" | "sharing" | "social" | "donation" | "unknown"> {
+    if (creator.equals(pda.holderRewards(mint))) return "holders";
+    const info = await this.connection.getAccountInfo(creator, "confirmed");
+    if (!info) return "wallet";
+    if (!info.owner.equals(FEES_PROGRAM_ID)) return info.owner.equals(new PublicKey("11111111111111111111111111111111")) ? "wallet" : "unknown";
+    const disc = info.data.subarray(0, 8);
+    const is = (name: string) => disc.equals(Buffer.from((FEES_IDL.accounts as any[]).find((a) => a.name === name).discriminator));
+    if (is("SharingConfig")) return "sharing";
+    if (is("SocialFeePda")) return "social";
+    if (is("DonationFeePda")) return "donation";
+    return "unknown";
+  }
+
+  async initializeFeeProgramIxs(authority: PublicKey, socialClaimAuthority: PublicKey, flatFees: any, tiers: any[], claimRateLimit = 0n) {
+    const bn2 = (o: any) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "bigint" ? bn(v) : v]));
+    const tiersBn = tiers.map((t) => ({ marketCapLamportsThreshold: bn(t.marketCapLamportsThreshold), fees: bn2(t.fees) }));
+    return [
+      await this.fees.methods.initializeFeeProgramGlobal(socialClaimAuthority, 0, bn(claimRateLimit)).accounts({ authority } as any).instruction(),
+      await this.fees.methods.initializeFeeConfig(bn2(flatFees) as any, tiersBn as any).accounts({ authority, feeProgramGlobal: pda.feeProgramGlobal(), feeConfig: pda.feeConfig() } as any).instruction(),
+      await this.fees.methods.initializeBuyback(0, authority, bn(0n)).accounts({ authority, feeProgramGlobal: pda.feeProgramGlobal(), buybackVault: pda.buybackVault(0) } as any).instruction(),
+    ];
+  }
+
+  async createFeeSharingConfigIx(creator: PublicKey, mint: PublicKey, graduated: boolean, quoteMint: PublicKey = WSOL_MINT) {
+    const pool = graduated ? (quoteMint.equals(WSOL_MINT) ? pda.migrationPool(mint) : pda.migrationPoolV2(mint, quoteMint)) : null;
+    return this.fees.methods
+      .createFeeSharingConfig()
+      .accounts({
+        payer: creator, feeProgramGlobal: pda.feeProgramGlobal(), mint, sharingConfig: pda.sharingConfig(mint), bondingCurve: pda.bondingCurve(mint),
+        curveProgram: CURVE_PROGRAM_ID, curveEventAuthority: pda.curveEventAuthority(), pool, ammProgram: graduated ? AMM_PROGRAM_ID : null, ammEventAuthority: graduated ? pda.ammEventAuthority() : null,
+        systemProgram: SystemProgram.programId,
+      } as any)
+      .instruction();
+  }
+  async updateFeeSharesIx(admin: PublicKey, mint: PublicKey, shareholders: { address: PublicKey; shareBps: number }[]) {
+    const sharing = pda.sharingConfig(mint);
+    return this.fees.methods.updateFeeShares(shareholders).accounts({ authority: admin, mint, sharingConfig: sharing, creatorVault: pda.creatorVault(sharing) } as any).instruction();
+  }
+  async revokeFeeSharingIx(admin: PublicKey, mint: PublicKey) {
+    return this.fees.methods.revokeFeeSharingAuthority().accounts({ authority: admin, sharingConfig: pda.sharingConfig(mint) } as any).instruction();
+  }
+  /** Curve-side payout of a sharing coin's vault to its shareholders (anyone may call). */
+  async distributeCreatorFeesIx(mint: PublicKey, shareholders: PublicKey[], quoteMint: PublicKey = WSOL_MINT, payer?: PublicKey) {
+    const sharing = pda.sharingConfig(mint);
+    if (quoteMint.equals(WSOL_MINT)) {
+      return this.curve.methods
+        .distributeCreatorFees()
+        .accounts({ mint, bondingCurve: pda.bondingCurve(mint), sharingConfig: sharing, creatorVault: pda.creatorVault(sharing), systemProgram: SystemProgram.programId } as any)
+        .remainingAccounts(shareholders.map((r) => ({ pubkey: r, isSigner: false, isWritable: true })))
+        .instruction();
+    }
+    return this.curve.methods
+      .distributeCreatorFeesV2(true)
+      .accounts({ payer: payer ?? shareholders[0], mint, bondingCurve: pda.bondingCurve(mint), sharingConfig: sharing, creatorVault: pda.creatorVault(sharing), creatorVaultQuote: pda.creatorVaultQuote(sharing, quoteMint), quoteMint, quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId } as any)
+      .remainingAccounts([...shareholders.map((r) => ({ pubkey: r, isSigner: false, isWritable: false })), ...shareholders.map((r) => ({ pubkey: getAssociatedTokenAddressSync(quoteMint, r, true), isSigner: false, isWritable: true }))])
+      .instruction();
+  }
+  /** AMM-side payout (graduated sharing coins). */
+  async distributeCoinCreatorFeesIx(payer: PublicKey, mint: PublicKey, pool: PoolState, shareholders: PublicKey[]) {
+    const sharing = pda.sharingConfig(mint);
+    const q = pool.quoteMint;
+    return this.amm.methods
+      .distributeCoinCreatorFees(true)
+      .accounts({ payer, pool: pool.address, sharingConfig: sharing, quoteMint: q, coinCreatorVaultAuthority: pda.ammCreatorVaultAuthority(sharing), coinCreatorVaultAta: pda.ammCreatorVaultAta(sharing, q), quoteTokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId } as any)
+      .remainingAccounts([...shareholders.map((r) => ({ pubkey: r, isSigner: false, isWritable: false })), ...shareholders.map((r) => ({ pubkey: getAssociatedTokenAddressSync(q, r, true), isSigner: false, isWritable: true }))])
+      .instruction();
+  }
+
+  async createSocialFeePdaIx(payer: PublicKey, userId: string, platform: number) {
+    return this.fees.methods.createSocialFeePda(userId, platform).accounts({ payer, feeProgramGlobal: pda.feeProgramGlobal(), socialFeePda: pda.socialFeePda(userId, platform), systemProgram: SystemProgram.programId } as any).instruction();
+  }
+  async claimSocialFeePdaIx(authority: PublicKey, userId: string, platform: number, recipient: PublicKey) {
+    return this.fees.methods.claimSocialFeePda(userId, platform).accounts({ socialClaimAuthority: authority, feeProgramGlobal: pda.feeProgramGlobal(), socialFeePda: pda.socialFeePda(userId, platform), recipient } as any).instruction();
+  }
+  async createDonationFeePdaIx(payer: PublicKey, mint: PublicKey, beneficiary: PublicKey) {
+    return this.fees.methods.createDonationFeePda().accounts({ payer, feeProgramGlobal: pda.feeProgramGlobal(), baseMint: mint, beneficiary, donationFeePda: pda.donationFeePda(mint, beneficiary), systemProgram: SystemProgram.programId } as any).instruction();
+  }
+  async crankDonationIx(payer: PublicKey, mint: PublicKey, beneficiary: PublicKey) {
+    return this.fees.methods.crankDonationFeePda().accounts({ payer, feeProgramGlobal: pda.feeProgramGlobal(), donationFeePda: pda.donationFeePda(mint, beneficiary), beneficiary } as any).instruction();
+  }
+  /** Sweep a creator vault to its creator address (permissionless; needed for PDA creators). */
+  async collectForCreatorIx(creator: PublicKey) {
+    return this.curve.methods.collectCreatorFee().accounts({ creator, creatorVault: pda.creatorVault(creator), systemProgram: SystemProgram.programId } as any).instruction();
+  }
+  async sweepBuybackIx(authority: PublicKey, index = 0) {
+    return this.fees.methods.sweepBuyback(index).accounts({ authority, buybackVault: pda.buybackVault(index) } as any).instruction();
   }
 
   // ------------------------------------------------------------- admin

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useCoin, useConfig, useHolders, useRewards, useTrades } from "../lib/api";
+import { useCoin, useConfig, useHolders, useRewards, useSharing, useTrades } from "../lib/api";
+import { currentTier } from "../components/TradePanel";
+import SharingCard from "../components/SharingCard";
 import { ago, compact, explorer, priceQ, qty, short, sol } from "../lib/format";
 import Avatar from "../components/Avatar";
 import Chart from "../components/Chart";
@@ -15,6 +17,7 @@ export default function CoinPage() {
   const { data: coin, isLoading, refetch } = useCoin(mint);
   const { data: cfg } = useConfig();
   const { data: rewards } = useRewards(mint, !!coin?.is_holder_reward);
+  const { data: sharing } = useSharing(mint, !!coin && !coin.is_holder_reward);
   const { publicKey } = useWallet();
   const toast = useToast();
   const [tab, setTab] = useState<"trades" | "holders" | "about">("trades");
@@ -29,7 +32,13 @@ export default function CoinPage() {
   const qDec = coin.quote_decimals ?? 9;
   const target = qSym === "SOL" && Number(cfg.global.initialVirtualSolReserves) === 30e9 ? 85 : null;
   const copy = (s: string) => { navigator.clipboard.writeText(s); toast.push({ kind: "ok", title: "Copied" }); };
-  const isCreator = publicKey?.toBase58() === coin.creator;
+  const isCreator = publicKey?.toBase58() === coin.creator || (sharing?.exists && publicKey?.toBase58() === sharing.admin);
+  const tier = currentTier(cfg, coin, null);
+  const nextTier = (() => {
+    const t = cfg.feeConfig?.feeTiers ?? [];
+    const mcap = BigInt(Math.floor(coin.mcap));
+    return t.find((x) => BigInt(x.marketCapLamportsThreshold) > mcap) ?? null;
+  })();
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-3">
@@ -44,6 +53,9 @@ export default function CoinPage() {
               {graduated ? <Badge color="acc">AMM</Badge> : coin.complete ? <Badge color="gold">graduating</Badge> : <Badge>bonding curve</Badge>}
               {qSym !== "SOL" && <Badge>pair /{qSym}</Badge>}
               {!!coin.is_holder_reward && <Badge color="acc">rewards → holders</Badge>}
+              {coin.creator_kind === "sharing" && <Badge color="acc">fees shared</Badge>}
+              {coin.creator_kind === "social" && <Badge color="acc">fees → X account</Badge>}
+              {coin.creator_kind === "donation" && <Badge color="acc">fees → charity</Badge>}
             </div>
             <div className="flex items-center gap-2 flex-wrap text-[12px] text-mute mt-1">
               <button onClick={() => copy(coin.mint)} className="pill !h-7 num hover:border-line2" title="Copy contract address">{short(coin.mint, 5)} <span className="text-dim">⧉</span></button>
@@ -129,12 +141,14 @@ export default function CoinPage() {
           </div>
         )}
         <div className="panel p-3 text-[12px] text-mute space-y-1.5">
-          <div className="label mb-1">Fee split on every trade</div>
-          <Row k={coin.is_holder_reward ? "Holders" : "Creator"} v={`${Number(cfg.global.creatorFeeBasisPoints) / 100}%`} />
-          <Row k="Protocol" v={`${Number(cfg.global.feeBasisPoints) / 100}%`} />
+          <div className="label mb-1">Fee split on every trade{tier ? " · tiered by market cap" : ""}</div>
+          <Row k={coin.is_holder_reward ? "Holders" : coin.creator_kind === "sharing" ? "Creator (shared)" : "Creator"} v={`${Number(tier ? tier.creatorFeeBps : cfg.global.creatorFeeBasisPoints) / 100}%`} />
+          <Row k="Protocol" v={`${Number(tier ? tier.protocolFeeBps : cfg.global.feeBasisPoints) / 100}%`} />
+          {tier && nextTier && <p className="text-[11px] pt-1">Drops to {(Number(nextTier.fees.protocolFeeBps) + Number(nextTier.fees.creatorFeeBps)) / 100}% total above {qty(nextTier.marketCapLamportsThreshold, qDec, 0)} {qSym} market cap.</p>}
           {graduated && cfg.global.amm && <Row k="AMM LPs" v={`${Number(cfg.global.amm.lpFeeBasisPoints) / 100}%`} />}
-          {isCreator && !coin.is_holder_reward && <Link to="/profile" className="btn btn-ghost w-full mt-2 !h-9">Claim your fees →</Link>}
+          {isCreator && !coin.is_holder_reward && coin.creator_kind === "wallet" && <Link to="/profile" className="btn btn-ghost w-full mt-2 !h-9">Claim your fees →</Link>}
         </div>
+        {!coin.is_holder_reward && (coin.creator_kind === "wallet" || coin.creator_kind === "sharing") && <SharingCard coin={coin} sharing={sharing ?? null} />}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { Connection, PublicKey, type ConfirmedSignatureInfo } from "@solana/web3.js";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, OpenpumpClient, decodeEventsFromParsedTx, type DecodedEvent } from "@openpump/sdk";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, FEES_PROGRAM_ID, OpenpumpClient, decodeEventsFromParsedTx, type DecodedEvent } from "@openpump/sdk";
 import type { Db } from "./db";
 import { fetchMetadata } from "./metadata";
 
@@ -30,7 +30,7 @@ export class Indexer {
 
   async start() {
     this.running = true;
-    for (const p of [CURVE_PROGRAM_ID, AMM_PROGRAM_ID]) await this.backfill(p).catch((e) => console.error("backfill", p.toBase58(), e));
+    for (const p of [CURVE_PROGRAM_ID, AMM_PROGRAM_ID, FEES_PROGRAM_ID]) await this.backfill(p).catch((e) => console.error("backfill", p.toBase58(), e));
     const interval = Number(process.env.POLL_MS || (this.conn.rpcEndpoint.includes("api.devnet") || this.conn.rpcEndpoint.includes("api.mainnet") ? 6000 : 2500));
     let flip = 0;
     let backoff = 0;
@@ -38,8 +38,10 @@ export class Indexer {
       if (!this.running) return;
       try {
         // alternate programs per tick to stay under public-RPC rate limits
-        await this.pollNew(flip++ % 2 === 0 ? CURVE_PROGRAM_ID : AMM_PROGRAM_ID);
+        const programs = [CURVE_PROGRAM_ID, AMM_PROGRAM_ID, FEES_PROGRAM_ID];
+        await this.pollNew(programs[flip++ % programs.length]);
         if (flip % 4 === 0) await this.fetchPendingMetadata();
+        if (flip % 6 === 0) await this.resolveCreatorKinds();
         backoff = 0;
       } catch (e) {
         const msg = (e as Error).message || "";
@@ -152,6 +154,8 @@ export class Indexer {
             (num(d.virtualSolReserves) / num(d.virtualTokenReserves)) * num(d.tokenTotalSupply),
             q.mint, q.symbol, q.decimals, d.isHolderReward ? 1 : 0
           );
+        const kind = d.isHolderReward ? "holders" : toStr(d.creator) === toStr(d.user) ? "wallet" : "pending";
+        this.db.prepare("UPDATE coins SET creator_kind=? WHERE mint=?").run(kind, toStr(d.mint));
         this.broadcast({ type: "create", mint: toStr(d.mint), name: d.name, symbol: d.symbol, creator: toStr(d.creator), ts });
       },
       "curve:TradeEvent": () => {
@@ -175,6 +179,16 @@ export class Indexer {
           .run(toStr(d.virtualSolReserves), toStr(d.virtualTokenReserves), toStr(d.realSolReserves), toStr(d.realTokenReserves), price, mcap, ts, toStr(d.solAmount), toStr(d.creatorFee), toStr(d.protocolFee), mint);
         this.broadcast({ type: "trade", venue: "curve", mint, user: toStr(d.user), isBuy: d.isBuy, sol: toStr(d.solAmount), tokens: toStr(d.tokenAmount), price, mcap, ts, sig: ev.signature });
       },
+      "curve:SetCreatorEvent": () => {
+        this.db.prepare("UPDATE coins SET creator=?, creator_kind='pending' WHERE mint=?").run(toStr(d.newCreator), toStr(d.mint));
+      },
+      "fees:CreateFeeSharingConfigEvent": () => {
+        this.db.prepare("UPDATE coins SET creator=?, creator_kind='sharing' WHERE mint=?").run(toStr(d.sharingConfig), toStr(d.mint));
+        this.broadcast({ type: "sharing", mint: toStr(d.mint), ts });
+      },
+      "curve:DistributeCreatorFeesEvent": () => this.broadcast({ type: "sharing_payout", mint: toStr(d.mint), distributed: toStr(d.distributed), ts }),
+      "amm:DistributeCoinCreatorFeesEvent": () => this.broadcast({ type: "sharing_payout", pool: toStr(d.pool), distributed: toStr(d.distributed), ts }),
+      "fees:SocialFeePdaClaimed": () => this.broadcast({ type: "social_claim", userId: d.userId, platform: num(d.platform), amount: toStr(d.amount), recipient: toStr(d.recipient), ts }),
       "curve:CompleteEvent": () => {
         this.db.prepare("UPDATE coins SET complete=1, completed_at=? WHERE mint=?").run(ts, toStr(d.mint));
         this.broadcast({ type: "complete", mint: toStr(d.mint), ts });
@@ -226,6 +240,15 @@ export class Indexer {
       )
       .run(toStr(d.poolBaseReserves), toStr(d.poolQuoteReserves), price, mcap, ts, sol, toStr(d.coinCreatorFee), toStr(d.protocolFee), mint);
     this.broadcast({ type: "trade", venue: "amm", mint, user: toStr(d.user), isBuy, sol, tokens, price, mcap, ts, sig: ev.signature });
+  }
+
+  /** Classify PDA creators (sharing / social / donation) with one RPC read each. */
+  private async resolveCreatorKinds() {
+    const rows = this.db.prepare("SELECT mint, creator FROM coins WHERE creator_kind='pending' LIMIT 5").all() as any[];
+    for (const r of rows) {
+      const kind = await this.client.creatorKind(new PublicKey(r.creator), new PublicKey(r.mint)).catch(() => "unknown");
+      this.db.prepare("UPDATE coins SET creator_kind=? WHERE mint=?").run(kind === "unknown" ? "wallet" : kind, r.mint);
+    }
   }
 
   // ------------------------------------------------------------- metadata

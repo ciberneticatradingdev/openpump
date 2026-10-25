@@ -38,6 +38,7 @@ export interface Coin {
   quote_decimals: number;
   is_holder_reward: number;
   holder_paid: string;
+  creator_kind: "wallet" | "holders" | "sharing" | "social" | "donation" | "pending";
 }
 
 export const WSOL = "So11111111111111111111111111111111111111112";
@@ -67,9 +68,13 @@ export interface Incentives {
   mint: string; symbol: string; decimals: number; startTime: number; endTime: number; secondsInADay: number; active: boolean; today: number | null;
   supplyToday: string; volumeToday: string; totalTokenSupply: string[]; solVolumes: string[];
 }
+export interface TierFeesS { lpFeeBps: string; protocolFeeBps: string; creatorFeeBps: string }
+export interface FeeConfigS { flatFees: TierFeesS; feeTiers: { marketCapLamportsThreshold: string; fees: TierFeesS }[]; stableFeeTiers: { marketCapLamportsThreshold: string; fees: TierFeesS }[]; exoticFlatFees: TierFeesS; stableMints: string[] }
 export interface Config {
   quoteMints: QuoteMintInfo[];
   incentives: Incentives | null;
+  feeConfig: FeeConfigS | null;
+  feesProgram: string;
   curveProgram: string;
   ammProgram: string;
   rpc: string;
@@ -84,6 +89,8 @@ export interface Config {
     initialRealTokenReserves: string;
     tokenTotalSupply: string;
     migrationFeeLamports: string;
+    buybackBasisPoints?: string;
+    buybackFeeRecipient?: string;
     antiSnipeSlots: string;
     antiSnipeMaxBps: string;
     paused: boolean;
@@ -126,3 +133,9 @@ export const useRewards = (mint?: string, enabled = true) =>
 
 export const useUserIncentives = (pubkey?: string) =>
   useQuery({ queryKey: ["incentives", pubkey], queryFn: () => get<{ exists: boolean; claimable: string; projectedToday: string; currentSolVolume: string; totalClaimed: string }>(`/api/user/${pubkey}/incentives`), enabled: !!pubkey, refetchInterval: 15_000 });
+
+export interface Sharing { exists: boolean; admin?: string; adminRevoked?: boolean; active?: boolean; shareholders?: { address: string; shareBps: number }[]; pendingCurve?: string; pendingAmm?: string }
+export const useSharing = (mint?: string, enabled = true) =>
+  useQuery({ queryKey: ["sharing", mint], queryFn: () => get<Sharing>(`/api/coins/${mint}/sharing`), enabled: !!mint && enabled, refetchInterval: 15_000 });
+export const useSocial = (platform: number, userId?: string) =>
+  useQuery({ queryKey: ["social", platform, userId], queryFn: () => get<{ address: string; exists: boolean; pendingVault: string; claimable: string; coins: Coin[] }>(`/api/social/${platform}/${encodeURIComponent(userId!)}`), enabled: !!userId && userId.length > 0, refetchInterval: 15_000 });

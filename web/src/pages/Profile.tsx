@@ -4,7 +4,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { useCoins, useConfig, useCreator, useUserIncentives, type Coin } from "../lib/api";
+import { useCoins, useConfig, useCreator, useSocial, useUserIncentives, type Coin } from "../lib/api";
 import { useClient, useSendTx, useToast } from "../lib/solana";
 import { qty, short, sol, tokens as fmtTokens } from "../lib/format";
 import CoinCard from "../components/CoinCard";
@@ -27,6 +27,9 @@ export default function ProfilePage() {
   const { data: inc, refetch: refetchInc } = useUserIncentives(pubkey);
   const [busy, setBusy] = useState(false);
   const campaign = cfg?.incentives ?? null;
+  const [handle, setHandle] = useState("");
+  const handleId = handle.trim().replace(/^@/, "").toLowerCase();
+  const { data: social } = useSocial(1, /^[a-z0-9_]{1,15}$/.test(handleId) ? handleId : undefined);
   const claimIncentives = async () => {
     if (!publicKey || !campaign) return;
     setBusy(true);
@@ -144,6 +147,20 @@ export default function ProfilePage() {
           </div>
         </section>
       )}
+
+      <section className="panel p-4 flex flex-wrap items-center gap-4">
+        <div className="flex-1 min-w-[240px]">
+          <div className="font-head font-semibold text-[14px]">Fees earned by an X account</div>
+          <div className="text-[12px] text-mute mt-0.5">Coins can be launched with their creator fee going to an X handle. Look one up; claiming requires verifying that X login with the OpenPump team.</div>
+        </div>
+        <input className="input !h-10 w-48 text-[13px]" placeholder="@handle" value={handle} onChange={(e) => setHandle(e.target.value)} />
+        {social && (
+          <div className="flex gap-2">
+            <div className="panel px-3 py-2 min-w-[130px]"><div className="label">Coins</div><div className="kpi">{social.coins.length}</div></div>
+            <div className="panel px-3 py-2 min-w-[150px]"><div className="label">Earned, unclaimed</div><div className="kpi">{sol(Number(social.pendingVault) + Number(social.claimable), 4)} SOL</div></div>
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <section className="panel">

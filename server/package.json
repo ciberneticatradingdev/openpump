@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "admin:init": "tsx src/admin.ts init",
-    "admin:params": "tsx src/admin.ts params"
+    "admin:params": "tsx src/admin.ts params",
+    "admin:fees": "tsx src/admin.ts fees"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",

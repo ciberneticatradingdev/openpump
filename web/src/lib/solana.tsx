@@ -41,7 +41,11 @@ export function SolanaProviders({ children }: { children: ReactNode }) {
 
 export function useClient() {
   const { connection } = useConnection();
-  return useMemo(() => new OpenpumpClient(connection), [connection]);
+  return useMemo(() => {
+    const c = new OpenpumpClient(connection);
+    c.detectFeeProgram().catch(() => {}); // flags fee_config / buyback for trade builders
+    return c;
+  }, [connection]);
 }
 
 /** Sign + send + confirm with toasts; returns the signature or null. */

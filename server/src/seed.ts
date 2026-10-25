@@ -7,7 +7,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import { DEFAULT_AMM_FEES, DEFAULT_PARAMS, OpenpumpClient, curve as curveMath, pda } from "@openpump/sdk";
+import { DEFAULT_AMM_FEES, DEFAULT_FEE_TIERS, DEFAULT_FLAT_FEES, DEFAULT_PARAMS, OpenpumpClient, curve as curveMath, pda } from "@openpump/sdk";
 import { createMint, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 
 const RPC = process.env.RPC_URL || "http://127.0.0.1:8899";
@@ -61,6 +61,12 @@ async function main() {
     ]);
     console.log("initialized global + amm config");
   }
+  if (!(await conn.getAccountInfo(pda.feeConfig()))) {
+    await send(await client.initializeFeeProgramIxs(admin.publicKey, admin.publicKey, DEFAULT_FLAT_FEES, DEFAULT_FEE_TIERS));
+    await send([await client.setParamsIx(admin.publicKey, { feeRecipient: admin.publicKey, ...DEFAULT_PARAMS, antiSnipeSlots: 0n, buybackBasisPoints: 2000n, buybackFeeRecipient: pda.buybackVault(0) })]);
+    console.log("fees program initialized: tiers + buyback vault (20 % of protocol fee)");
+  }
+  await client.detectFeeProgram();
   const global = await client.fetchGlobal();
 
   const local = RPC.includes("127.0.0.1") || RPC.includes("localhost");

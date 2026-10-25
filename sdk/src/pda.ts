@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, FEES_PROGRAM_ID, MPL_TOKEN_METADATA_PROGRAM_ID, WSOL_MINT } from "./ids";
 
 const u16le = (n: number) => Buffer.from([n & 0xff, (n >> 8) & 0xff]);
 
@@ -21,6 +21,15 @@ export const pda = {
   /** Holder rewards: the "creator" of a holder-reward coin, and the vault its fees accrue in. */
   holderRewards: (mint: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("holder-rewards"), mint.toBuffer()], CURVE_PROGRAM_ID)[0],
   holderVault: (mint: PublicKey) => pda.creatorVault(pda.holderRewards(mint)),
+  /** Fees program */
+  feeProgramGlobal: () => PublicKey.findProgramAddressSync([Buffer.from("fee-program-global")], FEES_PROGRAM_ID)[0],
+  feeConfig: () => PublicKey.findProgramAddressSync([Buffer.from("fee-config")], FEES_PROGRAM_ID)[0],
+  sharingConfig: (mint: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("sharing-config"), mint.toBuffer()], FEES_PROGRAM_ID)[0],
+  socialFeePda: (userId: string, platform: number) =>
+    PublicKey.findProgramAddressSync([Buffer.from("social-fee-pda"), Buffer.from(userId), Buffer.from([platform])], FEES_PROGRAM_ID)[0],
+  donationFeePda: (mint: PublicKey, beneficiary: PublicKey) =>
+    PublicKey.findProgramAddressSync([Buffer.from("donation-fee-pda"), mint.toBuffer(), beneficiary.toBuffer()], FEES_PROGRAM_ID)[0],
+  buybackVault: (index = 0) => PublicKey.findProgramAddressSync([Buffer.from("buyback"), Buffer.from([index])], FEES_PROGRAM_ID)[0],
   /** Volume incentives */
   globalVolumeAccumulator: () => PublicKey.findProgramAddressSync([Buffer.from("global_volume_accumulator")], CURVE_PROGRAM_ID)[0],
   userVolumeAccumulator: (user: PublicKey) => PublicKey.findProgramAddressSync([Buffer.from("user_volume_accumulator"), user.toBuffer()], CURVE_PROGRAM_ID)[0],
