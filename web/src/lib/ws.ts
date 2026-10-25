@@ -20,6 +20,7 @@ export type LiveMsg =
   | { type: "create"; mint: string; name: string; symbol: string; creator: string; ts: number }
   | { type: "complete" | "migrate"; mint: string; ts: number }
   | { type: "holder_rewards"; mint: string; total: string; recipients: number; sig: string; ts: number }
+  | { type: "incentive_claim"; user: string; amount: string; ts: number }
   | { type: "hello" };
 
 const listeners = new Set<(m: LiveMsg) => void>();
@@ -54,6 +55,8 @@ export function useLive(onMsg?: (m: LiveMsg) => void) {
         qc.invalidateQueries({ queryKey: ["candles", m.mint] });
         qc.invalidateQueries({ queryKey: ["coins"] });
         qc.invalidateQueries({ queryKey: ["activity"] });
+      } else if (m.type === "incentive_claim") {
+        qc.invalidateQueries({ queryKey: ["incentives", m.user] });
       } else if (m.type === "holder_rewards") {
         qc.invalidateQueries({ queryKey: ["rewards", m.mint] });
         qc.invalidateQueries({ queryKey: ["coin", m.mint] });

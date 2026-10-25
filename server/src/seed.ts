@@ -134,6 +134,17 @@ async function main() {
       console.log("  4 AMM buys done");
     }
   }
+  // ---- trade-to-earn demo campaign (localnet: 60-second "days", 10k OPENPUMP/day) — buys above are untracked; UI buys will be
+  if (local || process.env.SEED_INCENTIVES) {
+    const incMint = await createMint(conn, admin, admin.publicKey, null, 6);
+    const now = Math.floor(Date.now() / 1000);
+    const day = Number(process.env.INCENTIVE_DAY_SECONDS || 60);
+    await send([await client.adminUpdateIncentivesIx(admin.publicKey, incMint, { startTime: now + 5, endTime: now + 5 + day * 29, secondsInADay: day, dayNumber: 30, tokenSupplyPerDay: 10_000n * 1_000_000n })]);
+    const vault = getAssociatedTokenAddressSync(incMint, pda.globalVolumeAccumulator(), true);
+    await mintTo(conn, admin, incMint, vault, admin, 1_000_000 * 1e6);
+    console.log("incentive campaign: mint", incMint.toBase58(), `${day}s days, 10k/day, vault funded`);
+  }
+
   // ---- holder-rewards demo coin: fees accrue to holders, crank pays them out
   {
     const kp = Keypair.generate();
@@ -145,8 +156,12 @@ async function main() {
       const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });
       const tc = new OpenpumpClient(conn, tp);
       const sol = BigInt(Math.floor((local ? 1 + Math.random() * 3 : 0.02) * 1e9));
-      const ix = await tc.buyExactSolIx(t.publicKey, kp.publicKey, holderPda, global.feeRecipient, sol, 0n);
-      await tp.sendAndConfirm(new Transaction().add(ix), [t]);
+      // tracked buys (trade-to-earn) when a campaign exists: init the accumulator first
+      const tracked = !!(await client.fetchIncentives());
+      const ixs = [];
+      if (tracked) { await new Promise((r) => setTimeout(r, 6000)); ixs.push(await tc.initUserVolumeIx(t.publicKey)); }
+      ixs.push(await tc.buyExactSolIx(t.publicKey, kp.publicKey, holderPda, global.feeRecipient, sol, 0n, tracked));
+      await tp.sendAndConfirm(new Transaction().add(...ixs), [t]);
     }
     console.log("  3 HODL buys; pot:", Number(await client.holderPot(kp.publicKey)) / 1e9, "SOL");
   }

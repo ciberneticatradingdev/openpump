@@ -192,6 +192,7 @@ export class Indexer {
         this.db.prepare("UPDATE coins SET holder_paid=CAST(CAST(holder_paid AS INTEGER)+CAST(? AS INTEGER) AS TEXT) WHERE mint=?").run(toStr(d.total), mint);
         this.broadcast({ type: "holder_rewards", mint, total: toStr(d.total), recipients: num(d.recipients), sig: ev.signature, ts });
       },
+      "curve:ClaimTokenIncentivesEvent": () => this.broadcast({ type: "incentive_claim", user: toStr(d.user), amount: toStr(d.amount), ts }),
       "amm:BuyEvent": () => this.ammTrade(ev, idx, true, ts),
       "amm:SellEvent": () => this.ammTrade(ev, idx, false, ts),
       "amm:CreatePoolEvent": () => {

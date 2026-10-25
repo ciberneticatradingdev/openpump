@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCoins, useConfig, useStats, type Coin } from "../lib/api";
 import { useLive } from "../lib/ws";
-import { sol } from "../lib/format";
+import { qty, sol } from "../lib/format";
 import CoinCard, { CoinCardSkeleton } from "../components/CoinCard";
 import Ticker from "../components/Ticker";
 import { BRAND } from "../lib/brand";
@@ -47,6 +47,15 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {cfg?.incentives?.active && (
+        <Link to="/profile" className="panel panel-hover px-4 py-2.5 flex flex-wrap items-center gap-3 text-[13px]">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-acc bg-acc/10 border border-acc/30 rounded-full px-1.5 py-0.5">trade to earn</span>
+          <span>Day {(cfg.incentives.today ?? 0) + 1}: <b className="num">{qty(cfg.incentives.supplyToday, cfg.incentives.decimals, 0)} {cfg.incentives.symbol}</b> split by SOL buy volume on bonding curves.</span>
+          <span className="text-mute num">{sol(cfg.incentives.volumeToday, 2)} SOL traded today</span>
+          <span className="ml-auto text-acc">Your rewards →</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {COLS.map((col) => (

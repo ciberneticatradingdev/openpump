@@ -3,7 +3,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { amm as ammMath, curve as curveMath, type PoolState } from "@openpump/sdk";
+import { amm as ammMath, curve as curveMath, incentives as incMath, pda, type PoolState } from "@openpump/sdk";
 import { isV2, type Coin, type Config } from "../lib/api";
 import { useClient, useSendTx } from "../lib/solana";
 import { qty, tokens as fmtTokens } from "../lib/format";
@@ -115,9 +115,15 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
         const units = toUnits(Number(amt), qDec);
         const minOut = (quote.out * (10000n - slipBps)) / 10000n;
         if (!graduated) {
-          ixs = v2
-            ? [await client.buyExactQuoteInIx(publicKey, mint, creator, feeRecipient, quoteMint, units, minOut)]
-            : [await client.buyExactSolIx(publicKey, mint, creator, feeRecipient, units, minOut)];
+          if (v2) ixs = [await client.buyExactQuoteInIx(publicKey, mint, creator, feeRecipient, quoteMint, units, minOut)];
+          else {
+            // trade-to-earn: count this buy toward the volume campaign when one is live
+            const inc = cfg.incentives;
+            const track = !!inc && incMath.active({ ...inc, totalTokenSupply: [], solVolumes: [] });
+            ixs = [];
+            if (track && !(await connection.getAccountInfo(pda.userVolumeAccumulator(publicKey), "confirmed"))) ixs.push(await client.initUserVolumeIx(publicKey));
+            ixs.push(await client.buyExactSolIx(publicKey, mint, creator, feeRecipient, units, minOut, track));
+          }
         } else {
           const maxIn = (quote.cost * (10000n + slipBps)) / 10000n;
           ixs = await client.ammBuyIxs(publicKey, mint, pool!, new PublicKey(g.amm!.protocolFeeRecipient), quote.out, maxIn > units ? units : maxIn);
@@ -211,6 +217,9 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
             {!publicKey ? "Connect wallet" : busy ? "Sending…" : side === "buy" ? `Buy ${coin.symbol}` : `Sell ${coin.symbol}`}
           </button>
           <p className="text-[11px] text-dim text-center">{graduated ? "Trades on the AMM pool. Fees: LP + protocol + creator." : "Trades on the bonding curve. Creator earns from trade one."}</p>
+          {!graduated && !v2 && cfg.incentives?.active && side === "buy" && (
+            <p className="text-[11px] text-acc text-center">Trade to earn: this buy counts toward today's {cfg.incentives.symbol} rewards.</p>
+          )}
         </>
       )}
     </div>

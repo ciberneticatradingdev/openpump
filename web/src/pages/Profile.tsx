@@ -4,7 +4,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { useCoins, useConfig, useCreator, type Coin } from "../lib/api";
+import { useCoins, useConfig, useCreator, useUserIncentives, type Coin } from "../lib/api";
 import { useClient, useSendTx, useToast } from "../lib/solana";
 import { qty, short, sol, tokens as fmtTokens } from "../lib/format";
 import CoinCard from "../components/CoinCard";
@@ -24,7 +24,17 @@ export default function ProfilePage() {
   const toast = useToast();
   const [holdings, setHoldings] = useState<{ coin: Coin; amount: bigint }[]>([]);
   const { data: all } = useCoins("mcap", "", 200);
+  const { data: inc, refetch: refetchInc } = useUserIncentives(pubkey);
   const [busy, setBusy] = useState(false);
+  const campaign = cfg?.incentives ?? null;
+  const claimIncentives = async () => {
+    if (!publicKey || !campaign) return;
+    setBusy(true);
+    try {
+      const sig = await send([await client.claimIncentivesIx(publicKey, publicKey, new PublicKey(campaign.mint))], `Claim ${campaign.symbol} rewards`);
+      if (sig) setTimeout(() => refetchInc(), 1500);
+    } finally { setBusy(false); }
+  };
 
   useEffect(() => {
     if (!pubkey || !all) return;
@@ -114,6 +124,26 @@ export default function ProfilePage() {
           ))}
         </div>
       </div>
+
+      {campaign && (
+        <section className="panel p-4 flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-[240px]">
+            <div className="font-head font-semibold text-[14px]">Trade to earn <span className="text-acc">{campaign.symbol}</span> {campaign.active ? <span className="text-[10px] font-bold uppercase tracking-wider text-acc bg-acc/10 border border-acc/30 rounded-full px-1.5 py-0.5 ml-1">live · day {(campaign.today ?? 0) + 1}</span> : <span className="text-[10px] text-dim ml-1">not active</span>}</div>
+            <div className="text-[12px] text-mute mt-0.5">
+              Every SOL you buy on a bonding curve counts. Each day's pool of <b className="text-ink num">{qty(campaign.supplyToday, campaign.decimals, 0)} {campaign.symbol}</b> is split pro-rata by volume; claim after the day closes.
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="panel px-3 py-2 min-w-[140px]"><div className="label">Your volume today</div><div className="kpi">{sol(inc?.currentSolVolume || 0, 3)} SOL</div></div>
+            <div className="panel px-3 py-2 min-w-[140px]"><div className="label">Projected today</div><div className="kpi">{qty(inc?.projectedToday || 0, campaign.decimals, 2)}</div></div>
+            <div className="panel px-3 py-2 min-w-[150px]">
+              <div className="label">Claimable</div>
+              <div className="kpi">{qty(inc?.claimable || 0, campaign.decimals, 2)} {campaign.symbol}</div>
+              {isMe && <button onClick={claimIncentives} disabled={busy || Number(inc?.claimable || 0) <= 0} className="btn btn-acc !h-8 w-full mt-2 text-[12px]">Claim</button>}
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <section className="panel">

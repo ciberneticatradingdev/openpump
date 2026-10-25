@@ -129,3 +129,36 @@ export const fmt = {
   compact: (n: number) =>
     n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : n.toFixed(n < 10 ? 2 : 0),
 };
+
+/** Mirrors programs/openpump-curve/src/incentives.rs `settle` for client-side previews. */
+export interface IncentiveGlobal { startTime: number; endTime: number; secondsInADay: number; totalTokenSupply: bigint[]; solVolumes: bigint[] }
+export interface IncentiveUser { totalUnclaimedTokens: bigint; currentSolVolume: bigint; lastUpdateTimestamp: number }
+export const incentives = {
+  dayOf(ts: number, g: IncentiveGlobal) {
+    if (g.secondsInADay <= 0 || ts < g.startTime) return null;
+    return Math.floor((ts - g.startTime) / g.secondsInADay);
+  },
+  active(g: IncentiveGlobal | null, now = Math.floor(Date.now() / 1000)) {
+    return !!g && g.startTime > 0 && now >= g.startTime && now <= g.endTime;
+  },
+  /** Tokens a claim right now would pay: already-accrued + the completed previous day's share. */
+  claimable(g: IncentiveGlobal, u: IncentiveUser, now = Math.floor(Date.now() / 1000)) {
+    let total = u.totalUnclaimedTokens;
+    const today = incentives.dayOf(now, g);
+    const previous = incentives.dayOf(u.lastUpdateTimestamp, g);
+    if (today !== null && previous !== null) {
+      const endDay = incentives.dayOf(g.endTime, g) ?? 0;
+      if (previous < today && previous <= endDay && previous < 30 && g.solVolumes[previous] > 0n && u.currentSolVolume > 0n) {
+        total += (u.currentSolVolume * g.totalTokenSupply[previous]) / g.solVolumes[previous];
+      }
+    }
+    return total;
+  },
+  /** Projected share of today's supply at the current volumes (changes until the day closes). */
+  projectedToday(g: IncentiveGlobal, u: IncentiveUser, now = Math.floor(Date.now() / 1000)) {
+    const today = incentives.dayOf(now, g);
+    const last = incentives.dayOf(u.lastUpdateTimestamp, g);
+    if (today === null || last !== today || today >= 30 || g.solVolumes[today] === 0n) return 0n;
+    return (u.currentSolVolume * g.totalTokenSupply[today]) / g.solVolumes[today];
+  },
+};

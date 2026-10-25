@@ -1,6 +1,6 @@
 import express from "express";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, DEFAULT_PARAMS, OpenpumpClient, pda } from "@openpump/sdk";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, DEFAULT_PARAMS, OpenpumpClient, incentives as incMath, pda } from "@openpump/sdk";
 import type { Db } from "./db";
 
 const SORTS: Record<string, string> = {
@@ -52,6 +52,39 @@ export function apiRouter(db: Db, conn: Connection) {
     }
   };
 
+  let incCache: { at: number; value: any } | null = null;
+  const getIncentives = async () => {
+    if (incCache && Date.now() - incCache.at < 30_000) return incCache.value;
+    let value: any = null;
+    try {
+      const g = await client.fetchIncentives();
+      if (g && g.startTime > 0) {
+        const now = Math.floor(Date.now() / 1000);
+        const today = incMath.dayOf(now, g);
+        value = {
+          mint: g.mint.toBase58(), symbol: process.env.INCENTIVE_SYMBOL || "OPENPUMP", decimals: Number(process.env.INCENTIVE_DECIMALS || 6),
+          startTime: g.startTime, endTime: g.endTime, secondsInADay: g.secondsInADay, active: incMath.active(g, now), today,
+          supplyToday: today !== null && today < 30 ? g.totalTokenSupply[today].toString() : "0",
+          volumeToday: today !== null && today < 30 ? g.solVolumes[today].toString() : "0",
+          totalTokenSupply: g.totalTokenSupply.map(String), solVolumes: g.solVolumes.map(String),
+        };
+      }
+    } catch {}
+    incCache = { at: Date.now(), value };
+    return value;
+  };
+
+  r.get("/api/user/:pubkey/incentives", async (req, res) => {
+    try {
+      const g = await client.fetchIncentives();
+      const u = await client.fetchUserVolume(new PublicKey(req.params.pubkey));
+      if (!g || !u) return res.json({ exists: !!u, claimable: "0", projectedToday: "0", currentSolVolume: u?.currentSolVolume.toString() ?? "0", totalClaimed: u?.totalClaimedTokens.toString() ?? "0" });
+      res.json({ exists: true, claimable: incMath.claimable(g, u).toString(), projectedToday: incMath.projectedToday(g, u).toString(), currentSolVolume: u.currentSolVolume.toString(), totalClaimed: u.totalClaimedTokens.toString() });
+    } catch (e) {
+      res.status(400).json({ error: (e as Error).message });
+    }
+  });
+
   r.get("/api/config", async (_req, res) => {
     const quoteMints = [{ mint: "So11111111111111111111111111111111111111112", symbol: "SOL", decimals: 9 }];
     for (const entry of (process.env.QUOTE_MINTS || "").split(",").filter(Boolean)) {
@@ -60,6 +93,7 @@ export function apiRouter(db: Db, conn: Connection) {
     }
     res.json({
       quoteMints,
+      incentives: await getIncentives(),
       curveProgram: CURVE_PROGRAM_ID.toBase58(),
       ammProgram: AMM_PROGRAM_ID.toBase58(),
       rpc: process.env.PUBLIC_RPC_URL || process.env.RPC_URL,

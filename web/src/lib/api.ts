@@ -63,8 +63,13 @@ export interface Trade {
   image?: string | null;
 }
 
+export interface Incentives {
+  mint: string; symbol: string; decimals: number; startTime: number; endTime: number; secondsInADay: number; active: boolean; today: number | null;
+  supplyToday: string; volumeToday: string; totalTokenSupply: string[]; solVolumes: string[];
+}
 export interface Config {
   quoteMints: QuoteMintInfo[];
+  incentives: Incentives | null;
   curveProgram: string;
   ammProgram: string;
   rpc: string;
@@ -118,3 +123,6 @@ export const useCreator = (pubkey?: string) =>
 export interface Rewards { isHolderReward: boolean; paid: string; pot: string; distributions: { sig: string; mint: string; total: string; recipients: number; ts: number }[] }
 export const useRewards = (mint?: string, enabled = true) =>
   useQuery({ queryKey: ["rewards", mint], queryFn: () => get<Rewards>(`/api/coins/${mint}/rewards`), enabled: !!mint && enabled, refetchInterval: 15_000 });
+
+export const useUserIncentives = (pubkey?: string) =>
+  useQuery({ queryKey: ["incentives", pubkey], queryFn: () => get<{ exists: boolean; claimable: string; projectedToday: string; currentSolVolume: string; totalClaimed: string }>(`/api/user/${pubkey}/incentives`), enabled: !!pubkey, refetchInterval: 15_000 });
