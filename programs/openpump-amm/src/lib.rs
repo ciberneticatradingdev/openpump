@@ -19,6 +19,8 @@ use anchor_spl::token_interface::{
 
 pub mod math;
 use math::*;
+pub mod multihop;
+use multihop::*;
 use openpump_fee_types::{ConfigStatus, FeeConfig, SharingConfig, FEES_PROGRAM_ID, FEE_CONFIG_SEED, SHARING_CONFIG_SEED};
 
 declare_id!("BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb");
@@ -503,6 +505,11 @@ pub mod openpump_amm {
             timestamp: Clock::get()?.unix_timestamp,
         });
         Ok(())
+    }
+
+    /// Route through up to 4 pools in one instruction (see multihop.rs for the remaining-accounts layout).
+    pub fn multi_hop_swap<'info>(ctx: Context<'_, '_, 'info, 'info, MultiHopSwap<'info>>, amount_in: u64, min_amount_out: u64) -> Result<()> {
+        multihop::multi_hop_swap(ctx, amount_in, min_amount_out)
     }
 
     /// Protocol: community takeover of a pool's coin creator (mirrors the curve's admin_cto).

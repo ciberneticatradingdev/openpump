@@ -2013,6 +2013,172 @@
       ]
     },
     {
+      "name": "multi_hop_swap",
+      "docs": [
+        "Route through up to 4 pools in one instruction (see multihop.rs for the remaining-accounts layout)."
+      ],
+      "discriminator": [
+        43,
+        100,
+        73,
+        19,
+        233,
+        246,
+        111,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_in_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_out_token_account",
+          "writable": true
+        },
+        {
+          "name": "global_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_config",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "token_2022_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "event_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in",
+          "type": "u64"
+        },
+        {
+          "name": "min_amount_out",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "sell",
       "docs": [
         "Sell an exact amount of base tokens, receiving at least `min_quote_amount_out` (after fees)."
@@ -3360,6 +3526,19 @@
       ]
     },
     {
+      "name": "MultiHopSwapEvent",
+      "discriminator": [
+        234,
+        159,
+        160,
+        154,
+        165,
+        156,
+        255,
+        85
+      ]
+    },
+    {
       "name": "SellEvent",
       "discriminator": [
         62,
@@ -3900,6 +4079,42 @@
           {
             "name": "max_configurable_creator_fee_bps",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiHopSwapEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "input_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "output_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          },
+          {
+            "name": "legs",
+            "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

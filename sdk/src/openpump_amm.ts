@@ -2019,6 +2019,172 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "multiHopSwap",
+      "docs": [
+        "Route through up to 4 pools in one instruction (see multihop.rs for the remaining-accounts layout)."
+      ],
+      "discriminator": [
+        43,
+        100,
+        73,
+        19,
+        233,
+        246,
+        111,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "userInTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "userOutTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "globalConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeConfig",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                50,
+                191,
+                176,
+                155,
+                212,
+                196,
+                247,
+                247,
+                172,
+                197,
+                92,
+                253,
+                33,
+                102,
+                203,
+                247,
+                159,
+                252,
+                203,
+                183,
+                61,
+                58,
+                213,
+                149,
+                62,
+                171,
+                3,
+                137,
+                31,
+                188,
+                106
+              ]
+            }
+          }
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "token2022Program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "eventAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  95,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amountIn",
+          "type": "u64"
+        },
+        {
+          "name": "minAmountOut",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "sell",
       "docs": [
         "Sell an exact amount of base tokens, receiving at least `min_quote_amount_out` (after fees)."
@@ -3366,6 +3532,19 @@ export type OpenpumpAmm = {
       ]
     },
     {
+      "name": "multiHopSwapEvent",
+      "discriminator": [
+        234,
+        159,
+        160,
+        154,
+        165,
+        156,
+        255,
+        85
+      ]
+    },
+    {
       "name": "sellEvent",
       "discriminator": [
         62,
@@ -3906,6 +4085,42 @@ export type OpenpumpAmm = {
           {
             "name": "maxConfigurableCreatorFeeBps",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiHopSwapEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "inputMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "outputMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amountIn",
+            "type": "u64"
+          },
+          {
+            "name": "amountOut",
+            "type": "u64"
+          },
+          {
+            "name": "legs",
+            "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
