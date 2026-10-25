@@ -2199,10 +2199,6 @@
           "type": "pubkey"
         },
         {
-          "name": "is_mayhem_mode",
-          "type": "bool"
-        },
-        {
           "name": "is_holder_reward",
           "type": "bool"
         },
@@ -4198,95 +4194,6 @@
       ]
     },
     {
-      "name": "toggle_mayhem_mode",
-      "docs": [
-        "Allow pools to be created in mayhem mode (migration pools inherit the curve's flag regardless)."
-      ],
-      "discriminator": [
-        1,
-        9,
-        111,
-        208,
-        100,
-        31,
-        255,
-        163
-      ],
-      "accounts": [
-        {
-          "name": "admin",
-          "signer": true,
-          "relations": [
-            "global_config"
-          ]
-        },
-        {
-          "name": "global_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  108,
-                  111,
-                  98,
-                  97,
-                  108,
-                  45,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "event_authority",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  95,
-                  95,
-                  101,
-                  118,
-                  101,
-                  110,
-                  116,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "program"
-        }
-      ],
-      "args": [
-        {
-          "name": "enabled",
-          "type": "bool"
-        }
-      ]
-    },
-    {
       "name": "update_admin",
       "discriminator": [
         161,
@@ -5327,46 +5234,41 @@
     },
     {
       "code": 6014,
-      "name": "MayhemDisabled",
-      "msg": "Mayhem mode is disabled"
-    },
-    {
-      "code": 6015,
       "name": "BoostDisabled",
       "msg": "Boost is disabled"
     },
     {
-      "code": 6016,
+      "code": 6015,
       "name": "AlreadyBoosted",
       "msg": "Pool already has a boost in flight"
     },
     {
-      "code": 6017,
+      "code": 6016,
       "name": "NotMigrationPool",
       "msg": "Only migration pools can be boosted"
     },
     {
-      "code": 6018,
+      "code": 6017,
       "name": "PoolHasLiquidityProviders",
       "msg": "Pool has liquidity providers"
     },
     {
-      "code": 6019,
+      "code": 6018,
       "name": "BoostInProgress",
       "msg": "Liquidity is locked while a boost is in flight"
     },
     {
-      "code": 6020,
+      "code": 6019,
       "name": "NothingToBoost",
       "msg": "Nothing to boost"
     },
     {
-      "code": 6021,
+      "code": 6020,
       "name": "InvalidAccount",
       "msg": "Not an account of this program"
     },
     {
-      "code": 6022,
+      "code": 6021,
       "name": "AlreadyExtended",
       "msg": "Account already has the current layout"
     }
@@ -5644,10 +5546,6 @@
             "type": "u64"
           },
           {
-            "name": "is_mayhem_mode",
-            "type": "bool"
-          },
-          {
             "name": "is_holder_reward",
             "type": "bool"
           },
@@ -5917,13 +5815,6 @@
             "type": "u64"
           },
           {
-            "name": "mayhem_mode_enabled",
-            "docs": [
-              "Pools may be created in mayhem mode by non-migration callers."
-            ],
-            "type": "bool"
-          },
-          {
             "name": "buyback_basis_points",
             "docs": [
               "Share of the protocol fee (bps) sent to `buyback_fee_recipient`'s quote ATA on direct swaps."
@@ -6089,10 +5980,6 @@
           },
           {
             "name": "can_edit_creator_fee",
-            "type": "bool"
-          },
-          {
-            "name": "is_mayhem_mode",
             "type": "bool"
           },
           {

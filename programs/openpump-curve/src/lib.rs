@@ -95,9 +95,6 @@ pub mod openpump_curve {
         g.admin_set_creator_authority = ctx.accounts.authority.key();
         g.creator_fee_configurable = true;
         g.max_configurable_creator_fee_bps = 100; // creators may set up to 1 %
-        g.mayhem_mode_enabled = false;
-        g.mayhem_initial_virtual_sol_reserves = params.initial_virtual_sol_reserves;
-        g.mayhem_initial_virtual_token_reserves = params.initial_virtual_token_reserves;
         g.apply(&params);
         emit_cpi!(SetParamsEvent { authority: g.authority, params, timestamp: Clock::get()?.unix_timestamp });
         Ok(())
@@ -120,11 +117,10 @@ pub mod openpump_curve {
     /// mint authority revoked. Anyone can call; `user` becomes the creator.
     /// `creator`: who earns the creator fee (Pubkey::default() = the launching wallet). May be a
     /// fees-program PDA (social / donation / sharing) so fees accrue there from trade one.
-    pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey, is_mayhem_mode: bool) -> Result<()> {
+    pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey) -> Result<()> {
         let g = &ctx.accounts.global;
         require!(!g.paused, CurveError::Paused);
         require!(!is_holder_reward || g.holder_reward_enabled, CurveError::HolderRewardDisabled);
-        require!(!is_mayhem_mode || g.mayhem_mode_enabled, CurveError::MayhemDisabled);
         require!(name.len() <= 32 && symbol.len() <= 10 && uri.len() <= 200, CurveError::MetadataTooLong);
 
         let mint_auth_seeds: &[&[u8]] = &[MINT_AUTHORITY_SEED, &[ctx.bumps.mint_authority]];
@@ -179,9 +175,8 @@ pub mod openpump_curve {
         bc.is_holder_reward = is_holder_reward;
         bc.creator_fee_bps = 0;
         bc.can_edit_creator_fee = !is_holder_reward;
-        bc.is_mayhem_mode = is_mayhem_mode;
-        bc.virtual_token_reserves = if is_mayhem_mode { g.mayhem_initial_virtual_token_reserves } else { g.initial_virtual_token_reserves };
-        bc.virtual_sol_reserves = if is_mayhem_mode { g.mayhem_initial_virtual_sol_reserves } else { g.initial_virtual_sol_reserves };
+        bc.virtual_token_reserves = g.initial_virtual_token_reserves;
+        bc.virtual_sol_reserves = g.initial_virtual_sol_reserves;
         bc.real_token_reserves = g.initial_real_token_reserves;
         bc.real_sol_reserves = 0;
         bc.token_total_supply = g.token_total_supply;
@@ -208,7 +203,6 @@ pub mod openpump_curve {
             quote_mint: bc.quote_mint,
             is_holder_reward: bc.is_holder_reward,
             token_program: ctx.accounts.token_program.key(),
-            is_mayhem_mode: bc.is_mayhem_mode,
         });
         Ok(())
     }
@@ -403,7 +397,6 @@ pub mod openpump_curve {
             base_amount,
             quote_amount,
             bc.creator,
-            bc.is_mayhem_mode,
             bc.is_holder_reward,
             bc.creator_fee_bps,
             bc.can_edit_creator_fee,
@@ -507,17 +500,6 @@ pub mod openpump_curve {
         Ok(())
     }
 
-    pub fn toggle_mayhem_mode(ctx: Context<AuthorityOnly>, enabled: bool) -> Result<()> {
-        ctx.accounts.global.mayhem_mode_enabled = enabled;
-        Ok(())
-    }
-    pub fn set_mayhem_virtual_params(ctx: Context<AuthorityOnly>, initial_virtual_sol_reserves: u64, initial_virtual_token_reserves: u64) -> Result<()> {
-        require!(initial_virtual_sol_reserves > 0 && initial_virtual_token_reserves > ctx.accounts.global.initial_real_token_reserves, CurveError::InvalidParams);
-        let g = &mut ctx.accounts.global;
-        g.mayhem_initial_virtual_sol_reserves = initial_virtual_sol_reserves;
-        g.mayhem_initial_virtual_token_reserves = initial_virtual_token_reserves;
-        Ok(())
-    }
     pub fn set_creator_fee_bps(ctx: Context<CreatorOnly>, creator_fee_bps: u64, lock: bool) -> Result<()> {
         admin::set_creator_fee_bps(ctx, creator_fee_bps, lock)
     }
@@ -554,8 +536,8 @@ pub mod openpump_curve {
 
     // ----- Token-2022 coins (see token2022.rs)
 
-    pub fn create_v3(ctx: Context<CreateV3>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey, is_mayhem_mode: bool) -> Result<()> {
-        token2022::create_v3(ctx, name, symbol, uri, is_holder_reward, creator, is_mayhem_mode)
+    pub fn create_v3(ctx: Context<CreateV3>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey) -> Result<()> {
+        token2022::create_v3(ctx, name, symbol, uri, is_holder_reward, creator)
     }
 
     // ----- custom pairs (v2 family, see quote.rs)
@@ -564,7 +546,7 @@ pub mod openpump_curve {
         quote::set_quote_config(ctx, params)
     }
     pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: String, is_holder_reward: bool, creator: Pubkey) -> Result<()> {
-        quote::create_v2(ctx, name, symbol, uri, is_holder_reward, creator) // custom pairs are never mayhem
+        quote::create_v2(ctx, name, symbol, uri, is_holder_reward, creator)
     }
     pub fn buy_v2(ctx: Context<TradeV2>, amount: u64, max_quote_cost: u64) -> Result<()> {
         quote::buy_v2(ctx, amount, max_quote_cost)
@@ -965,10 +947,6 @@ pub struct Global {
     pub admin_set_creator_authority: Pubkey,
     pub creator_fee_configurable: bool,
     pub max_configurable_creator_fee_bps: u64,
-    /// Mayhem mode: coins launched with it start from these virtual reserves and are traded by the mayhem vault.
-    pub mayhem_mode_enabled: bool,
-    pub mayhem_initial_virtual_sol_reserves: u64,
-    pub mayhem_initial_virtual_token_reserves: u64,
 }
 
 impl Global {
@@ -1012,8 +990,6 @@ pub struct BondingCurve {
     /// Per-coin creator fee override (bps). 0 = follow the fee schedule.
     pub creator_fee_bps: u64,
     pub can_edit_creator_fee: bool,
-    /// Launched in mayhem mode: the mayhem vault trades it until its deadline, then burns.
-    pub is_mayhem_mode: bool,
 }
 
 // ---------------------------------------------------------------- events
@@ -1042,7 +1018,6 @@ pub struct CreateEvent {
     pub quote_mint: Pubkey,
     pub is_holder_reward: bool,
     pub token_program: Pubkey,
-    pub is_mayhem_mode: bool,
 }
 
 #[event]
@@ -1148,6 +1123,4 @@ pub enum CurveError {
     CreatorFeeNotConfigurable,
     #[msg("Creator fee is locked for this coin")]
     CreatorFeeLocked,
-    #[msg("Mayhem mode is disabled")]
-    MayhemDisabled,
 }

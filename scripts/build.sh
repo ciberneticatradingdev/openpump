@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 source ~/.cargo/env
 anchor build --no-idl -- --tools-version v1.54 "$@"
 mkdir -p target/idl target/types
-for p in openpump_amm openpump_fees openpump_curve openpump_mayhem; do
+for p in openpump_amm openpump_fees openpump_curve; do
   anchor idl build -p "$p" -o "target/idl/$p.json" -t "target/types/$p.ts"
 done
 ls -la target/deploy/*.so target/idl/*.json target/types/*.ts

@@ -19,7 +19,6 @@ import { assert } from "chai";
 import { OpenpumpCurve } from "../target/types/openpump_curve";
 import { OpenpumpAmm } from "../target/types/openpump_amm";
 import { OpenpumpFees } from "../target/types/openpump_fees";
-import { OpenpumpMayhem } from "../target/types/openpump_mayhem";
 
 const MPL_TOKEN_METADATA = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
@@ -47,7 +46,6 @@ describe("OpenPump — curve + amm", () => {
   const curve = new Program<OpenpumpCurve>(require("../target/idl/openpump_curve.json"), provider);
   const amm = new Program<OpenpumpAmm>(require("../target/idl/openpump_amm.json"), provider);
   const fees = new Program<OpenpumpFees>(require("../target/idl/openpump_fees.json"), provider);
-  const mayhem = new Program<OpenpumpMayhem>(require("../target/idl/openpump_mayhem.json"), provider);
   const ZERO = PublicKey.default;
   const logsOf = async (e: any) => { try { return e.logs ?? (await e.getLogs?.(conn)) ?? []; } catch { return []; } };
   const admin = (provider.wallet as anchor.Wallet).payer;
@@ -150,7 +148,7 @@ describe("OpenPump — curve + amm", () => {
 
   it("creates a coin: metadata, full supply on the curve, mint authority revoked", async () => {
     await curve.methods
-      .create("People Coin", "PEOPLE", "https://example.com/people.json", false, PublicKey.default, false)
+      .create("People Coin", "PEOPLE", "https://example.com/people.json", false, PublicKey.default)
       .accounts({
         mint,
         mintAuthority,
@@ -475,7 +473,7 @@ describe("OpenPump — curve + amm", () => {
       MPL_TOKEN_METADATA
     );
     await curve.methods
-      .create("Snipe Test", "SNIPE", "https://example.com/s.json", false, PublicKey.default, false)
+      .create("Snipe Test", "SNIPE", "https://example.com/s.json", false, PublicKey.default)
       .accounts({
         mint: mint2.publicKey,
         mintAuthority,
@@ -684,7 +682,7 @@ describe("OpenPump — curve + amm", () => {
     it("a holder-reward coin's creator is the holder-rewards PDA and fees accrue in its vault", async () => {
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), mintH.publicKey.toBuffer()], MPL_TOKEN_METADATA);
       await curve.methods
-        .create("Holders Coin", "HODL", "https://example.com/h.json", true, PublicKey.default, false)
+        .create("Holders Coin", "HODL", "https://example.com/h.json", true, PublicKey.default)
         .accounts({
           mint: mintH.publicKey, mintAuthority, bondingCurve: bcH, associatedBondingCurve: getAssociatedTokenAddressSync(mintH.publicKey, bcH, true), global,
           mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID,
@@ -788,7 +786,7 @@ describe("OpenPump — curve + amm", () => {
       [bcV] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), mintV.publicKey.toBuffer()], curve.programId);
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), mintV.publicKey.toBuffer()], MPL_TOKEN_METADATA);
       await curve.methods
-        .create("Volume Coin", "VOL", "https://example.com/v.json", false, PublicKey.default, false)
+        .create("Volume Coin", "VOL", "https://example.com/v.json", false, PublicKey.default)
         .accounts({ mint: mintV.publicKey, mintAuthority, bondingCurve: bcV, associatedBondingCurve: getAssociatedTokenAddressSync(mintV.publicKey, bcV, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([creator, mintV])
         .rpc();
@@ -922,7 +920,7 @@ describe("OpenPump — curve + amm", () => {
       const m = Keypair.generate();
       const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
-      await curve.methods.create("Tier Coin", "TIER", "https://example.com/t.json", false, ZERO, false)
+      await curve.methods.create("Tier Coin", "TIER", "https://example.com/t.json", false, ZERO)
         .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([creator, m]).rpc();
       const accts = { ...tradeAccounts(trader.publicKey), mint: m.publicKey, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), associatedUser: getAssociatedTokenAddressSync(m.publicKey, trader.publicKey), feeConfig };
@@ -948,7 +946,7 @@ describe("OpenPump — curve + amm", () => {
       const m = Keypair.generate();
       const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
-      await curve.methods.create("Buyback Coin", "BB", "https://example.com/bb.json", false, ZERO, false)
+      await curve.methods.create("Buyback Coin", "BB", "https://example.com/bb.json", false, ZERO)
         .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([creator, m]).rpc();
       await curve.methods.buyExactSolIn(new BN(2 * LAMPORTS_PER_SOL), new BN(0))
@@ -971,7 +969,7 @@ describe("OpenPump — curve + amm", () => {
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
       const [sharing] = PublicKey.findProgramAddressSync([Buffer.from("sharing-config"), m.publicKey.toBuffer()], fees.programId);
       const [sharingVault] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), sharing.toBuffer()], curve.programId);
-      await curve.methods.create("Shared Coin", "SHARE", "https://example.com/sh.json", false, ZERO, false)
+      await curve.methods.create("Shared Coin", "SHARE", "https://example.com/sh.json", false, ZERO)
         .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([creator, m]).rpc();
       await fees.methods.createFeeSharingConfig()
@@ -1014,7 +1012,7 @@ describe("OpenPump — curve + amm", () => {
       const m = Keypair.generate();
       const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
-      await curve.methods.create("Social Coin", "SOC", "https://example.com/soc.json", false, social, false)
+      await curve.methods.create("Social Coin", "SOC", "https://example.com/soc.json", false, social)
         .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: trader.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([trader, m]).rpc();
       assert.equal((await curve.account.bondingCurve.fetch(bc)).creator.toBase58(), social.toBase58());
@@ -1044,7 +1042,7 @@ describe("OpenPump — curve + amm", () => {
       const [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
       await fees.methods.createDonationFeePda().accounts({ payer: creator.publicKey, feeProgramGlobal: feeGlobal, baseMint: m.publicKey, beneficiary: beneficiary.publicKey, donationFeePda: donation, systemProgram: SystemProgram.programId }).signers([creator]).rpc().catch(async (e) => { throw e; });
-      await curve.methods.create("Charity Coin", "GIVE", "https://example.com/g.json", false, donation, false)
+      await curve.methods.create("Charity Coin", "GIVE", "https://example.com/g.json", false, donation)
         .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([creator, m]).rpc();
       await curve.methods.buyExactSolIn(new BN(2 * LAMPORTS_PER_SOL), new BN(0))
@@ -1098,7 +1096,7 @@ describe("OpenPump — curve + amm", () => {
     const mk = async () => {
       [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
       const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
-      await curve.methods.create("CTO Coin", "CTO", "https://example.com/cto.json", false, PublicKey.default, false)
+      await curve.methods.create("CTO Coin", "CTO", "https://example.com/cto.json", false, PublicKey.default)
         .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
         .signers([creator, m]).rpc();
     };
@@ -1199,7 +1197,7 @@ describe("OpenPump — curve + amm", () => {
     it("create_v3 mints a Token-2022 coin with on-mint metadata, no Metaplex", async () => {
       [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
       await curve.methods
-        .createV3("Twenty Two", "T22", "https://example.com/t22.json", false, PublicKey.default, false)
+        .createV3("Twenty Two", "T22", "https://example.com/t22.json", false, PublicKey.default)
         .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: abc(), global, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: T22, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID })
         .signers([creator, m])
         .rpc();
@@ -1277,95 +1275,6 @@ describe("OpenPump — curve + amm", () => {
     });
   });
 
-  // ------------------------------------------------------------------ Mayhem mode
-  describe("mayhem mode", () => {
-    const traderBot = Keypair.generate();
-    const m = Keypair.generate();
-    let bc: PublicKey;
-    const [gp] = PublicKey.findProgramAddressSync([Buffer.from("global-params")], mayhem.programId);
-    const [vault] = PublicKey.findProgramAddressSync([Buffer.from("sol-vault")], mayhem.programId);
-    const [stateV] = PublicKey.findProgramAddressSync([Buffer.from("mayhem-state"), m.publicKey.toBuffer()], mayhem.programId);
-    const vaultAta = () => getAssociatedTokenAddressSync(m.publicKey, vault, true);
-    const curveEv = PublicKey.findProgramAddressSync([Buffer.from("__event_authority")], curve.programId)[0];
-    const tradeAccts = () => ({
-      trader: traderBot.publicKey, globalParams: gp, mayhemState: stateV, mint: m.publicKey, solVault: vault, mayhemTokenVault: vaultAta(),
-      curveProgram: curve.programId, global, feeRecipient: feeRecipient.publicKey, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true),
-      creatorVault, feeConfig: null, buybackFeeRecipient: null, curveEventAuthority: curveEv, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
-    });
-    const price = (vs: BN, vt: BN) => new BN(vs.toString()).mul(new BN("1000000000000000")).div(vt); // lamports/token*1e9*1e6 as in the program
-
-    before(async () => {
-      await airdrop(traderBot.publicKey, 5);
-      await mayhem.methods.initializeGlobalParams(traderBot.publicKey, feeRecipient.publicKey, new BN(5 * LAMPORTS_PER_SOL), new BN(3)).accounts({ admin: admin.publicKey }).rpc();
-      // fund the vault
-      await provider.sendAndConfirm(new Transaction().add(SystemProgram.transfer({ fromPubkey: admin.publicKey, toPubkey: vault, lamports: 20 * LAMPORTS_PER_SOL })));
-    });
-
-    it("mayhem launches use the mayhem virtual params and register a state with a deadline", async () => {
-      await curve.methods.toggleMayhemMode(true).accounts({ authority: admin.publicKey, global }).rpc();
-      await curve.methods.setMayhemVirtualParams(new BN(60 * LAMPORTS_PER_SOL), PARAMS.initialVirtualTokenReserves).accounts({ authority: admin.publicKey, global }).rpc();
-      [bc] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), m.publicKey.toBuffer()], curve.programId);
-      const [meta] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), m.publicKey.toBuffer()], MPL_TOKEN_METADATA);
-      await curve.methods.create("Mayhem Coin", "MAYHEM", "https://example.com/mayhem.json", false, PublicKey.default, true)
-        .accounts({ mint: m.publicKey, mintAuthority, bondingCurve: bc, associatedBondingCurve: getAssociatedTokenAddressSync(m.publicKey, bc, true), global, mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta, user: creator.publicKey, systemProgram: SystemProgram.programId, tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY })
-        .signers([creator, m]).rpc();
-      const c = await curve.account.bondingCurve.fetch(bc);
-      assert.isTrue(c.isMayhemMode);
-      assert.equal(c.virtualSolReserves.toString(), (60 * LAMPORTS_PER_SOL).toString());
-      await mayhem.methods.initState().accounts({ payer: creator.publicKey, globalParams: gp, mint: m.publicKey, bondingCurve: bc, mayhemState: stateV, systemProgram: SystemProgram.programId }).signers([creator]).rpc();
-      const st = await mayhem.account.mayhemState.fetch(stateV);
-      assert.equal(st.mint.toBase58(), m.publicKey.toBase58());
-      assert.isAbove(st.endTimestamp.toNumber(), 0);
-    });
-
-    it("trader buys from the vault inside the price tolerance; cap and tolerance are enforced", async () => {
-      const c = await curve.account.bondingCurve.fetch(bc);
-      const ref = price(c.virtualSolReserves, c.virtualTokenReserves);
-      try {
-        await mayhem.methods.buy(new BN(1 * LAMPORTS_PER_SOL), ref.muln(2), 100).accounts(tradeAccts()).signers([traderBot]).rpc();
-        assert.fail("price out of range");
-      } catch (e) { assert.include(String(e), "PriceOutOfRange"); }
-      try {
-        await mayhem.methods.buy(new BN(6 * LAMPORTS_PER_SOL), ref, 100).accounts(tradeAccts()).signers([traderBot]).rpc();
-        assert.fail("cap");
-      } catch (e) { assert.include(String(e), "SweepCapExceeded"); }
-      const v0 = await lamports(vault);
-      await mayhem.methods.buy(new BN(2 * LAMPORTS_PER_SOL), ref, 100).accounts(tradeAccts()).signers([traderBot]).rpc();
-      assert.isBelow(await lamports(vault), v0 - 2 * LAMPORTS_PER_SOL);
-      assert.isAbove(Number(await tokenBal(vaultAta())), 0);
-      const g = await mayhem.account.globalParams.fetch(gp);
-      assert.isAbove(Number(g.solDeployed.toString()), 2 * LAMPORTS_PER_SOL);
-      try {
-        await mayhem.methods.buy(new BN(1 * LAMPORTS_PER_SOL), ref, 100).accounts({ ...tradeAccts(), trader: trader.publicKey, globalParams: gp }).signers([trader]).rpc();
-        assert.fail("not the trader");
-      } catch (e) { assert.include(String(e), "Unauthorized"); }
-    });
-
-    it("trader sells back within the retained-reserve limit", async () => {
-      const c = await curve.account.bondingCurve.fetch(bc);
-      const ref = price(c.virtualSolReserves, c.virtualTokenReserves);
-      const have = await tokenBal(vaultAta());
-      try {
-        await mayhem.methods.sell(new BN(have.toString()), ref, 500, 9900).accounts(tradeAccts()).signers([traderBot]).rpc();
-        assert.fail("retained reserve");
-      } catch (e) { assert.include(String(e), "RetainedReserve"); }
-      const v0 = await lamports(vault);
-      await mayhem.methods.sell(new BN((have / 2n).toString()), ref, 500, 0).accounts(tradeAccts()).signers([traderBot]).rpc();
-      assert.isAbove(await lamports(vault), v0);
-    });
-
-    it("after the deadline anyone burns what the vault still holds; admin withdraws SOL", async () => {
-      for (;;) { const t = await conn.getBlockTime(await conn.getSlot("confirmed")); const st = await mayhem.account.mayhemState.fetch(stateV); if (t && t >= st.endTimestamp.toNumber()) break; await new Promise((r) => setTimeout(r, 500)); }
-      const supplyBefore = (await getMint(conn, m.publicKey)).supply;
-      await mayhem.methods.burnTokens().accounts({ mayhemState: stateV, mint: m.publicKey, mayhemTokenVault: vaultAta(), solVault: vault, tokenProgram: TOKEN_PROGRAM_ID }).rpc();
-      assert.isBelow(Number((await getMint(conn, m.publicKey)).supply), Number(supplyBefore));
-      assert.equal((await tokenBal(vaultAta())).toString(), "0");
-      const a0 = await lamports(admin.publicKey);
-      await mayhem.methods.withdrawAdmin(new BN(1 * LAMPORTS_PER_SOL)).accounts({ admin: admin.publicKey, globalParams: gp, solVault: vault, systemProgram: SystemProgram.programId }).rpc();
-      assert.isAbove(await lamports(admin.publicKey), a0 + 0.9 * LAMPORTS_PER_SOL);
-      await curve.methods.toggleMayhemMode(false).accounts({ authority: admin.publicKey, global }).rpc();
-    });
-  });
 
   // ------------------------------------------------------------------ AMM extras (pump.fun PumpSwap parity)
   describe("AMM extras: exact-quote-in, buyback split, boost buy-and-burn, extend_account", () => {

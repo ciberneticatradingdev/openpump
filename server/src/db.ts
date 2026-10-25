@@ -38,9 +38,7 @@ export function openDb(file: string) {
       is_holder_reward INTEGER DEFAULT 0,
       holder_paid TEXT DEFAULT '0',
       creator_kind TEXT DEFAULT 'wallet',
-      token_program TEXT DEFAULT 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-      is_mayhem_mode INTEGER DEFAULT 0,
-      mayhem_end INTEGER
+      token_program TEXT DEFAULT 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
     );
     CREATE TABLE IF NOT EXISTS distributions (
       sig TEXT PRIMARY KEY,
@@ -77,7 +75,7 @@ export function openDb(file: string) {
     CREATE TABLE IF NOT EXISTS pools (pool TEXT PRIMARY KEY, mint TEXT NOT NULL, virtual_quote TEXT DEFAULT '0');
   `);
   try { db.exec("ALTER TABLE pools ADD COLUMN virtual_quote TEXT DEFAULT '0'"); } catch {}
-  for (const col of ["quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112'", "quote_symbol TEXT DEFAULT 'SOL'", "quote_decimals INTEGER DEFAULT 9", "is_holder_reward INTEGER DEFAULT 0", "holder_paid TEXT DEFAULT '0'", "creator_kind TEXT DEFAULT 'wallet'", "token_program TEXT DEFAULT 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'", "is_mayhem_mode INTEGER DEFAULT 0", "mayhem_end INTEGER", "boost_burned TEXT DEFAULT '0'", "boost_pending TEXT DEFAULT '0'"]) {
+  for (const col of ["quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112'", "quote_symbol TEXT DEFAULT 'SOL'", "quote_decimals INTEGER DEFAULT 9", "is_holder_reward INTEGER DEFAULT 0", "holder_paid TEXT DEFAULT '0'", "creator_kind TEXT DEFAULT 'wallet'", "token_program TEXT DEFAULT 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'", "boost_burned TEXT DEFAULT '0'", "boost_pending TEXT DEFAULT '0'"]) {
     try { db.exec(`ALTER TABLE coins ADD COLUMN ${col}`); } catch {}
   }
   return db;

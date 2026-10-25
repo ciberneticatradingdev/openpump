@@ -1,6 +1,6 @@
 # Parity with pump.fun / PumpSwap
 
-Feature-by-feature comparison against pump.fun's current programs (pump, pump_amm, pump_fees, mayhem). "Done" means implemented in OpenPump with a passing integration test. Instruction names differ on purpose; this is a clean-room implementation shaped after public behaviour, not a copy.
+Feature-by-feature comparison against pump.fun's current programs (pump, pump_amm, pump_fees). "Done" means implemented in OpenPump with a passing integration test. Instruction names differ on purpose; this is a clean-room implementation shaped after public behaviour, not a copy.
 
 Legend: ✅ done · 🔶 partial / different design · ⏭ skipped on purpose · ⬜ not yet
 
@@ -22,7 +22,7 @@ Legend: ✅ done · 🔶 partial / different design · ⏭ skipped on purpose ·
 | Trade-to-earn volume campaigns | *_user_volume_accumulator, claim_token_incentives | ✅ | AMM volume CPIs into the same campaign |
 | Anti-snipe window | first-slot caps | ✅ per-buy cap during the opening slots | |
 | Admin community takeover | admin_cto | ✅ `admin_cto` | to a wallet or to holder rewards |
-| Mayhem launches | is_mayhem_mode, toggle_mayhem_mode | ✅ | own virtual reserves |
+| Mayhem launches | is_mayhem_mode, toggle_mayhem_mode + the mayhem program | ⏭ | protocol market-making vault: OpenPump does not trade its own coins |
 | Quote mint registry | add/remove_quote_mint, quote control | 🔶 `set_quote_config` | enable flag + reserves per mint; no delegated quote-control admin |
 | Account layout upgrades | extend_account | ✅ `extend_account` | Global and BondingCurve |
 | Cashback | claim_cashback, toggle_cashback_enabled | ⏭ | deprecated by pump (create_v2 rejects it) |
@@ -43,7 +43,7 @@ Legend: ✅ done · 🔶 partial / different design · ⏭ skipped on purpose ·
 | Multi-hop swap | multi_hop_swap | ✅ | up to 4 legs |
 | Boost (delayed buy-and-burn) | init_boost, boost_buy_and_burn | ✅ | virtual quote reserves, LP locked while in flight |
 | Buyback share of the protocol fee | update_buyback_config | ✅ | to the fees program's vault, as quote tokens |
-| Mayhem pools | toggle_mayhem_mode, is_mayhem_mode | ✅ | migration pools inherit the curve's flag |
+| Mayhem pools | toggle_mayhem_mode, is_mayhem_mode | ⏭ | see curve |
 | Admin CTO on a pool | admin_cto_pool | ✅ | |
 | Creator fee sharing on AMM fees | sharing config as coin creator | ✅ `distribute_coin_creator_fees` | |
 | Kill switch per instruction | disable | ✅ | |
@@ -67,16 +67,6 @@ Legend: ✅ done · 🔶 partial / different design · ⏭ skipped on purpose ·
 | View helpers | get_fees_with_quote_mint, get_minimum_distributable_fee | ⬜ | the SDK computes these client-side |
 | Layout upgrades | extend_fee_config | ⬜ | |
 
-## Mayhem
-
-| Feature | mayhem | OpenPump | Notes |
-|---|---|---|---|
-| Global params, trader / admin roles | ✅ | ✅ | |
-| Per-coin state with a deadline | ✅ | ✅ `init_state` | |
-| Buy / sell through the curve within a price band and a per-sweep cap | ✅ | ✅ | sells respect a retained-reserve floor |
-| Burn leftovers after the window | ✅ | ✅ `burn_tokens`, permissionless | |
-| Admin withdraw, sweep, pause | ✅ | ✅ | |
-
 ## Test coverage
 
-54 Anchor integration tests (`tests/openpump.ts`) exercise every ✅ row above on a local validator, plus Rust unit tests for the curve and AMM math. Run `anchor test --skip-build` after `./scripts/build.sh`.
+50 Anchor integration tests (`tests/openpump.ts`) exercise every ✅ row above on a local validator, plus Rust unit tests for the curve and AMM math. Run `anchor test --skip-build` after `./scripts/build.sh`.

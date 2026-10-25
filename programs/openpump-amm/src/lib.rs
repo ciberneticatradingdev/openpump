@@ -79,7 +79,6 @@ pub mod openpump_amm {
         cfg.admin_set_coin_creator_authority = ctx.accounts.admin.key();
         cfg.creator_fee_configurable = true;
         cfg.max_configurable_creator_fee_bps = 100;
-        cfg.mayhem_mode_enabled = false;
         cfg.buyback_basis_points = 0;
         cfg.buyback_fee_recipient = Pubkey::default();
         cfg.boost_authority = Pubkey::default();
@@ -130,12 +129,6 @@ pub mod openpump_amm {
     /// Kill switch. Bits: 1 create_pool, 2 deposit, 4 withdraw, 8 buy, 16 sell.
     pub fn disable(ctx: Context<AdminOnly>, disable_flags: u8) -> Result<()> {
         ctx.accounts.global_config.disable_flags = disable_flags;
-        Ok(())
-    }
-
-    /// Allow pools to be created in mayhem mode (migration pools inherit the curve's flag regardless).
-    pub fn toggle_mayhem_mode(ctx: Context<AdminOnly>, enabled: bool) -> Result<()> {
-        ctx.accounts.global_config.mayhem_mode_enabled = enabled;
         Ok(())
     }
 
@@ -212,7 +205,6 @@ pub mod openpump_amm {
         base_amount_in: u64,
         quote_amount_in: u64,
         coin_creator: Pubkey,
-        is_mayhem_mode: bool,
         is_holder_reward: bool,
         creator_fee_bps: u64,
         can_edit_creator_fee: bool,
@@ -220,9 +212,6 @@ pub mod openpump_amm {
         let cfg = &ctx.accounts.global_config;
         require!(cfg.disable_flags & DISABLE_CREATE_POOL == 0, AmmError::Disabled);
         require!(base_amount_in > 0 && quote_amount_in > 0, AmmError::ZeroAmount);
-        // Migration pools (creator = the coin's bonding-curve PDA) inherit the curve's flags; anyone else needs mayhem enabled here.
-        let migration = ctx.accounts.creator.key() == Pubkey::find_program_address(&[b"bonding-curve", ctx.accounts.base_mint.key().as_ref()], &CURVE_PROGRAM_ID).0;
-        require!(!is_mayhem_mode || cfg.mayhem_mode_enabled || migration, AmmError::MayhemDisabled);
         require!(creator_fee_bps <= cfg.max_configurable_creator_fee_bps, AmmError::FeeTooHigh);
 
         let lp_total = initial_lp_amount(base_amount_in, quote_amount_in)?;
@@ -263,7 +252,6 @@ pub mod openpump_amm {
         pool.is_holder_reward = is_holder_reward;
         pool.creator_fee_bps = creator_fee_bps;
         pool.can_edit_creator_fee = can_edit_creator_fee && !is_holder_reward;
-        pool.is_mayhem_mode = is_mayhem_mode;
         pool.virtual_quote_reserves = 0;
 
         // Mint LP: creator share + permanently locked minimum (held by the pool's own ATA).
@@ -304,7 +292,6 @@ pub mod openpump_amm {
             base_amount_in,
             quote_amount_in,
             lp_minted: lp_to_creator,
-            is_mayhem_mode,
             is_holder_reward,
             creator_fee_bps,
             timestamp: Clock::get()?.unix_timestamp,
@@ -1229,8 +1216,6 @@ pub struct GlobalConfig {
     pub admin_set_coin_creator_authority: Pubkey,
     pub creator_fee_configurable: bool,
     pub max_configurable_creator_fee_bps: u64,
-    /// Pools may be created in mayhem mode by non-migration callers.
-    pub mayhem_mode_enabled: bool,
     /// Share of the protocol fee (bps) sent to `buyback_fee_recipient`'s quote ATA on direct swaps.
     pub buyback_basis_points: u64,
     pub buyback_fee_recipient: Pubkey,
@@ -1260,7 +1245,6 @@ pub struct Pool {
     /// Per-pool creator fee override (bps). 0 = follow the schedule.
     pub creator_fee_bps: u64,
     pub can_edit_creator_fee: bool,
-    pub is_mayhem_mode: bool,
     /// Quote parked in the boost vault but still priced as if in the pool (see boost.rs).
     pub virtual_quote_reserves: u64,
 }
@@ -1290,7 +1274,6 @@ pub struct CreatePoolEvent {
     pub base_amount_in: u64,
     pub quote_amount_in: u64,
     pub lp_minted: u64,
-    pub is_mayhem_mode: bool,
     pub is_holder_reward: bool,
     pub creator_fee_bps: u64,
     pub timestamp: i64,
@@ -1413,8 +1396,6 @@ pub enum AmmError {
     CreatorFeeNotConfigurable,
     #[msg("Creator fee is locked for this pool")]
     CreatorFeeLocked,
-    #[msg("Mayhem mode is disabled")]
-    MayhemDisabled,
     #[msg("Boost is disabled")]
     BoostDisabled,
     #[msg("Pool already has a boost in flight")]

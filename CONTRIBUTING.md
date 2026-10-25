@@ -8,7 +8,7 @@ Requirements: Rust, Solana CLI 2.x, Anchor 0.31.1, Node 20+, pnpm.
 
 ```bash
 pnpm install
-./scripts/build.sh            # builds the four programs with platform-tools v1.54 and regenerates IDLs/types
+./scripts/build.sh            # builds the three programs with platform-tools v1.54 and regenerates IDLs/types
 anchor test --skip-build      # full integration suite, ~1 minute on a quiet machine
 ```
 

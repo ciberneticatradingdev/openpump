@@ -2205,10 +2205,6 @@ export type OpenpumpAmm = {
           "type": "pubkey"
         },
         {
-          "name": "isMayhemMode",
-          "type": "bool"
-        },
-        {
           "name": "isHolderReward",
           "type": "bool"
         },
@@ -4204,95 +4200,6 @@ export type OpenpumpAmm = {
       ]
     },
     {
-      "name": "toggleMayhemMode",
-      "docs": [
-        "Allow pools to be created in mayhem mode (migration pools inherit the curve's flag regardless)."
-      ],
-      "discriminator": [
-        1,
-        9,
-        111,
-        208,
-        100,
-        31,
-        255,
-        163
-      ],
-      "accounts": [
-        {
-          "name": "admin",
-          "signer": true,
-          "relations": [
-            "globalConfig"
-          ]
-        },
-        {
-          "name": "globalConfig",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  108,
-                  111,
-                  98,
-                  97,
-                  108,
-                  45,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "eventAuthority",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  95,
-                  95,
-                  101,
-                  118,
-                  101,
-                  110,
-                  116,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "program"
-        }
-      ],
-      "args": [
-        {
-          "name": "enabled",
-          "type": "bool"
-        }
-      ]
-    },
-    {
       "name": "updateAdmin",
       "discriminator": [
         161,
@@ -5333,46 +5240,41 @@ export type OpenpumpAmm = {
     },
     {
       "code": 6014,
-      "name": "mayhemDisabled",
-      "msg": "Mayhem mode is disabled"
-    },
-    {
-      "code": 6015,
       "name": "boostDisabled",
       "msg": "Boost is disabled"
     },
     {
-      "code": 6016,
+      "code": 6015,
       "name": "alreadyBoosted",
       "msg": "Pool already has a boost in flight"
     },
     {
-      "code": 6017,
+      "code": 6016,
       "name": "notMigrationPool",
       "msg": "Only migration pools can be boosted"
     },
     {
-      "code": 6018,
+      "code": 6017,
       "name": "poolHasLiquidityProviders",
       "msg": "Pool has liquidity providers"
     },
     {
-      "code": 6019,
+      "code": 6018,
       "name": "boostInProgress",
       "msg": "Liquidity is locked while a boost is in flight"
     },
     {
-      "code": 6020,
+      "code": 6019,
       "name": "nothingToBoost",
       "msg": "Nothing to boost"
     },
     {
-      "code": 6021,
+      "code": 6020,
       "name": "invalidAccount",
       "msg": "Not an account of this program"
     },
     {
-      "code": 6022,
+      "code": 6021,
       "name": "alreadyExtended",
       "msg": "Account already has the current layout"
     }
@@ -5650,10 +5552,6 @@ export type OpenpumpAmm = {
             "type": "u64"
           },
           {
-            "name": "isMayhemMode",
-            "type": "bool"
-          },
-          {
             "name": "isHolderReward",
             "type": "bool"
           },
@@ -5923,13 +5821,6 @@ export type OpenpumpAmm = {
             "type": "u64"
           },
           {
-            "name": "mayhemModeEnabled",
-            "docs": [
-              "Pools may be created in mayhem mode by non-migration callers."
-            ],
-            "type": "bool"
-          },
-          {
             "name": "buybackBasisPoints",
             "docs": [
               "Share of the protocol fee (bps) sent to `buyback_fee_recipient`'s quote ATA on direct swaps."
@@ -6095,10 +5986,6 @@ export type OpenpumpAmm = {
           },
           {
             "name": "canEditCreatorFee",
-            "type": "bool"
-          },
-          {
-            "name": "isMayhemMode",
             "type": "bool"
           },
           {

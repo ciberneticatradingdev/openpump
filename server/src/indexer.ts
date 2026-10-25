@@ -1,5 +1,5 @@
 import { Connection, PublicKey, type ConfirmedSignatureInfo } from "@solana/web3.js";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, FEES_PROGRAM_ID, MAYHEM_PROGRAM_ID, OpenpumpClient, decodeEventsFromParsedTx, type DecodedEvent } from "@openpump/sdk";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, FEES_PROGRAM_ID, OpenpumpClient, decodeEventsFromParsedTx, type DecodedEvent } from "@openpump/sdk";
 import type { Db } from "./db";
 import { fetchMetadata } from "./metadata";
 
@@ -30,7 +30,7 @@ export class Indexer {
 
   async start() {
     this.running = true;
-    for (const p of [CURVE_PROGRAM_ID, AMM_PROGRAM_ID, FEES_PROGRAM_ID, MAYHEM_PROGRAM_ID]) await this.backfill(p).catch((e) => console.error("backfill", p.toBase58(), e));
+    for (const p of [CURVE_PROGRAM_ID, AMM_PROGRAM_ID, FEES_PROGRAM_ID]) await this.backfill(p).catch((e) => console.error("backfill", p.toBase58(), e));
     const interval = Number(process.env.POLL_MS || (this.conn.rpcEndpoint.includes("api.devnet") || this.conn.rpcEndpoint.includes("api.mainnet") ? 6000 : 2500));
     let flip = 0;
     let backoff = 0;
@@ -38,7 +38,7 @@ export class Indexer {
       if (!this.running) return;
       try {
         // alternate programs per tick to stay under public-RPC rate limits
-        const programs = [CURVE_PROGRAM_ID, AMM_PROGRAM_ID, FEES_PROGRAM_ID, MAYHEM_PROGRAM_ID];
+        const programs = [CURVE_PROGRAM_ID, AMM_PROGRAM_ID, FEES_PROGRAM_ID];
         await this.pollNew(programs[flip++ % programs.length]);
         if (flip % 4 === 0) await this.fetchPendingMetadata();
         if (flip % 6 === 0) await this.resolveCreatorKinds();
@@ -155,7 +155,7 @@ export class Indexer {
             q.mint, q.symbol, q.decimals, d.isHolderReward ? 1 : 0
           );
         const kind = d.isHolderReward ? "holders" : toStr(d.creator) === toStr(d.user) ? "wallet" : "pending";
-        this.db.prepare("UPDATE coins SET creator_kind=?, token_program=?, is_mayhem_mode=? WHERE mint=?").run(kind, toStr(d.tokenProgram) || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", d.isMayhemMode ? 1 : 0, toStr(d.mint));
+        this.db.prepare("UPDATE coins SET creator_kind=?, token_program=? WHERE mint=?").run(kind, toStr(d.tokenProgram) || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", toStr(d.mint));
         this.broadcast({ type: "create", mint: toStr(d.mint), name: d.name, symbol: d.symbol, creator: toStr(d.creator), ts });
       },
       "curve:TradeEvent": () => {
@@ -182,9 +182,6 @@ export class Indexer {
       "curve:SetCreatorEvent": () => {
         this.db.prepare("UPDATE coins SET creator=?, creator_kind='pending' WHERE mint=?").run(toStr(d.newCreator), toStr(d.mint));
       },
-      "mayhem:MayhemStateInitEvent": () => this.db.prepare("UPDATE coins SET mayhem_end=? WHERE mint=?").run(num(d.endTimestamp), toStr(d.mint)),
-      "mayhem:MayhemTradeEvent": () => this.broadcast({ type: "mayhem_trade", mint: toStr(d.mint), side: num(d.side), sol: toStr(d.solAmount), ts }),
-      "mayhem:BurnEvent": () => this.broadcast({ type: "mayhem_burn", mint: toStr(d.mint), amount: toStr(d.amount), ts }),
       "fees:CreateFeeSharingConfigEvent": () => {
         this.db.prepare("UPDATE coins SET creator=?, creator_kind='sharing' WHERE mint=?").run(toStr(d.sharingConfig), toStr(d.mint));
         this.broadcast({ type: "sharing", mint: toStr(d.mint), ts });

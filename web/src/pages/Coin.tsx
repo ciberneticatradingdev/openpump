@@ -59,7 +59,6 @@ export default function CoinPage() {
               {coin.creator_kind === "donation" && <Badge color="acc">fees → charity</Badge>}
               {BigInt(coin.boost_pending || "0") > 0n && <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border text-acc bg-acc/10 border-acc/30" title="Quote parked in the boost vault, to be spent on buy-and-burns">boost · {(Number(coin.boost_pending) / 1e9).toFixed(2)} {coin.quote_symbol || "SOL"} to burn</span>}
               {BigInt(coin.boost_burned || "0") > 0n && <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border text-mute bg-white/5 border-line">{(Number(coin.boost_burned) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 0 })} burned</span>}
-              {!!coin.is_mayhem_mode && <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border text-red bg-red/10 border-red/30">mayhem{coin.mayhem_end ? ` · ends ${new Date(coin.mayhem_end * 1000).toLocaleDateString()}` : ""}</span>}
             </div>
             <div className="flex items-center gap-2 flex-wrap text-[12px] text-mute mt-1">
               <button onClick={() => copy(coin.mint)} className="pill !h-7 num hover:border-line2" title="Copy contract address">{short(coin.mint, 5)} <span className="text-dim">⧉</span></button>

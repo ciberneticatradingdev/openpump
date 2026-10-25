@@ -69,16 +69,15 @@ async function main() {
     console.log("fees program initialized: tiers + buyback vault (20 % of protocol fee)");
   }
   {
-    // AMM extras: boost (delayed buy-and-burn on graduation), buyback share to the fees vault, mayhem pools
+    // AMM extras: boost (delayed buy-and-burn on graduation), buyback share to the fees vault
     const ac = await client.fetchAmmConfig();
     if (!ac.boostEnabled || ac.buybackBasisPoints === 0n) {
       await send([
         await client.ammToggleBoostIx(admin.publicKey, true),
         await client.ammSetBoostAuthorityIx(admin.publicKey, admin.publicKey),
         await client.ammUpdateBuybackConfigIx(admin.publicKey, 2000n, pda.buybackVault(0)),
-        await client.ammToggleMayhemModeIx(admin.publicKey, true),
       ]);
-      console.log("amm: boost on (20 % of quote at graduation, authority = admin), buyback 20 % of protocol fee → fees vault, mayhem pools on");
+      console.log("amm: boost on (20 % of quote at graduation, authority = admin), buyback 20 % of protocol fee → fees vault");
     }
   }
   await client.detectFeeProgram();
@@ -193,26 +192,6 @@ async function main() {
       await tp.sendAndConfirm(new Transaction().add(...ixs), [t]);
     }
     console.log("  3 HODL buys; pot:", Number(await client.holderPot(kp.publicKey)) / 1e9, "SOL");
-  }
-
-  // ---- mayhem demo coin (local only): protocol vault trades it for a limited window, then burns
-  if (local) {
-    const mg = client.mayhem.methods;
-    await send([
-      await client.curve.methods.toggleMayhemMode(true).accounts({ authority: admin.publicKey, global: pda.global() } as any).instruction(),
-      await client.curve.methods.setMayhemVirtualParams(new BN("60000000000"), new BN(DEFAULT_PARAMS.initialVirtualTokenReserves.toString())).accounts({ authority: admin.publicKey, global: pda.global() } as any).instruction(),
-    ]);
-    if (!(await client.fetchMayhemParams())) {
-      await send([await mg.initializeGlobalParams(admin.publicKey, global.feeRecipient, new BN("5000000000"), new BN(1800)).accounts({ admin: admin.publicKey } as any).instruction()]);
-      await send([SystemProgram.transfer({ fromPubkey: admin.publicKey, toPubkey: pda.mayhemSolVault(), lamports: 20 * 1e9 })]);
-    }
-    const kp = Keypair.generate();
-    const { uri } = await uploadMeta({ name: "Mayhem Mode", symbol: "MAYHEM", desc: "the vault trades this one for 30 minutes", color: "ff4d4d" });
-    await send([await client.createIx(admin.publicKey, kp.publicKey, "Mayhem Mode", "MAYHEM", uri, false, PublicKey.default, true), await client.mayhemInitStateIx(admin.publicKey, kp.publicKey)], [kp]);
-    const c = (await client.fetchBondingCurve(kp.publicKey))!;
-    const ref = OpenpumpClient.mayhemReference(c);
-    await send([await client.mayhemBuyIx(admin.publicKey, kp.publicKey, admin.publicKey, global.feeRecipient, 2_000_000_000n, ref, 300)]);
-    console.log("created MAYHEM (vault bought 2 SOL)", kp.publicKey.toBase58());
   }
 
   // ---- custom pair demo: a quote token "OPEN" + one coin paired with it (local or QUOTE_MINT provided)

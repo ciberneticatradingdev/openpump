@@ -6,4 +6,3 @@ export * from "./events";
 export type { OpenpumpCurve } from "./openpump_curve";
 export type { OpenpumpAmm } from "./openpump_amm";
 export type { OpenpumpFees } from "./openpump_fees";
-export type { OpenpumpMayhem } from "./openpump_mayhem";

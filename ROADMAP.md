@@ -19,11 +19,10 @@ Progress is tracked with checkboxes here and in GitHub issues tagged `phase-N`.
 - [x] Admin CTO (community takeover of a coin's creator) on curve and AMM
 - [x] Token-2022 launches with on-mint metadata (`create_v3`)
 - [x] Multi-hop swaps (coin → coin in one instruction)
-- [x] Mayhem mode: protocol market-making vault with price band, sweep cap and end-of-window burn
 - [x] Boost: delayed buy-and-burn at graduation (`init_boost` / `boost_buy_and_burn`)
 - [x] `extend_account` on curve and AMM for layout upgrades
 - [x] SDK, indexer, API, web app, seed scripts
-- [x] 54 integration tests, math unit tests
+- [x] 50 integration tests, math unit tests
 
 **Done when:** every feature in [docs/PARITY.md](docs/PARITY.md) marked "done" has a passing test. ✅
 
@@ -89,7 +88,6 @@ Progress is tracked with checkboxes here and in GitHub issues tagged `phase-N`.
 - [ ] Donation launches: fees to a published beneficiary
 - [ ] Token-2022 launches
 - [ ] Coin → coin swaps in the UI (multi-hop)
-- [ ] Mayhem mode launches with the protocol vault
 - [ ] Boost at graduation enabled
 - [ ] Admin CTO process documented (how a community requests a takeover)
 
@@ -101,7 +99,7 @@ Progress is tracked with checkboxes here and in GitHub issues tagged `phase-N`.
 
 **Goal.** Make it safe to hold size on OpenPump.
 
-- [ ] External audit of the four programs; report published in `audit/`
+- [ ] External audit of the three programs; report published in `audit/`
 - [ ] Bug bounty funded from the treasury
 - [ ] Multisig expanded to community signers; fee parameter changes announced with a timelock
 - [ ] Incident runbook: kill switch owners, pause procedure, communication channel
@@ -128,6 +126,7 @@ Progress is tracked with checkboxes here and in GitHub issues tagged `phase-N`.
 
 ## Not on the roadmap (on purpose)
 
+- **Mayhem mode.** pump.fun's protocol market-making vault. OpenPump does not trade its own coins; removed entirely.
 - **Cashback.** pump.fun deprecated it; we did not port a dead feature.
 - **Fees accruing inside pools.** Our fees leave the pool on every trade; there is no `sweep_*` and nothing to drain.
 - **Legacy layout migrations** (`migrate_pool_coin_creator`, the `_v2` AMM family). Fresh programs do not carry them.

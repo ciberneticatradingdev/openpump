@@ -2,17 +2,14 @@ import { PublicKey } from "@solana/web3.js";
 import curveIdl from "../idl/openpump_curve.json";
 import ammIdl from "../idl/openpump_amm.json";
 import feesIdl from "../idl/openpump_fees.json";
-import mayhemIdl from "../idl/openpump_mayhem.json";
 
 export const CURVE_IDL = curveIdl as any;
 export const AMM_IDL = ammIdl as any;
 export const FEES_IDL = feesIdl as any;
-export const MAYHEM_IDL = mayhemIdl as any;
 
 export const CURVE_PROGRAM_ID = new PublicKey(curveIdl.address);
 export const AMM_PROGRAM_ID = new PublicKey(ammIdl.address);
 export const FEES_PROGRAM_ID = new PublicKey(feesIdl.address);
-export const MAYHEM_PROGRAM_ID = new PublicKey(mayhemIdl.address);
 export const MPL_TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 export const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 

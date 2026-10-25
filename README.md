@@ -1,8 +1,8 @@
 # OpenPump
 
-**pump.fun, open and better.** A clean-room, open-source launchpad for Solana: bonding curve, AMM, fee engine and market-making vault, written from scratch to match what pump.fun and PumpSwap do today, then go further.
+**pump.fun, open and better.** A clean-room, open-source launchpad for Solana: bonding curve, AMM and fee engine, written from scratch to match what pump.fun and PumpSwap do today, then go further.
 
-> Status: **code complete, pre-mainnet.** Four Anchor programs, a TypeScript SDK, an indexer/API and a web app. 54 integration tests pass on a local validator. Nothing is on mainnet yet. See the [roadmap](ROADMAP.md) for how we get there, and [docs/PARITY.md](docs/PARITY.md) for a feature-by-feature comparison with pump.fun.
+> Status: **code complete, pre-mainnet.** Three Anchor programs, a TypeScript SDK, an indexer/API and a web app. 50 integration tests pass on a local validator. Nothing is on mainnet yet. See the [roadmap](ROADMAP.md) for how we get there, and [docs/PARITY.md](docs/PARITY.md) for a feature-by-feature comparison with pump.fun.
 
 ---
 
@@ -12,7 +12,7 @@ pump.fun is closed source, upgradeable by one party, and keeps the entire fee st
 
 OpenPump is the full stack, in the open:
 
-- **Same mechanics people already know.** Bonding curve with virtual reserves, graduation into a constant-product AMM with burned LP, creator fees from trade #1, custom pairs, holder rewards, trade-to-earn, fee tiers by market cap, fee sharing, social and charity fees, Token-2022, multi-hop swaps, mayhem mode, boost buy-and-burn.
+- **Same mechanics people already know.** Bonding curve with virtual reserves, graduation into a constant-product AMM with burned LP, creator fees from trade #1, custom pairs, holder rewards, trade-to-earn, fee tiers by market cap, fee sharing, social and charity fees, Token-2022, multi-hop swaps, boost buy-and-burn.
 - **Owned by the people using it.** Upgrade authority goes to a multisig, fee parameters are on-chain and public, and the protocol's buyback share flows to the community token, $OPENPUMP.
 - **Built to be forked, audited and integrated.** Public IDLs, a typed SDK, an indexer anyone can run, and a reference web app.
 
@@ -20,13 +20,12 @@ OpenPump is the full stack, in the open:
 
 | Piece | Where | What |
 |---|---|---|
-| Bonding curve | `programs/openpump-curve` | create / buy / buy_exact_sol_in / sell / migrate / creator fees · custom pairs (any SPL or Token-2022 quote) · holder rewards · volume incentives · Token-2022 launches (`create_v3`) · mayhem launches · admin CTO · `extend_account` |
-| AMM | `programs/openpump-amm` | create_pool / deposit / withdraw / buy / buy_exact_quote_in / sell · multi-hop (coin → coin in one instruction) · trade-to-earn on AMM volume · buyback share of the protocol fee · boost (delayed buy-and-burn at graduation) · mayhem pools · kill switch · `extend_account` |
+| Bonding curve | `programs/openpump-curve` | create / buy / buy_exact_sol_in / sell / migrate / creator fees · custom pairs (any SPL or Token-2022 quote) · holder rewards · volume incentives · Token-2022 launches (`create_v3`) · admin CTO · `extend_account` |
+| AMM | `programs/openpump-amm` | create_pool / deposit / withdraw / buy / buy_exact_quote_in / sell · multi-hop (coin → coin in one instruction) · trade-to-earn on AMM volume · buyback share of the protocol fee · boost (delayed buy-and-burn at graduation) · kill switch · `extend_account` |
 | Fees | `programs/openpump-fees` | market-cap fee tiers · creator fee sharing (split with shareholders) · social fee PDAs (fees for an X handle, claimed by its verified wallet) · donation PDAs · buyback vaults · admin CTO |
-| Mayhem | `programs/openpump-mayhem` | protocol market-making vault: trades mayhem-mode coins inside a price band with a per-sweep cap, burns what it holds after the window |
 | Shared types | `crates/openpump-fee-types` | FeeConfig / SharingConfig / tier selection, read by every program |
 | SDK | `sdk/` | PDAs, exact on-chain math in BigInt, instruction builders for every instruction, event decoding |
-| Server | `server/` | SQLite indexer (decodes `emit_cpi!` events from all four programs), REST + WebSocket, metadata uploads, cranks (holder payouts, donations) |
+| Server | `server/` | SQLite indexer (decodes `emit_cpi!` events from all three programs), REST + WebSocket, metadata uploads, cranks (holder payouts, donations) |
 | Web | `web/` | Vite + React: board, coin page (chart, trades, holders, trade panel), create, swap, profile |
 
 Program IDs are fixed across clusters:
@@ -36,7 +35,6 @@ Program IDs are fixed across clusters:
 | Curve | `AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB` |
 | AMM | `BQHw8ro8CMRQbRGDWsseCEffKksJZCqUg4K45sjA6eYb` |
 | Fees | `goxedqtEDBUXsuMxYDpgfivPGZuQD4ifzfcFkhVCUe5` |
-| Mayhem | `Bh6Tz6WwwQbxEAMB2FjkrLWjAXbAxDn3t445jU1pZMAP` |
 
 ## Roadmap at a glance
 
@@ -48,7 +46,7 @@ Full version with milestones and definitions of done: **[ROADMAP.md](ROADMAP.md)
 | 1 · $OPENPUMP | Launch the community token on pump.fun, validate demand, fund the treasury | next |
 | 2 · OpenSwap | The AMM on mainnet under a multisig, verified build, swap UI | |
 | 3 · First launch | The bonding curve on mainnet; the first coin launched and graduated on OpenPump | |
-| 4 · Full launchpad | Custom pairs quoted in $OPENPUMP, holder rewards, trade-to-earn, fee tiers, sharing, social fees, mayhem, boost | |
+| 4 · Full launchpad | Custom pairs quoted in $OPENPUMP, holder rewards, trade-to-earn, fee tiers, sharing, social fees, boost | |
 | 5 · Harden | External audit, bug bounty, verified builds, multisig governance of fee parameters | |
 | 6 · Ecosystem | Public API, bots and terminals, integrations, mobile | |
 
@@ -66,14 +64,14 @@ Treasury wallet, fee parameters and multisig signers will be published on-chain 
 
 ```bash
 ./scripts/build.sh            # anchor build with platform-tools v1.54 (edition-2024 crates) + IDLs/types
-anchor test --skip-build      # 54 integration tests on a local validator (Metaplex preloaded from tests/fixtures)
+anchor test --skip-build      # 50 integration tests on a local validator (Metaplex preloaded from tests/fixtures)
 cargo test --lib              # math unit tests
 ```
 
-Local stack with seeded data (coins, a graduated pool with a live boost, a holder-rewards coin, a custom pair, a mayhem coin):
+Local stack with seeded data (coins, a graduated pool with a live boost, a holder-rewards coin, a custom pair):
 
 ```bash
-./scripts/localnet.sh &                                   # validator with all four programs + Metaplex
+./scripts/localnet.sh &                                   # validator with all three programs + Metaplex
 cp server/.env.example server/.env                        # RPC_URL=http://127.0.0.1:8899
 pnpm --filter @openpump/server start &                   # API on :8787
 RPC_URL=http://127.0.0.1:8899 pnpm --filter @openpump/server exec tsx src/seed.ts

@@ -5,16 +5,15 @@
  */
 import { BorshCoder } from "@coral-xyz/anchor";
 import { PublicKey, type ParsedTransactionWithMeta, type VersionedTransactionResponse } from "@solana/web3.js";
-import { AMM_IDL, AMM_PROGRAM_ID, CURVE_IDL, CURVE_PROGRAM_ID, FEES_IDL, FEES_PROGRAM_ID, MAYHEM_IDL, MAYHEM_PROGRAM_ID } from "./ids";
+import { AMM_IDL, AMM_PROGRAM_ID, CURVE_IDL, CURVE_PROGRAM_ID, FEES_IDL, FEES_PROGRAM_ID } from "./ids";
 
 const EVENT_TAG = Buffer.from("e445a52e51cb9a1d", "hex");
 const curveCoder = new BorshCoder(CURVE_IDL);
 const ammCoder = new BorshCoder(AMM_IDL);
 const feesCoder = new BorshCoder(FEES_IDL);
-const mayhemCoder = new BorshCoder(MAYHEM_IDL);
 
 export interface DecodedEvent {
-  program: "curve" | "amm" | "fees" | "mayhem";
+  program: "curve" | "amm" | "fees";
   name: string;
   data: any;
   signature: string;
@@ -31,9 +30,9 @@ function camelKeys(obj: any): any {
   return out;
 }
 
-function decodeData(program: "curve" | "amm" | "fees" | "mayhem", data: Buffer) {
+function decodeData(program: "curve" | "amm" | "fees", data: Buffer) {
   if (data.length < 16 || !data.subarray(0, 8).equals(EVENT_TAG)) return null;
-  const coder = program === "curve" ? curveCoder : program === "amm" ? ammCoder : program === "fees" ? feesCoder : mayhemCoder;
+  const coder = program === "curve" ? curveCoder : program === "amm" ? ammCoder : feesCoder;
   const ev = coder.events.decode(data.subarray(8).toString("base64"));
   return ev ? { name: ev.name, data: camelKeys(ev.data) } : null;
 }
@@ -53,7 +52,6 @@ export function decodeEventsFromTx(tx: VersionedTransactionResponse, signature: 
     if (k.equals(CURVE_PROGRAM_ID)) return "curve" as const;
     if (k.equals(AMM_PROGRAM_ID)) return "amm" as const;
     if (k.equals(FEES_PROGRAM_ID)) return "fees" as const;
-    if (k.equals(MAYHEM_PROGRAM_ID)) return "mayhem" as const;
     return null;
   };
   const consider = (programIdIndex: number, dataB58: string) => {
@@ -76,7 +74,7 @@ export function decodeEventsFromParsedTx(tx: ParsedTransactionWithMeta, signatur
     for (const ix of inner.instructions as any[]) {
       if (!("data" in ix) || !ix.programId) continue;
       const pid = new PublicKey(ix.programId);
-      const program = pid.equals(CURVE_PROGRAM_ID) ? "curve" : pid.equals(AMM_PROGRAM_ID) ? "amm" : pid.equals(FEES_PROGRAM_ID) ? "fees" : pid.equals(MAYHEM_PROGRAM_ID) ? "mayhem" : null;
+      const program = pid.equals(CURVE_PROGRAM_ID) ? "curve" : pid.equals(AMM_PROGRAM_ID) ? "amm" : pid.equals(FEES_PROGRAM_ID) ? "fees" : null;
       if (!program) continue;
       const ev = decodeData(program, Buffer.from(bs58decode(ix.data)));
       if (ev) out.push({ program, ...ev, signature, slot: tx.slot, blockTime: tx.blockTime ?? null });

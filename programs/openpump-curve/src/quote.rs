@@ -119,7 +119,6 @@ pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: Stri
     bc.is_holder_reward = is_holder_reward;
     bc.creator_fee_bps = 0;
     bc.can_edit_creator_fee = !is_holder_reward;
-    bc.is_mayhem_mode = false;
     bc.virtual_token_reserves = q.initial_virtual_token_reserves;
     bc.virtual_sol_reserves = q.initial_virtual_quote_reserves;
     bc.real_token_reserves = q.initial_real_token_reserves;
@@ -147,7 +146,6 @@ pub fn create_v2(ctx: Context<CreateV2>, name: String, symbol: String, uri: Stri
         quote_mint: bc.quote_mint,
         is_holder_reward: bc.is_holder_reward,
         token_program: ctx.accounts.token_program.key(),
-        is_mayhem_mode: false,
         });
     Ok(())
 }
@@ -389,7 +387,6 @@ pub fn migrate_v2(ctx: Context<MigrateV2>) -> Result<()> {
         base_amount,
         quote_amount,
         bc.creator,
-        bc.is_mayhem_mode,
         bc.is_holder_reward,
         bc.creator_fee_bps,
         bc.can_edit_creator_fee,

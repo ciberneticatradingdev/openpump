@@ -2,7 +2,7 @@
 
 ## Status
 
-OpenPump has **not been audited**. The programs are tested (54 integration tests, math unit tests) but no third party has reviewed them. Until Phase 5 of the [roadmap](ROADMAP.md) is complete, treat every deployment as experimental.
+OpenPump has **not been audited**. The programs are tested (50 integration tests, math unit tests) but no third party has reviewed them. Until Phase 5 of the [roadmap](ROADMAP.md) is complete, treat every deployment as experimental.
 
 ## Reporting a vulnerability
 
@@ -21,6 +21,6 @@ Please do not open a public issue for anything that could be exploited.
 
 ## Scope
 
-In scope: the four programs under `programs/`, the shared crate under `crates/`, and the SDK's math under `sdk/src/math.ts` (clients rely on it for quotes).
+In scope: the three programs under `programs/`, the shared crate under `crates/`, and the SDK's math under `sdk/src/math.ts` (clients rely on it for quotes).
 
 Out of scope until they are deployed to mainnet: the indexer, the web app, and the cranks.

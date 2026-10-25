@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>OpenPump — The open-source launchpad</title>
-<meta name="description" content="OpenPump is the open-source launchpad for Solana: bonding curve, AMM, fee engine and market-making vault, built from scratch to match pump.fun and go further. Community token: $OPENPUMP." />
+<meta name="description" content="OpenPump is the open-source launchpad for Solana: bonding curve, AMM and fee engine, built from scratch to match pump.fun and go further. Community token: $OPENPUMP." />
 <meta property="og:title" content="OpenPump — The open-source launchpad" />
 <meta property="og:description" content="The full pump.fun + PumpSwap stack, open source, owned by the people using it. $OPENPUMP funds the build." />
 <meta property="og:type" content="website" />
@@ -172,7 +172,7 @@
   @media (min-width: 960px) {
     .hero { padding: 96px 0 72px; }
     .hero .wrap { grid-template-columns: 1.05fr 0.95fr; align-items: center; }
-    .grid { grid-template-columns: repeat(4, 1fr); }
+    .grid { grid-template-columns: repeat(3, 1fr); }
     .pillars { grid-template-columns: repeat(4, 1fr); }
   }
   @media (prefers-reduced-motion: reduce) { .dot, .eyebrow i { animation: none; } html { scroll-behavior: auto; } }
@@ -206,15 +206,15 @@
     <div>
       <span class="eyebrow"><i></i> The open-source launchpad</span>
       <h1>pump.fun,<br/><span>open</span> and better.</h1>
-      <p class="lead">The whole stack, rebuilt from scratch and published: bonding curve, AMM, fee engine, market-making vault. Same mechanics traders already know, with the keys in a multisig and the fees flowing back to the people who use it.</p>
+      <p class="lead">The whole stack, rebuilt from scratch and published: bonding curve, AMM, fee engine. Same mechanics traders already know, with the keys in a multisig and the fees flowing back to the people who use it.</p>
       <div class="ctas">
         <a class="btn dark" href="#roadmap">Read the roadmap</a>
         <a class="btn" href="https://github.com/ciberneticatradingdev/openpump" target="_blank" rel="noopener">View the code</a>
       </div>
       <div class="chips">
-        <span class="chip"><b>4</b> programs</span>
-        <span class="chip"><b>104</b> instructions</span>
-        <span class="chip"><b>54</b> integration tests</span>
+        <span class="chip"><b>3</b> programs</span>
+        <span class="chip"><b>86</b> instructions</span>
+        <span class="chip"><b>50</b> integration tests</span>
         <span class="chip"><b>0</b> lines copied</span>
         <span class="chip">pre-mainnet</span>
       </div>
@@ -253,14 +253,14 @@
   <div class="wrap">
     <div class="sec-head">
       <div class="kicker">What it is</div>
-      <h2>Four programs. Everything pump.fun does, in the open.</h2>
+      <h2>Three programs. Everything pump.fun does, in the open.</h2>
       <p>Written clean-room from the public behaviour of pump.fun and PumpSwap. Same IDs on every cluster, public IDLs, a typed SDK, an indexer anyone can run.</p>
     </div>
     <div class="grid">
       <div class="card feat">
         <div class="ic">BC</div>
         <h3>Bonding curve</h3>
-        <p>Create, buy, sell, graduate. Creator fees from trade #1, anti-snipe window, custom pairs, holder rewards, Token-2022 launches, mayhem launches.</p>
+        <p>Create, buy, sell, graduate. Creator fees from trade #1, anti-snipe window, custom pairs, holder rewards, Token-2022 launches.</p>
         <div class="id mono">AmSumZo1ko2pXPKCAxp2uZwcFoQrVzNkRFf4w7EEHunB</div>
       </div>
       <div class="card feat">
@@ -275,15 +275,9 @@
         <p>Fee tiers by market cap, creator fee sharing, social fees for an X handle, charity launches, buyback vaults, community takeovers.</p>
         <div class="id mono">goxedqtEDBUXsuMxYDpgfivPGZuQD4ifzfcFkhVCUe5</div>
       </div>
-      <div class="card feat">
-        <div class="ic">MM</div>
-        <h3>Mayhem vault</h3>
-        <p>A protocol market-maker that trades mayhem-mode coins inside a price band with a per-sweep cap, then burns what it holds when the window closes.</p>
-        <div class="id mono">Bh6Tz6WwwQbxEAMB2FjkrLWjAXbAxDn3t445jU1pZMAP</div>
-      </div>
     </div>
     <div class="taglist" aria-label="Feature list">
-      <span class="tag">Custom pairs</span><span class="tag">Holder rewards</span><span class="tag">Trade-to-earn</span><span class="tag">Fee tiers</span><span class="tag">Fee sharing</span><span class="tag">Social fees</span><span class="tag">Donations</span><span class="tag">Token-2022</span><span class="tag">Multi-hop</span><span class="tag">Mayhem mode</span><span class="tag">Boost buy-and-burn</span><span class="tag">Admin CTO</span><span class="tag">Account extension</span><span class="tag off" title="pump.fun deprecated it">Cashback</span>
+      <span class="tag">Custom pairs</span><span class="tag">Holder rewards</span><span class="tag">Trade-to-earn</span><span class="tag">Fee tiers</span><span class="tag">Fee sharing</span><span class="tag">Social fees</span><span class="tag">Donations</span><span class="tag">Token-2022</span><span class="tag">Multi-hop</span><span class="tag">Boost buy-and-burn</span><span class="tag">Admin CTO</span><span class="tag">Account extension</span><span class="tag off" title="pump.fun deprecated it">Cashback</span>
     </div>
   </div>
 </section>
@@ -324,7 +318,7 @@
         <div>
           <div class="ph-head"><h3>Build</h3><span class="status">Done</span></div>
           <p>A clean-room implementation of everything pump.fun and PumpSwap do today, tested end to end.</p>
-          <ul><li>4 programs</li><li>custom pairs</li><li>holder rewards</li><li>trade-to-earn</li><li>fee engine</li><li>Token-2022</li><li>multi-hop</li><li>mayhem</li><li>boost</li><li>SDK + indexer + web</li><li>54 tests</li></ul>
+          <ul><li>3 programs</li><li>custom pairs</li><li>holder rewards</li><li>trade-to-earn</li><li>fee engine</li><li>Token-2022</li><li>multi-hop</li><li>boost</li><li>SDK + indexer + web</li><li>50 tests</li></ul>
         </div>
       </div>
       <div class="phase now">
@@ -359,7 +353,7 @@
         <div>
           <div class="ph-head"><h3>The full launchpad</h3></div>
           <p>Every feature already in the code, switched on, with $OPENPUMP at the center.</p>
-          <ul><li>pairs quoted in $OPENPUMP</li><li>holder rewards</li><li>trade-to-earn in $OPENPUMP</li><li>fee tiers</li><li>fee sharing</li><li>social fees (X)</li><li>donations</li><li>Token-2022</li><li>coin → coin swaps</li><li>mayhem</li><li>boost</li></ul>
+          <ul><li>pairs quoted in $OPENPUMP</li><li>holder rewards</li><li>trade-to-earn in $OPENPUMP</li><li>fee tiers</li><li>fee sharing</li><li>social fees (X)</li><li>donations</li><li>Token-2022</li><li>coin → coin swaps</li><li>boost</li></ul>
         </div>
       </div>
       <div class="phase">
@@ -413,7 +407,7 @@
     </details>
     <details>
       <summary>Is it audited?</summary>
-      <p>Not yet. It has 54 integration tests and math unit tests, which is not the same thing. An external audit and a bug bounty are on the roadmap and funded by the treasury. Until then, treat every deployment as experimental.</p>
+      <p>Not yet. It has 50 integration tests and math unit tests, which is not the same thing. An external audit and a bug bounty are on the roadmap and funded by the treasury. Until then, treat every deployment as experimental.</p>
     </details>
     <details>
       <summary>Who controls the programs?</summary>
