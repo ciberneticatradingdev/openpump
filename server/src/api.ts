@@ -19,9 +19,24 @@ export function apiRouter(db: Db, conn: Connection) {
 
   const getGlobal = async () => {
     if (globalCache && Date.now() - globalCache.at < 60_000) return globalCache.value;
-    try {
-      const g = await client.fetchGlobal();
-      const cfg = await client.fetchAmmConfig().catch(() => null);
+    // Curve Global and AMM GlobalConfig are read independently: one program can be upgraded (or not yet initialized)
+    // while the other still serves, and the app needs `amm` for pool trading regardless of the curve's state.
+    const [g, cfg] = await Promise.all([client.fetchGlobal().catch(() => null), client.fetchAmmConfig().catch(() => null)]);
+    const amm = cfg && {
+      lpFeeBasisPoints: cfg.lpFeeBasisPoints.toString(),
+      protocolFeeBasisPoints: cfg.protocolFeeBasisPoints.toString(),
+      coinCreatorFeeBasisPoints: cfg.coinCreatorFeeBasisPoints.toString(),
+      protocolFeeRecipient: cfg.protocolFeeRecipient.toBase58(),
+      disableFlags: cfg.disableFlags,
+      buybackBasisPoints: cfg.buybackBasisPoints.toString(),
+      buybackFeeRecipient: cfg.buybackFeeRecipient.toBase58(),
+      boostEnabled: cfg.boostEnabled,
+      boostAuthority: cfg.boostAuthority.toBase58(),
+      boostBasisPoints: cfg.boostBasisPoints.toString(),
+      creatorFeeConfigurable: cfg.creatorFeeConfigurable,
+      maxConfigurableCreatorFeeBps: cfg.maxConfigurableCreatorFeeBps.toString(),
+    };
+    if (g) {
       const value = {
         initialized: true,
         feeRecipient: g.feeRecipient.toBase58(),
@@ -37,28 +52,14 @@ export function apiRouter(db: Db, conn: Connection) {
         antiSnipeSlots: g.antiSnipeSlots.toString(),
         antiSnipeMaxBps: g.antiSnipeMaxBps.toString(),
         paused: g.paused,
-        amm: cfg && {
-          lpFeeBasisPoints: cfg.lpFeeBasisPoints.toString(),
-          protocolFeeBasisPoints: cfg.protocolFeeBasisPoints.toString(),
-          coinCreatorFeeBasisPoints: cfg.coinCreatorFeeBasisPoints.toString(),
-          protocolFeeRecipient: cfg.protocolFeeRecipient.toBase58(),
-          disableFlags: cfg.disableFlags,
-          buybackBasisPoints: cfg.buybackBasisPoints.toString(),
-          buybackFeeRecipient: cfg.buybackFeeRecipient.toBase58(),
-          boostEnabled: cfg.boostEnabled,
-          boostAuthority: cfg.boostAuthority.toBase58(),
-          boostBasisPoints: cfg.boostBasisPoints.toString(),
-          creatorFeeConfigurable: cfg.creatorFeeConfigurable,
-          maxConfigurableCreatorFeeBps: cfg.maxConfigurableCreatorFeeBps.toString(),
-        },
+        amm,
       };
       globalCache = { at: Date.now(), value };
       return value;
-    } catch {
-      const value = { initialized: false, ...Object.fromEntries(Object.entries(DEFAULT_PARAMS).map(([k, v]) => [k, typeof v === "bigint" ? v.toString() : v])) };
-      globalCache = { at: Date.now(), value };
-      return value;
     }
+    const value = { initialized: false, ...Object.fromEntries(Object.entries(DEFAULT_PARAMS).map(([k, v]) => [k, typeof v === "bigint" ? v.toString() : v])), amm };
+    globalCache = { at: Date.now(), value };
+    return value;
   };
 
   let incCache: { at: number; value: any } | null = null;
