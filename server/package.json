@@ -11,6 +11,8 @@
     "admin:fees": "tsx src/admin.ts fees",
     "admin:amm-extend": "tsx src/admin.ts amm-extend",
     "admin:amm-config": "tsx src/admin.ts amm-config",
+    "admin:curve-extend": "tsx src/admin.ts curve-extend",
+    "admin:curve-config": "tsx src/admin.ts curve-config",
     "pool": "tsx src/pool.ts"
   },
   "dependencies": {

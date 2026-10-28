@@ -1,7 +1,10 @@
 /**
  * One-off admin commands run from the deployer's machine:
  *   pnpm admin:init     -> create AMM config + curve Global with DEFAULT_PARAMS
- *   pnpm admin:params   -> re-apply DEFAULT_PARAMS (set_params)
+ *   pnpm admin:params   -> re-apply DEFAULT_PARAMS (set_params). INITIAL_VIRTUAL_SOL_LAMPORTS=1060000000 lowers graduation
+ *                          to ~3 SOL for devnet playgrounds (mainnet default 30 SOL → ~85 SOL to graduate)
+ *   pnpm admin:curve-extend -> after a curve upgrade that grew layouts: extend Global + every BondingCurve
+ *   pnpm admin:curve-config -> holder rewards on (authority = HOLDER_REWARD_AUTHORITY or admin), creator fee configurable (MAX_CREATOR_FEE_BPS, default 100)
  *   pnpm admin:fees     -> initialize the fees program (global, tiered config, buyback vault 0) and
  *                          route 20 % of the protocol fee to the buyback vault (set_params)
  *   pnpm admin:amm-extend -> after a program upgrade that grew layouts: extend the AMM GlobalConfig + every Pool
@@ -16,7 +19,7 @@ import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import anchorPkg from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
 const bs58encode = (b: Uint8Array) => anchorPkg.utils.bytes.bs58.encode(b);
-import { AMM_IDL, AMM_PROGRAM_ID, DEFAULT_AMM_FEES, DEFAULT_FEE_TIERS, DEFAULT_FLAT_FEES, DEFAULT_PARAMS, OpenpumpClient, bs58decode, pda } from "@openpump/sdk";
+import { AMM_IDL, AMM_PROGRAM_ID, CURVE_IDL, CURVE_PROGRAM_ID, DEFAULT_AMM_FEES, DEFAULT_FEE_TIERS, DEFAULT_FLAT_FEES, DEFAULT_PARAMS, OpenpumpClient, bs58decode, pda } from "@openpump/sdk";
 
 function loadKeypair(): Keypair {
   const raw = process.env.ADMIN_KEYPAIR || fs.readFileSync(`${process.env.HOME}/.config/solana/id.json`, "utf8");
@@ -32,6 +35,11 @@ async function main() {
   const client = new OpenpumpClient(conn, provider);
   const feeRecipient = new PublicKey(process.env.FEE_RECIPIENT || admin.publicKey.toBase58());
   const params = { feeRecipient, ...DEFAULT_PARAMS };
+  if (process.env.INITIAL_VIRTUAL_SOL_LAMPORTS) {
+    params.initialVirtualSolReserves = BigInt(process.env.INITIAL_VIRTUAL_SOL_LAMPORTS);
+    const grad = (params.initialVirtualSolReserves * params.initialRealTokenReserves) / (params.initialVirtualTokenReserves - params.initialRealTokenReserves);
+    console.log(`virtual SOL override: ${Number(params.initialVirtualSolReserves) / 1e9} SOL → graduation at ~${(Number(grad) / 1e9).toFixed(2)} SOL`);
+  }
   console.log("admin", admin.publicKey.toBase58(), "fee recipient", feeRecipient.toBase58());
 
   const tx = new Transaction();
@@ -63,6 +71,31 @@ async function main() {
       console.log("ok", await provider.sendAndConfirm(batch, [admin]));
     }
     return;
+  } else if (cmd === "curve-extend") {
+    const size = (name: string) => (client.curve.account as any)[name].size as number;
+    const disc = Buffer.from(CURVE_IDL.accounts.find((a: any) => a.name === "BondingCurve").discriminator);
+    const gInfo = await conn.getAccountInfo(pda.global(), "confirmed");
+    const todo: PublicKey[] = [];
+    if (gInfo && gInfo.data.length < size("global")) todo.push(pda.global());
+    const curves = await conn.getProgramAccounts(CURVE_PROGRAM_ID, { commitment: "confirmed", dataSlice: { offset: 0, length: 0 }, filters: [{ memcmp: { offset: 0, bytes: bs58encode(disc) } }] });
+    for (let i = 0; i < curves.length; i += 100) {
+      const chunk = curves.slice(i, i + 100);
+      const infos = await conn.getMultipleAccountsInfo(chunk.map((c) => c.pubkey), "confirmed");
+      chunk.forEach((c, j) => { if (infos[j] && infos[j]!.data.length < size("bondingCurve")) todo.push(c.pubkey); });
+    }
+    console.log(`global ${gInfo?.data.length}/${size("global")} bytes, ${curves.length} bonding curves; extending ${todo.length} account(s)`);
+    for (let i = 0; i < todo.length; i += 8) {
+      const batch = new Transaction();
+      for (const a of todo.slice(i, i + 8)) batch.add(await client.curveExtendAccountIx(admin.publicKey, a));
+      console.log("ok", await provider.sendAndConfirm(batch, [admin]));
+    }
+    return;
+  } else if (cmd === "curve-config") {
+    const holderAuth = new PublicKey(process.env.HOLDER_REWARD_AUTHORITY || admin.publicKey.toBase58());
+    const maxCreatorFeeBps = BigInt(process.env.MAX_CREATOR_FEE_BPS ?? 100);
+    tx.add(await client.curveUpdateHolderRewardConfigIx(admin.publicKey, true, holderAuth));
+    tx.add(await client.curveUpdateCreatorFeeConfigIx(admin.publicKey, true, maxCreatorFeeBps));
+    console.log(`curve: holder rewards on (authority ${holderAuth.toBase58()}), creator fee configurable up to ${maxCreatorFeeBps} bps`);
   } else if (cmd === "amm-config") {
     const buybackBps = BigInt(process.argv[3] ?? process.env.BUYBACK_BPS ?? 0);
     const boostBps = BigInt(process.argv[4] ?? 2000);
@@ -79,7 +112,7 @@ async function main() {
     tx.add(await client.adminUpdateIncentivesIx(admin.publicKey, new PublicKey(mint), { startTime: Number(start), endTime: Number(end), secondsInADay: Number(day), dayNumber: Number(dayNumber), tokenSupplyPerDay: BigInt(supply) }));
     console.log("vault ATA:", (await import("@solana/spl-token")).getAssociatedTokenAddressSync(new PublicKey(mint), (await import("@openpump/sdk")).pda.globalVolumeAccumulator(), true).toBase58());
   } else {
-    throw new Error("usage: admin.ts init|params|fees|amm-extend|amm-config|incentives");
+    throw new Error("usage: admin.ts init|params|fees|amm-extend|amm-config|curve-extend|curve-config|incentives");
   }
   const sig = await provider.sendAndConfirm(tx, [admin]);
   console.log("ok", sig);

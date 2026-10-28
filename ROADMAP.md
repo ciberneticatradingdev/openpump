@@ -37,7 +37,7 @@ Progress is tracked with checkboxes here and in GitHub issues tagged `phase-N`.
 - [x] Make this repository public with the roadmap and the parity matrix (license: pending)
 - [x] X account: [@openpumptrade](https://x.com/openpumptrade)
 - [ ] Telegram; weekly build updates linked to commits
-- [ ] Testnet playground: the full launchpad on devnet with a faucet so the community can launch and trade test coins and file bugs
+- [x] Testnet playground: the full launchpad on devnet (curve + AMM + fees at the current build, graduation at ~3 SOL, demo coins at every stage) at [app.openpump.trade](https://app.openpump.trade); faucet: faucet.solana.com
 - [ ] Bug reports from the playground triaged into Phase 2 and 3 issues
 
 **Done when:** the treasury holds enough to deploy the AMM (about 12 SOL) and at least 100 people have used the devnet playground.

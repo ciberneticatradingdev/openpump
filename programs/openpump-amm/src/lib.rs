@@ -227,6 +227,17 @@ pub mod openpump_amm {
             &ctx.accounts.creator,
             base_amount_in,
         )?;
+        // A native (WSOL) quote account may have been credited with raw lamports by the caller (the curve does this
+        // when it migrates): bring its token balance up to date here, with a plain one-account sync_native. The Token
+        // program (p-token) rejects extra account metas, so the sync has to live inside a CPI that already carries
+        // both sides of the lamport move; create_pool does.
+        if ctx.accounts.user_quote_token_account.is_native() {
+            token_interface::sync_native(CpiContext::new(
+                ctx.accounts.quote_token_program.to_account_info(),
+                token_interface::SyncNative { account: ctx.accounts.user_quote_token_account.to_account_info() },
+            ))?;
+            ctx.accounts.user_quote_token_account.reload()?;
+        }
         transfer_from_user(
             &ctx.accounts.quote_token_program,
             &ctx.accounts.user_quote_token_account,

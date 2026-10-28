@@ -337,33 +337,12 @@ pub mod openpump_curve {
                 token_program: ctx.accounts.token_program.to_account_info(),
             },
         ))?;
-        // 2. migration fee -> protocol, curve SOL -> WSOL ATA. These are direct lamport moves on
-        // program-owned/arbitrary accounts; the runtime only syncs accounts that take part in the
-        // next CPI, so we pass both debited/credited accounts along with sync_native or the
-        // instruction trips `UnbalancedInstruction`.
-        debit(&bc_info, &ctx.accounts.fee_recipient.to_account_info(), g.migration_fee_lamports)?;
+        // 2. curve SOL -> WSOL ATA as a raw lamport move (the curve PDA owns the lamports). The AMM's create_pool
+        // CPI receives both the debited curve and the credited ATA, so the runtime sees a balanced move, and the AMM
+        // runs sync_native on the ATA itself: the Token program (p-token) rejects a sync_native carrying extra metas,
+        // which is what an in-curve sync would need to stay balanced.
         debit(&bc_info, &ctx.accounts.bonding_curve_wsol.to_account_info(), quote_amount)?;
-        {
-            // Extra metas (ignored by the Token program) make the runtime sync both sides of the
-            // direct lamport moves above before it checks the caller's balance invariant.
-            let mut ix = anchor_spl::token::spl_token::instruction::sync_native(
-                &ctx.accounts.token_program.key(),
-                &ctx.accounts.bonding_curve_wsol.key(),
-            )?;
-            ix.accounts.push(AccountMeta::new(bc_info.key(), false));
-            ix.accounts.push(AccountMeta::new(ctx.accounts.fee_recipient.key(), false));
-            anchor_lang::solana_program::program::invoke(
-                &ix,
-                &[
-                    ctx.accounts.bonding_curve_wsol.to_account_info(),
-                    ctx.accounts.token_program.to_account_info(),
-                    bc_info.clone(),
-                    ctx.accounts.fee_recipient.to_account_info(),
-                ],
-            )?;
-        }
 
-        // 3. create the AMM pool, curve PDA = liquidity owner, user pays rent
         openpump_amm::cpi::create_pool(
             CpiContext::new_with_signer(
                 ctx.accounts.amm_program.to_account_info(),
@@ -432,6 +411,9 @@ pub mod openpump_curve {
                 bc_signer,
             ))?;
         }
+
+        // 3. migration fee -> protocol, after the last CPI so no callee sees a one-sided lamport change.
+        debit(&bc_info, &ctx.accounts.fee_recipient.to_account_info(), g.migration_fee_lamports)?;
 
         let bc = &mut ctx.accounts.bonding_curve;
         bc.migrated = true;
@@ -619,7 +601,12 @@ fn execute_buy(ctx: Context<Trade>, tokens_out: u64, sol_in: u64, max_sol_cost: 
     if let Some(bb) = &ctx.accounts.buyback_fee_recipient {
         sys_transfer(&sys, &user, &bb.to_account_info(), buyback_fee)?;
     }
-    sys_transfer(&sys, &user, &ctx.accounts.creator_vault.to_account_info(), creator_fee)?;
+    // The creator vault is a data-less system account: its first credit must leave it rent-exempt or the runtime rejects
+    // the transaction (a tiny first buy pays a fee far below the ~0.0009 SOL floor). Top it up once; the floor never leaves.
+    let vault = ctx.accounts.creator_vault.to_account_info();
+    let floor = Rent::get()?.minimum_balance(0);
+    let top_up = floor.saturating_sub(vault.lamports().saturating_add(creator_fee));
+    sys_transfer(&sys, &user, &vault, creator_fee.saturating_add(top_up))?;
 
     // tokens: curve -> user
     let mint_key = bc.mint;

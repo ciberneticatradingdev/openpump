@@ -15,9 +15,11 @@ NEW=$(stat -f%z "$SO" 2>/dev/null || stat -c%s "$SO")
 CUR=$(solana program show "$ID" -u "$URL" 2>/dev/null | awk '/Data Length/{print $3}' || true)
 echo "$NAME: binary $NEW bytes, on-chain ${CUR:-none}"
 if [ -n "${CUR:-}" ] && [ "$NEW" -gt "$CUR" ]; then
-  solana program extend "$ID" $((NEW - CUR)) -u "$URL" -k "$K"
+  EXTRA=$((NEW - CUR)); [ "$EXTRA" -lt 10240 ] && EXTRA=10240  # the loader refuses extensions under 10 KiB
+  solana program extend "$ID" "$EXTRA" -u "$URL" -k "$K"
 fi
 # TPU sends; retries + priority fee because public devnet RPCs rate-limit by IP
-solana program deploy "$SO" --program-id "$ID" --upgrade-authority "$K" -u "$URL" -k "$K" --max-sign-attempts 100 --with-compute-unit-price 200000
+PROG_ID_ARG="$ID"; [ -z "${CUR:-}" ] && PROG_ID_ARG="target/deploy/openpump_${NAME}-keypair.json"  # first deploy signs with the program keypair
+solana program deploy "$SO" --program-id "$PROG_ID_ARG" --upgrade-authority "$K" -u "$URL" -k "$K" --max-sign-attempts 100 --with-compute-unit-price 200000
 solana program show "$ID" -u "$URL" | grep -E "Data Length|Last Deployed"
 echo "next: cd server && RPC_URL=$URL pnpm admin:amm-extend   (after an AMM upgrade that grew layouts)"

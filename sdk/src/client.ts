@@ -622,8 +622,9 @@ export class OpenpumpClient {
     const ata = getAssociatedTokenAddressSync(q, user);
     const sell = await this.amm.methods.sell(bn(baseIn), bn(minQuoteOut)).accounts(this.swapAccounts(user, mint, pool, protocolFeeRecipient, await this.coinTokenProgram(mint))).instruction();
     const ensure = createAssociatedTokenAccountIdempotentInstruction(user, ata, user, q);
-    if (!q.equals(WSOL_MINT)) return [ensure, sell];
-    return [ensure, sell, this.unwrapSolIx(user)];
+    const pre = this.buybackAtaIxs(user, q); // the buyback recipient's quote ATA must exist when it is passed (same as buys)
+    if (!q.equals(WSOL_MINT)) return [...pre, ensure, sell];
+    return [...pre, ensure, sell, this.unwrapSolIx(user)];
   }
 
   async ammCollectCreatorFeeIxs(creator: PublicKey, quoteMint: PublicKey = WSOL_MINT) {
@@ -1077,6 +1078,15 @@ export class OpenpumpClient {
     const p: any = {};
     for (const [k, v] of Object.entries(params)) p[k] = typeof v === "bigint" ? bn(v) : v;
     return this.curve.methods.initialize(p).accounts({ authority } as any).instruction();
+  }
+
+  /** Curve: allow holder-reward coins and name the crank that pays holders. */
+  async curveUpdateHolderRewardConfigIx(authority: PublicKey, enabled: boolean, holderRewardAuthority: PublicKey) {
+    return this.curve.methods.updateHolderRewardConfig(enabled, holderRewardAuthority).accounts({ authority, global: pda.global() } as any).instruction();
+  }
+  /** Curve: whether creators may set their own fee and the cap. */
+  async curveUpdateCreatorFeeConfigIx(authority: PublicKey, configurable: boolean, maxBps: bigint) {
+    return this.curve.methods.updateCreatorFeeConfig(configurable, bn(maxBps)).accounts({ authority, global: pda.global() } as any).instruction();
   }
 
   async setParamsIx(authority: PublicKey, params: Record<string, any>) {

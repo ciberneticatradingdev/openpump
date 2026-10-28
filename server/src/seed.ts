@@ -20,11 +20,11 @@ const provider = new AnchorProvider(conn, new Wallet(admin), { commitment: "conf
 const client = new OpenpumpClient(conn, provider);
 
 const COINS = [
-  { name: "People Coin", symbol: "PEOPLE", desc: "the launchpad the community asked for", color: "ff5c1a" },
-  { name: "Megaphone", symbol: "LOUD", desc: "say it louder", color: "ffd400" },
-  { name: "Town Hall", symbol: "HALL", desc: "everyone gets a seat", color: "27c4ff" },
-  { name: "Picket Line", symbol: "PICKET", desc: "we are not leaving", color: "7cff5c" },
-  { name: "Banner", symbol: "BANNER", desc: "hold it high", color: "ff4fd8" },
+  { name: "Open Test", symbol: "OPENT", desc: "the first coin on the open launchpad. devnet only, worth nothing, break it", color: "02d086" },
+  { name: "Chevron", symbol: "CHEV", desc: "two chevrons and a spark", color: "024130" },
+  { name: "Mint Green", symbol: "MINT", desc: "the color of the launchpad", color: "e5fdf0" },
+  { name: "Fork Me", symbol: "FORK", desc: "read it, fork it, break it", color: "b7791f" },
+  { name: "Parity", symbol: "PARITY", desc: "feature by feature", color: "e0245e" },
 ];
 
 const send = async (ixs: any[], signers: Keypair[] = []) => {
@@ -34,13 +34,13 @@ const send = async (ixs: any[], signers: Keypair[] = []) => {
 
 async function uploadMeta(c: (typeof COINS)[number]) {
   // 1x1 PNG tinted via SVG → keep it simple: upload an SVG as the image
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" rx="48" fill="#${c.color}"/><text x="128" y="150" font-size="72" font-family="Arial Black,Arial" font-weight="900" text-anchor="middle" fill="#111">${c.symbol.slice(0, 4)}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" rx="48" fill="#${c.color}"/><text x="128" y="150" font-size="64" font-family="Arial Black,Arial" font-weight="900" text-anchor="middle" fill="${c.color === "e5fdf0" ? "#024130" : "#e5fdf0"}">${c.symbol.slice(0, 4)}</text></svg>`;
   const form = new FormData();
   form.append("image", new Blob([svg], { type: "image/svg+xml" }), "image.svg");
   form.append("name", c.name);
   form.append("symbol", c.symbol);
   form.append("description", c.desc);
-  form.append("twitter", "https://x.com/peoplespad");
+  form.append("twitter", "https://x.com/openpumptrade");
   const res = await fetch(`${API}/api/upload`, { method: "POST", body: form });
   if (!res.ok) throw new Error(`upload failed ${res.status} ${await res.text()}`);
   return (await res.json()) as { uri: string };
@@ -97,7 +97,8 @@ async function main() {
   for (const [i, c] of coins.entries()) {
     // reuse an existing coin with this symbol (re-runs on devnet shouldn't spam duplicates)
     const existing: any[] = await fetch(`${API}/api/coins?q=${c.symbol}&limit=5`).then((r) => r.json()).catch(() => []);
-    const found = process.env.FORCE_NEW ? null : existing.find((e) => e.symbol === c.symbol && !e.complete);
+    const found = process.env.FORCE_NEW ? null : existing.find((e) => e.symbol === c.symbol);
+    if (found?.migrated) { console.log(`skipping ${c.symbol}: already graduated (${found.mint})`); continue; }
     let mint: { publicKey: PublicKey };
     if (found) {
       mint = { publicKey: new PublicKey(found.mint) };
@@ -108,11 +109,15 @@ async function main() {
       await send([await client.createIx(admin.publicKey, kp.publicKey, c.name, c.symbol, uri)], [kp]);
       mint = kp;
       console.log(`created ${c.symbol} ${kp.publicKey.toBase58()}`);
+      // devnet keeps the anti-snipe window (15 slots, 1 % of supply per buy): let it pass before seeding size
+      if (!local) await new Promise((r) => setTimeout(r, 9000));
     }
 
-    // random-ish trading; coin #0 graduates
-    const n = local ? (i === 0 ? 12 : 3 + i * 2) : 3;
+    // random-ish trading; coin #0 graduates (on devnet only with GRADUATE=1: it costs the whole curve, ~3 SOL with devnet params)
+    const graduate = i === 0 && (local || !!process.env.GRADUATE);
+    const n = local ? (i === 0 ? 12 : 3 + i * 2) : graduate ? 8 : 3;
     for (let k = 0; k < n; k++) {
+      if (found?.complete) break; // already sold out: straight to migration
       const t = traders[k % traders.length];
       const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });
       const tc = new OpenpumpClient(conn, tp);
@@ -120,7 +125,7 @@ async function main() {
       if (bc.complete) break;
       const sellTurn = i !== 0 && k % 4 === 3;
       if (!sellTurn) {
-        const sol = BigInt(Math.floor((local ? (i === 0 ? 9 : 0.3 + Math.random() * 2) : (adminOnly ? 0.01 + Math.random() * 0.02 : 0.02 + Math.random() * 0.05)) * 1e9));
+        const sol = BigInt(Math.floor((local ? (i === 0 ? 9 : 0.3 + Math.random() * 2) : graduate ? 0.6 : (adminOnly ? 0.01 + Math.random() * 0.02 : 0.02 + Math.random() * 0.05)) * 1e9));
         const q = curveMath.quoteBuyExactSol(sol, bc, global);
         const ix = await tc.buyExactSolIx(t.publicKey, mint.publicKey, admin.publicKey, global.feeRecipient, sol, (q.tokensOut * 95n) / 100n);
         await tp.sendAndConfirm(new Transaction().add(ix), [t]);
@@ -153,7 +158,7 @@ async function main() {
       const tc = new OpenpumpClient(conn, tp);
       for (let k = 0; k < 4; k++) {
         const { baseReserve, quoteReserve } = await client.fetchPoolReserves(pool);
-        const budget = BigInt(Math.floor((1 + Math.random() * 3) * 1e9));
+        const budget = BigInt(Math.floor((local ? 1 + Math.random() * 3 : 0.05 + Math.random() * 0.1) * 1e9)); // devnet SOL is scarce
         const { amm } = await import("@openpump/sdk");
         const q = amm.quoteBuyWithBudget(budget, baseReserve, quoteReserve, cfg);
         const ixs = await tc.ammBuyIxs(t.publicKey, mint.publicKey, pool, cfg.protocolFeeRecipient, q.baseOut, q.totalIn);
@@ -175,10 +180,16 @@ async function main() {
 
   // ---- holder-rewards demo coin: fees accrue to holders, crank pays them out
   {
-    const kp = Keypair.generate();
-    const { uri } = await uploadMeta({ name: "Holders Club", symbol: "HODL", desc: "creator fee goes to holders", color: "7cff5c" });
-    await send([await client.createIx(admin.publicKey, kp.publicKey, "Holders Club", "HODL", uri, true)], [kp]);
-    console.log("created HODL (rewards → holders)", kp.publicKey.toBase58());
+    const existing: any[] = await fetch(`${API}/api/coins?q=HODL&limit=5`).then((r) => r.json()).catch(() => []);
+    const prev = process.env.FORCE_NEW ? null : existing.find((e) => e.symbol === "HODL" && !e.complete);
+    let kp: { publicKey: PublicKey } = prev ? { publicKey: new PublicKey(prev.mint) } : Keypair.generate();
+    if (prev) console.log("reusing HODL", prev.mint);
+    else {
+      const { uri } = await uploadMeta({ name: "Holders Club", symbol: "HODL", desc: "creator fee goes to holders", color: "7cff5c" });
+      await send([await client.createIx(admin.publicKey, kp.publicKey, "Holders Club", "HODL", uri, true)], [kp as Keypair]);
+      console.log("created HODL (rewards → holders)", kp.publicKey.toBase58());
+      if (!local) await new Promise((r) => setTimeout(r, 9000)); // anti-snipe window
+    }
     const holderPda = pda.holderRewards(kp.publicKey);
     for (const t of traders.slice(0, 3)) {
       const tp = new AnchorProvider(conn, new Wallet(t), { commitment: "confirmed" });

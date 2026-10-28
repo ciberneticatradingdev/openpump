@@ -61,3 +61,11 @@ export const pct = (n: number, d = 1) => `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`;
 
 export const explorer = (cluster: string) => (sig: string, kind: "tx" | "address" = "tx") =>
   `https://solscan.io/${kind}/${sig}${cluster === "mainnet" || cluster === "mainnet-beta" ? "" : `?cluster=${cluster === "localnet" ? "custom&customUrl=http://127.0.0.1:8899" : cluster}`}`;
+
+/** SOL raised when the curve sells out: virtual_sol * real_tokens / (virtual_tokens - real_tokens), rounded. */
+export const graduationSol = (g: { initialVirtualSolReserves: string | number | bigint; initialVirtualTokenReserves: string | number | bigint; initialRealTokenReserves: string | number | bigint }) => {
+  const vs = Number(g.initialVirtualSolReserves), vt = Number(g.initialVirtualTokenReserves), rt = Number(g.initialRealTokenReserves);
+  if (!vs || !vt || !rt || vt <= rt) return 85;
+  const sol = (vs * rt) / (vt - rt) / 1e9;
+  return sol >= 10 ? Math.round(sol) : Number(sol.toFixed(1));
+};

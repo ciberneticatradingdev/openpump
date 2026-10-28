@@ -461,6 +461,36 @@ describe("OpenPump — curve + amm", () => {
     await amm.methods.disable(0).accounts({ admin: admin.publicKey, globalConfig: ammGlobalConfig }).rpc();
   });
 
+  it("a tiny first buy still works: the creator vault is topped up to its rent floor", async () => {
+    const freshCreator = Keypair.generate();
+    const mint3 = Keypair.generate();
+    const [bc3] = PublicKey.findProgramAddressSync([Buffer.from("bonding-curve"), mint3.publicKey.toBuffer()], curve.programId);
+    const [meta3] = PublicKey.findProgramAddressSync([Buffer.from("metadata"), MPL_TOKEN_METADATA.toBuffer(), mint3.publicKey.toBuffer()], MPL_TOKEN_METADATA);
+    const [vault3] = PublicKey.findProgramAddressSync([Buffer.from("creator-vault"), freshCreator.publicKey.toBuffer()], curve.programId);
+    await curve.methods
+      .create("Tiny", "TINY", "https://example.com/t.json", false, freshCreator.publicKey)
+      .accounts({
+        mint: mint3.publicKey, mintAuthority, bondingCurve: bc3, associatedBondingCurve: getAssociatedTokenAddressSync(mint3.publicKey, bc3, true), global,
+        mplTokenMetadata: MPL_TOKEN_METADATA, metadata: meta3, user: creator.publicKey, systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID, associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, rent: SYSVAR_RENT_PUBKEY,
+      })
+      .signers([creator, mint3])
+      .rpc();
+    assert.isNull(await provider.connection.getAccountInfo(vault3), "vault does not exist before the first trade");
+    const accts = {
+      ...tradeAccounts(trader.publicKey),
+      mint: mint3.publicKey, bondingCurve: bc3, associatedBondingCurve: getAssociatedTokenAddressSync(mint3.publicKey, bc3, true),
+      associatedUser: getAssociatedTokenAddressSync(mint3.publicKey, trader.publicKey), creatorVault: vault3,
+    };
+    // 0.001 SOL: the 0.5 % creator fee is 5 000 lamports, far below the ~890 880-lamport rent floor
+    await curve.methods.buyExactSolIn(new BN(1_000_000), new BN(0)).accounts(accts).signers([trader]).rpc()
+      .catch(async (e) => { console.log((await logsOf(e)).join("\n")); throw e; });
+    const floor = await provider.connection.getMinimumBalanceForRentExemption(0);
+    const lamports = (await provider.connection.getAccountInfo(vault3))!.lamports;
+    assert.isAtLeast(lamports, floor, "vault is rent-exempt after a tiny first buy");
+    assert.equal(lamports, floor, "the top-up is exactly the floor when the fee is smaller than it");
+  });
+
   it("anti-snipe: a fresh coin caps per-buy size during the opening window", async () => {
     await curve.methods
       .setParams({ feeRecipient: feeRecipient.publicKey, ...PARAMS, antiSnipeSlots: new BN(1000), antiSnipeMaxBps: new BN(100) })

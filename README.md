@@ -177,6 +177,7 @@ evidence/             public pump.fun / PumpSwap IDLs the interfaces were shaped
 - **One trade-to-earn campaign** covers curve and AMM volume: an AMM buy CPIs into the curve's accumulator, signed by the AMM's tracker PDA. One claim for the user.
 - **Boost without moving the price.** At graduation part of the pool's quote is parked in a vault but still priced as virtual reserves; the boost authority spends it on buy-and-burns, and LP moves are locked until the vault is empty.
 - **Account extension** on curve and AMM lets old accounts grow into new layouts without migrations.
+- **Devnet caught what the local validator could not.** The Token program on devnet and mainnet is the new `p-token`, which rejects instructions carrying extra account metas; the test validator's legacy build ignored them. Our migration leaned on that for `sync_native`, so it is now the AMM that syncs a native quote account inside `create_pool`. Same session: a tiny first buy left the creator vault below its rent floor, so the first credit now tops it up. Both have regression tests and both would have failed on mainnet. Devnet runs with graduation at ~3 SOL (`INITIAL_VIRTUAL_SOL_LAMPORTS=1060000000`) so anyone can walk a coin end to end from the faucet.
 - **Not cloned on purpose:** mayhem mode, cashback (pump deprecated it), fee sweeps, legacy layout migrations, reserved fee recipients, the `_v2` instruction family. Details in [docs/PARITY.md](docs/PARITY.md).
 
 ## Security
