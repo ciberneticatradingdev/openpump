@@ -10,6 +10,7 @@ import Avatar from "../components/Avatar";
 import Chart from "../components/Chart";
 import Progress from "../components/Progress";
 import TradePanel from "../components/TradePanel";
+import LiquidityPanel from "../components/LiquidityPanel";
 import { progressOf } from "../components/CoinCard";
 import { useToast } from "../lib/solana";
 
@@ -104,7 +105,7 @@ export default function CoinPage() {
             <div className="p-4 text-[13px] text-mute space-y-2">
               <p className="text-ink whitespace-pre-wrap">{coin.description || "No description."}</p>
               <p>Mint: <span className="num text-ink">{coin.mint}</span></p>
-              <p>Bonding curve: <span className="num text-ink">{coin.bonding_curve}</span></p>
+              {coin.bonding_curve && <p>Bonding curve: <span className="num text-ink">{coin.bonding_curve}</span></p>}
               {coin.pool && <p>AMM pool: <span className="num text-ink">{coin.pool}</span></p>}
               <p>Metadata: <a href={coin.uri} target="_blank" rel="noreferrer" className="text-acc hover:underline break-all">{coin.uri}</a></p>
             </div>
@@ -118,18 +119,24 @@ export default function CoinPage() {
 
         <div className="panel p-3">
           <div className="flex items-center justify-between">
-            <span className="label">{graduated ? "Graduated" : "Bonding curve progress"}</span>
+            <span className="label">{graduated ? (coin.bonding_curve ? "Graduated" : "OpenSwap pool") : "Bonding curve progress"}</span>
             <span className="text-[12px] num font-semibold">{p.toFixed(1)}%</span>
           </div>
           <Progress value={p} className="mt-2" color={graduated ? "bg-acc" : coin.complete ? "bg-gold" : "bg-acc"} />
           <p className="text-[12px] text-mute mt-2">
             {graduated ? (
-              <>Trading on the AMM with <b className="text-ink num">{qty(coin.pool_quote || 0, qDec, 1)} {qSym}</b> liquidity. LP burned, so liquidity can never be pulled.</>
+              coin.bonding_curve ? (
+                <>Trading on the AMM with <b className="text-ink num">{qty(coin.pool_quote || 0, qDec, 1)} {qSym}</b> liquidity. Graduation LP is burned, so that liquidity can never be pulled.</>
+              ) : (
+                <>Standalone OpenSwap pool with <b className="text-ink num">{qty(coin.pool_quote || 0, qDec, 1)} {qSym}</b> liquidity, opened directly on the AMM (no bonding curve). Anyone can add or remove liquidity below.</>
+              )
             ) : (
               <><b className="text-ink num">{qty(coin.r_sol, qDec, 2)} {qSym}</b> raised{target ? <> of ~{target} SOL</> : null}. When the curve sells out, all of it + the remaining supply becomes permanent AMM liquidity.</>
             )}
           </p>
         </div>
+
+        {graduated && coin.pool && <LiquidityPanel coin={coin} cfg={cfg} onChanged={() => setTimeout(() => refetch(), 1500)} />}
 
         {!!coin.is_holder_reward && (
           <div className="panel p-3 text-[12px] text-mute space-y-1.5">

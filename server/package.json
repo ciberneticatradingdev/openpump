@@ -8,7 +8,10 @@
     "start": "tsx src/index.ts",
     "admin:init": "tsx src/admin.ts init",
     "admin:params": "tsx src/admin.ts params",
-    "admin:fees": "tsx src/admin.ts fees"
+    "admin:fees": "tsx src/admin.ts fees",
+    "admin:amm-extend": "tsx src/admin.ts amm-extend",
+    "admin:amm-config": "tsx src/admin.ts amm-config",
+    "pool": "tsx src/pool.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",

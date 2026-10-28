@@ -78,6 +78,9 @@ export function openDb(file: string) {
   for (const col of ["quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112'", "quote_symbol TEXT DEFAULT 'SOL'", "quote_decimals INTEGER DEFAULT 9", "is_holder_reward INTEGER DEFAULT 0", "holder_paid TEXT DEFAULT '0'", "creator_kind TEXT DEFAULT 'wallet'", "token_program TEXT DEFAULT 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'", "boost_burned TEXT DEFAULT '0'", "boost_pending TEXT DEFAULT '0'"]) {
     try { db.exec(`ALTER TABLE coins ADD COLUMN ${col}`); } catch {}
   }
+  for (const col of ["base_mint TEXT", "quote_mint TEXT DEFAULT 'So11111111111111111111111111111111111111112'", "lp_mint TEXT", "creator TEXT", "coin_creator TEXT", "idx INTEGER DEFAULT 0", "base_res TEXT DEFAULT '0'", "quote_res TEXT DEFAULT '0'", "lp_supply TEXT DEFAULT '0'", "created_at INTEGER", "source TEXT DEFAULT 'migration'", "decimals INTEGER DEFAULT 6"]) {
+    try { db.exec(`ALTER TABLE pools ADD COLUMN ${col}`); } catch {}
+  }
   return db;
 }
 

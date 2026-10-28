@@ -23,7 +23,7 @@ import type { OpenpumpFees } from "./openpump_fees";
 import { pda } from "./pda";
 import type { OpenpumpAmm } from "./openpump_amm";
 import type { OpenpumpCurve } from "./openpump_curve";
-import type { CurveState } from "./math";
+import { ceilDiv, type CurveState } from "./math";
 
 const bn = (v: bigint | number) => new BN(v.toString());
 const big = (v: BN) => BigInt(v.toString());
@@ -88,6 +88,8 @@ export interface AmmConfigState {
   boostAuthority: PublicKey;
   boostEnabled: boolean;
   boostBasisPoints: bigint;
+  creatorFeeConfigurable: boolean;
+  maxConfigurableCreatorFeeBps: bigint;
 }
 
 /** Read-only provider: instruction building and account fetching never need a real signer. */
@@ -236,6 +238,8 @@ export class OpenpumpClient {
       boostAuthority: c.boostAuthority,
       boostEnabled: !!c.boostEnabled,
       boostBasisPoints: big(c.boostBasisPoints),
+      creatorFeeConfigurable: !!c.creatorFeeConfigurable,
+      maxConfigurableCreatorFeeBps: big(c.maxConfigurableCreatorFeeBps),
     };
   }
 
@@ -502,6 +506,111 @@ export class OpenpumpClient {
   }
   async curveExtendAccountIx(payer: PublicKey, account: PublicKey) {
     return this.curve.methods.extendAccount().accounts({ payer, account, systemProgram: SystemProgram.programId } as any).instruction();
+  }
+
+  // ------------------------------------------------------------- pools: create / add / remove liquidity (standalone AMM use)
+
+  async fetchPoolByAddress(address: PublicKey): Promise<PoolState | null> {
+    const info = await this.connection.getAccountInfo(address, "confirmed");
+    return info ? this.decodePool(address, info.data) : null;
+  }
+
+  /** First pool index not yet used by `creator` for this pair (pools are keyed by index + creator + mints). */
+  async freePoolIndex(creator: PublicKey, baseMint: PublicKey, quoteMint: PublicKey, max = 16): Promise<number> {
+    const addrs = Array.from({ length: max }, (_, i) => pda.pool(i, creator, baseMint, quoteMint));
+    const infos = await this.connection.getMultipleAccountsInfo(addrs, "confirmed");
+    const i = infos.findIndex((x) => !x);
+    if (i < 0) throw new Error("no free pool index");
+    return i;
+  }
+
+  /** LP minted for a brand-new pool: isqrt(base * quote); the first 1 000 units stay locked in the pool. */
+  static initialLp(baseIn: bigint, quoteIn: bigint) {
+    const prod = baseIn * quoteIn;
+    if (prod < 2n) return prod;
+    let x = prod, y = (x + 1n) / 2n;
+    while (y < x) { x = y; y = (x + prod / x) / 2n; }
+    return x;
+  }
+  /** Exact amounts `deposit` pulls for `lpOut` (ceil, like the program). */
+  static depositAmounts(lpOut: bigint, baseReserve: bigint, quoteReserve: bigint, lpSupply: bigint) {
+    return { base: ceilDiv(lpOut * baseReserve, lpSupply), quote: ceilDiv(lpOut * quoteReserve, lpSupply) };
+  }
+  /** LP you get for spending `quoteIn` at the current ratio (floor). */
+  static lpForQuote(quoteIn: bigint, quoteReserve: bigint, lpSupply: bigint) {
+    return quoteReserve === 0n ? 0n : (quoteIn * lpSupply) / quoteReserve;
+  }
+  /** What `withdraw` pays for `lpIn` (floor, like the program). */
+  static withdrawAmounts(lpIn: bigint, baseReserve: bigint, quoteReserve: bigint, lpSupply: bigint) {
+    return lpSupply === 0n ? { base: 0n, quote: 0n } : { base: (lpIn * baseReserve) / lpSupply, quote: (lpIn * quoteReserve) / lpSupply };
+  }
+
+  /**
+   * Create a pool for any base/quote pair. `creator` must hold `baseIn` of the base mint (SOL is wrapped here for WSOL quotes;
+   * other quotes must already sit in the creator's quote ATA). Returns the pool and LP mint addresses with the instructions.
+   */
+  async createPoolIxs(
+    creator: PublicKey, index: number, baseMint: PublicKey, quoteMint: PublicKey, baseIn: bigint, quoteIn: bigint,
+    opts: { coinCreator?: PublicKey; isHolderReward?: boolean; creatorFeeBps?: bigint; canEditCreatorFee?: boolean; baseTokenProgram?: PublicKey; quoteTokenProgram?: PublicKey } = {}
+  ) {
+    const baseTp = opts.baseTokenProgram ?? (await this.coinTokenProgram(baseMint));
+    const quoteTp = opts.quoteTokenProgram ?? TOKEN_PROGRAM_ID;
+    const coinCreator = opts.coinCreator ?? creator;
+    const pool = pda.pool(index, creator, baseMint, quoteMint);
+    const lpMint = pda.lpMint(pool);
+    const vaultAuth = pda.ammCreatorVaultAuthority(coinCreator);
+    const ix = await this.amm.methods
+      .createPool(index, bn(baseIn), bn(quoteIn), coinCreator, !!opts.isHolderReward, bn(opts.creatorFeeBps ?? 0n), !!opts.canEditCreatorFee)
+      .accounts({
+        pool, globalConfig: pda.ammGlobalConfig(), creator, payer: creator, baseMint, quoteMint, lpMint,
+        userBaseTokenAccount: getAssociatedTokenAddressSync(baseMint, creator, false, baseTp),
+        userQuoteTokenAccount: getAssociatedTokenAddressSync(quoteMint, creator, false, quoteTp),
+        userPoolTokenAccount: getAssociatedTokenAddressSync(lpMint, creator, false, TOKEN_PROGRAM_ID),
+        lockedLpTokenAccount: getAssociatedTokenAddressSync(lpMint, pool, true, TOKEN_PROGRAM_ID),
+        poolBaseTokenAccount: getAssociatedTokenAddressSync(baseMint, pool, true, baseTp),
+        poolQuoteTokenAccount: getAssociatedTokenAddressSync(quoteMint, pool, true, quoteTp),
+        coinCreatorVaultAuthority: vaultAuth,
+        coinCreatorVaultAta: getAssociatedTokenAddressSync(quoteMint, vaultAuth, true, quoteTp),
+        tokenProgram: TOKEN_PROGRAM_ID, baseTokenProgram: baseTp, quoteTokenProgram: quoteTp,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+      } as any)
+      .instruction();
+    const cu = ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 });
+    const ixs = quoteMint.equals(WSOL_MINT) ? [cu, ...this.wrapSolIxs(creator, quoteIn), ix, this.unwrapSolIx(creator)] : [cu, ix];
+    return { pool, lpMint, ixs };
+  }
+
+  private async liquidityAccounts(user: PublicKey, pool: PoolState) {
+    const baseTp = await this.coinTokenProgram(pool.baseMint);
+    const quoteTp = TOKEN_PROGRAM_ID;
+    return {
+      pool: pool.address, globalConfig: pda.ammGlobalConfig(), user, baseMint: pool.baseMint, quoteMint: pool.quoteMint, lpMint: pool.lpMint,
+      userBaseTokenAccount: getAssociatedTokenAddressSync(pool.baseMint, user, false, baseTp),
+      userQuoteTokenAccount: getAssociatedTokenAddressSync(pool.quoteMint, user, false, quoteTp),
+      userPoolTokenAccount: getAssociatedTokenAddressSync(pool.lpMint, user, false, TOKEN_PROGRAM_ID),
+      poolBaseTokenAccount: pool.poolBaseTokenAccount, poolQuoteTokenAccount: pool.poolQuoteTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID, baseTokenProgram: baseTp, quoteTokenProgram: quoteTp,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any;
+  }
+
+  /** Add liquidity: mint `lpOut` LP, paying at most `maxBaseIn` / `maxQuoteIn` (WSOL quotes are wrapped here). */
+  async depositIxs(user: PublicKey, pool: PoolState, lpOut: bigint, maxBaseIn: bigint, maxQuoteIn: bigint) {
+    const ix = await this.amm.methods.deposit(bn(lpOut), bn(maxBaseIn), bn(maxQuoteIn)).accounts(await this.liquidityAccounts(user, pool)).instruction();
+    const lpAta = getAssociatedTokenAddressSync(pool.lpMint, user, false, TOKEN_PROGRAM_ID);
+    const ensureLp = createAssociatedTokenAccountIdempotentInstruction(user, lpAta, user, pool.lpMint, TOKEN_PROGRAM_ID);
+    if (!pool.quoteMint.equals(WSOL_MINT)) return [ensureLp, ix];
+    return [ensureLp, ...this.wrapSolIxs(user, maxQuoteIn), ix, this.unwrapSolIx(user)];
+  }
+
+  /** Remove liquidity: burn `lpIn` LP for at least `minBaseOut` / `minQuoteOut` (WSOL is unwrapped back to SOL). */
+  async withdrawIxs(user: PublicKey, pool: PoolState, lpIn: bigint, minBaseOut: bigint, minQuoteOut: bigint) {
+    const baseTp = await this.coinTokenProgram(pool.baseMint);
+    const ix = await this.amm.methods.withdraw(bn(lpIn), bn(minBaseOut), bn(minQuoteOut)).accounts(await this.liquidityAccounts(user, pool)).instruction();
+    const ensureBase = createAssociatedTokenAccountIdempotentInstruction(user, getAssociatedTokenAddressSync(pool.baseMint, user, false, baseTp), user, pool.baseMint, baseTp);
+    const ensureQuote = createAssociatedTokenAccountIdempotentInstruction(user, getAssociatedTokenAddressSync(pool.quoteMint, user), user, pool.quoteMint);
+    if (!pool.quoteMint.equals(WSOL_MINT)) return [ensureBase, ensureQuote, ix];
+    return [ensureBase, ensureQuote, ix, this.unwrapSolIx(user)];
   }
 
   async ammSellIxs(user: PublicKey, mint: PublicKey, pool: PoolState, protocolFeeRecipient: PublicKey, baseIn: bigint, minQuoteOut: bigint) {

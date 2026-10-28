@@ -98,7 +98,7 @@ export interface Config {
     antiSnipeSlots: string;
     antiSnipeMaxBps: string;
     paused: boolean;
-    amm?: { lpFeeBasisPoints: string; protocolFeeBasisPoints: string; coinCreatorFeeBasisPoints: string; protocolFeeRecipient: string; disableFlags: number; buybackBasisPoints?: string; buybackFeeRecipient?: string; boostEnabled?: boolean; boostAuthority?: string; boostBasisPoints?: string } | null;
+    amm?: { lpFeeBasisPoints: string; protocolFeeBasisPoints: string; coinCreatorFeeBasisPoints: string; protocolFeeRecipient: string; disableFlags: number; buybackBasisPoints?: string; buybackFeeRecipient?: string; boostEnabled?: boolean; boostAuthority?: string; boostBasisPoints?: string; creatorFeeConfigurable?: boolean; maxConfigurableCreatorFeeBps?: string } | null;
   };
 }
 
@@ -122,6 +122,14 @@ export const useCandles = (mint?: string, res = 60) =>
   useQuery({ queryKey: ["candles", mint, res], queryFn: () => get<any[]>(`/api/coins/${mint}/candles?res=${res}`), enabled: !!mint, refetchInterval: 6_000 });
 export const useHolders = (mint?: string) =>
   useQuery({ queryKey: ["holders", mint], queryFn: () => get<any[]>(`/api/coins/${mint}/holders`), enabled: !!mint, refetchInterval: 20_000 });
+export interface Pool {
+  pool: string; mint: string; base_mint: string; quote_mint: string; lp_mint: string; creator: string; coin_creator: string; idx: number;
+  base_res: string; quote_res: string; lp_supply: string; virtual_quote: string; created_at: number | null; source: "migration" | "standalone"; decimals: number;
+  name: string | null; symbol: string | null; image: string | null; price: number | null; mcap: number | null; volume_sol: string | null; trades: number | null;
+  last_trade_at: number | null; quote_symbol: string | null; quote_decimals: number | null; token_program: string | null;
+}
+export const usePools = (limit = 100) => useQuery({ queryKey: ["pools", limit], queryFn: () => get<Pool[]>(`/api/pools?limit=${limit}`), refetchInterval: 10_000 });
+export const usePool = (pool?: string) => useQuery({ queryKey: ["pool", pool], queryFn: () => get<Pool>(`/api/pools/${pool}`), enabled: !!pool, refetchInterval: 10_000 });
 export const useActivity = (limit = 30) => useQuery({ queryKey: ["activity", limit], queryFn: () => get<Trade[]>(`/api/activity?limit=${limit}`), refetchInterval: 8_000 });
 export const useCreator = (pubkey?: string) =>
   useQuery({

@@ -52,7 +52,7 @@ Progress is tracked with checkboxes here and in GitHub issues tagged `phase-N`.
 - [ ] Upgrade authority transferred to a Squads multisig; signers published
 - [ ] `solana-verify` reproducible build; verified-build badge in the README
 - [ ] AMM config: 0.20 % LP / 0.05 % protocol / 0.05 % coin creator; 20 % of the protocol fee to the buyback vault
-- [ ] Swap UI on mainnet: swap, pool page, add / remove liquidity, creator fee claims
+- [ ] Swap UI on mainnet: swap, pool page, add / remove liquidity, creator fee claims (built: `/pools`, `/pools/new`, liquidity panel on every pool; devnet first)
 - [ ] Indexer and public API on mainnet
 - [ ] $OPENPUMP / SOL pool on OpenSwap seeded from the treasury
 - [ ] First buyback of $OPENPUMP executed from the vault, transaction linked in `TREASURY.md`

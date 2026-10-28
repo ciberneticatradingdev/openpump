@@ -1,5 +1,5 @@
 import { Connection, PublicKey, type ConfirmedSignatureInfo } from "@solana/web3.js";
-import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, FEES_PROGRAM_ID, OpenpumpClient, decodeEventsFromParsedTx, type DecodedEvent } from "@openpump/sdk";
+import { AMM_PROGRAM_ID, CURVE_PROGRAM_ID, FEES_PROGRAM_ID, OpenpumpClient, decodeEventsFromParsedTx, pda, type DecodedEvent } from "@openpump/sdk";
 import type { Db } from "./db";
 import { fetchMetadata } from "./metadata";
 
@@ -210,8 +210,27 @@ export class Indexer {
       "amm:BuyEvent": () => this.ammTrade(ev, idx, true, ts),
       "amm:SellEvent": () => this.ammTrade(ev, idx, false, ts),
       "amm:CreatePoolEvent": () => {
-        this.db.prepare("INSERT OR IGNORE INTO pools(pool,mint) VALUES(?,?)").run(toStr(d.pool), toStr(d.baseMint));
+        const pool = toStr(d.pool)!, mint = toStr(d.baseMint)!, creator = toStr(d.creator)!;
+        const source = creator === pda.bondingCurve(new PublicKey(mint)).toBase58() ? "migration" : "standalone";
+        const lpSupply = BigInt(toStr(d.lpMinted)!) + 1000n; // + MINIMUM_LIQUIDITY locked in the pool
+        this.db
+          .prepare(
+            `INSERT INTO pools(pool,mint,base_mint,quote_mint,lp_mint,creator,coin_creator,idx,base_res,quote_res,lp_supply,created_at,source)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+             ON CONFLICT(pool) DO UPDATE SET base_mint=excluded.base_mint, quote_mint=excluded.quote_mint, lp_mint=excluded.lp_mint, creator=excluded.creator,
+               coin_creator=excluded.coin_creator, idx=excluded.idx, created_at=COALESCE(pools.created_at, excluded.created_at), source=excluded.source,
+               base_res=CASE WHEN pools.base_res='0' THEN excluded.base_res ELSE pools.base_res END,
+               quote_res=CASE WHEN pools.quote_res='0' THEN excluded.quote_res ELSE pools.quote_res END,
+               lp_supply=CASE WHEN pools.lp_supply='0' THEN excluded.lp_supply ELSE pools.lp_supply END`
+          )
+          .run(pool, mint, mint, toStr(d.quoteMint), toStr(d.lpMint), creator, toStr(d.coinCreator), num(d.index), toStr(d.baseAmountIn), toStr(d.quoteAmountIn), lpSupply.toString(), ts, source);
+        if (source === "standalone" && !this.db.prepare("SELECT 1 FROM coins WHERE mint=?").get(mint)) {
+          void this.adoptStandalonePool(ev, ts).catch((e) => console.error("adopt pool", pool, e?.message || e));
+        }
+        this.broadcast({ type: "pool", pool, mint, source, ts });
       },
+      "amm:DepositEvent": () => this.liquidity(ev, ts, "deposit"),
+      "amm:WithdrawEvent": () => this.liquidity(ev, ts, "withdraw"),
       "amm:InitBoostEvent": () => {
         this.db.prepare("UPDATE pools SET virtual_quote=? WHERE pool=?").run(toStr(d.virtualQuoteReserves), toStr(d.pool));
         this.db.prepare("UPDATE coins SET boost_pending=? WHERE mint=?").run(toStr(d.virtualQuoteReserves), toStr(d.mint));
@@ -228,11 +247,61 @@ export class Indexer {
     handlers[`${ev.program}:${ev.name}`]?.();
   }
 
+  /** Deposit / withdraw: pool reserves + LP supply move, the coin's price does not. */
+  private liquidity(ev: DecodedEvent, ts: number, kind: "deposit" | "withdraw") {
+    const d = ev.data;
+    const pool = toStr(d.pool)!;
+    this.db.prepare("UPDATE pools SET base_res=?, quote_res=?, lp_supply=? WHERE pool=?").run(toStr(d.poolBaseReserves), toStr(d.poolQuoteReserves), toStr(d.lpSupply), pool);
+    const row = this.db.prepare("SELECT mint FROM pools WHERE pool=?").get(pool) as any;
+    if (row) this.db.prepare("UPDATE coins SET pool_base=?, pool_quote=? WHERE mint=?").run(toStr(d.poolBaseReserves), toStr(d.poolQuoteReserves), row.mint);
+    const lp = kind === "deposit" ? toStr(d.lpTokenAmountOut) : toStr(d.lpTokenAmountIn);
+    const base = kind === "deposit" ? toStr(d.baseAmountIn) : toStr(d.baseAmountOut);
+    const quote = kind === "deposit" ? toStr(d.quoteAmountIn) : toStr(d.quoteAmountOut);
+    this.broadcast({ type: "liquidity", kind, pool, mint: row?.mint ?? null, user: toStr(d.user), lp, base, quote, ts, sig: ev.signature });
+  }
+
+  /**
+   * A pool created directly on the AMM (not by curve graduation) has no coin row. Make one from the mint + Metaplex metadata so
+   * the app can show it like any graduated coin: trades, chart, holders, trade panel and liquidity all key off `coins.pool`.
+   */
+  private async adoptStandalonePool(ev: DecodedEvent, ts: number) {
+    const d = ev.data;
+    const mint = new PublicKey(toStr(d.baseMint)!);
+    const [mintInfo, metaInfo] = await this.conn.getMultipleAccountsInfo([mint, pda.metadata(mint)], "confirmed");
+    if (!mintInfo) return;
+    const decimals = mintInfo.data[44];
+    const supply = mintInfo.data.readBigUInt64LE(36);
+    let name = mint.toBase58().slice(0, 6), symbol = mint.toBase58().slice(0, 4), uri: string | null = null;
+    if (metaInfo && metaInfo.data.length > 69) {
+      // Metaplex Metadata: key(1) update_authority(32) mint(32) then borsh strings (u32 len + bytes, NUL-padded)
+      let o = 65;
+      const str = () => { const len = metaInfo.data.readUInt32LE(o); const v = metaInfo.data.subarray(o + 4, o + 4 + len).toString("utf8").replace(/\0+$/g, ""); o += 4 + len; return v; };
+      name = str() || name; symbol = str() || symbol; uri = str() || null;
+    }
+    const q = quoteInfo(toStr(d.quoteMint));
+    const baseRes = Number(toStr(d.baseAmountIn)), quoteRes = Number(toStr(d.quoteAmountIn));
+    const price = (quoteRes / baseRes) * 10 ** decimals; // quote units per whole token
+    const mcap = (price / 10 ** decimals) * Number(supply);
+    this.db
+      .prepare(
+        `INSERT INTO coins(mint,name,symbol,uri,creator,bonding_curve,created_at,created_slot,create_sig,v_sol,v_tok,r_sol,r_tok,supply,price,mcap,quote_mint,quote_symbol,quote_decimals,is_holder_reward,
+           complete,migrated,migrated_at,pool,pool_base,pool_quote,creator_kind,token_program,metadata_fetched)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,?,?,?,'wallet',?,?) ON CONFLICT(mint) DO NOTHING`
+      )
+      .run(
+        mint.toBase58(), name, symbol, uri, toStr(d.coinCreator), "", ts, ev.slot, ev.signature, "0", "0", "0", "0", supply.toString(), price, mcap,
+        q.mint, q.symbol, q.decimals, d.isHolderReward ? 1 : 0, ts, toStr(d.pool), toStr(d.baseAmountIn), toStr(d.quoteAmountIn), mintInfo.owner.toBase58(), uri ? 0 : 2
+      );
+    this.db.prepare("UPDATE pools SET decimals=? WHERE pool=?").run(decimals, toStr(d.pool));
+    this.broadcast({ type: "create", mint: mint.toBase58(), name, symbol, creator: toStr(d.coinCreator), ts, standalone: true });
+  }
+
   private ammTrade(ev: DecodedEvent, idx: number, isBuy: boolean, ts: number) {
     const d = ev.data;
     const row = this.db.prepare("SELECT mint FROM pools WHERE pool=?").get(toStr(d.pool)) as any;
-    if (!row) return; // pool not created by migration (foreign pool) — ignore
+    if (!row) return; // pool unknown to this indexer (not created by our program) — ignore
     const mint = row.mint;
+    this.db.prepare("UPDATE pools SET base_res=?, quote_res=? WHERE pool=?").run(toStr(d.poolBaseReserves), toStr(d.poolQuoteReserves), toStr(d.pool));
     const baseRes = num(d.poolBaseReserves);
     const quoteRes = num(d.poolQuoteReserves);
     const price = (quoteRes / baseRes) * 1e6;

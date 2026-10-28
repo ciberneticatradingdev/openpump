@@ -67,7 +67,7 @@ OpenPump is the whole thing, in the open:
 | **Shared types** | [`crates/openpump-fee-types`](crates/openpump-fee-types) | FeeConfig / SharingConfig / tier selection, read by every program |
 | **SDK** | [`sdk/`](sdk) | PDAs, exact on-chain math in BigInt, instruction builders for every instruction, event decoding |
 | **Server** | [`server/`](server) | SQLite indexer (decodes `emit_cpi!` events), REST + WebSocket API, metadata uploads, cranks (holder payouts, donations) |
-| **Web** | [`web/`](web) | Vite + React: board, coin page (chart, trades, holders, trade panel), create, swap, profile |
+| **Web** | [`web/`](web) | Vite + React: board, coin page (chart, trades, holders, trade panel, add / remove liquidity), create, swap, pools (list + create a pool for any SPL token), profile |
 | **Site** | [`site/`](site) | The landing page at [openpump.trade](https://openpump.trade) |
 
 ## How a coin moves through it
@@ -150,7 +150,7 @@ RPC_URL=http://127.0.0.1:8899 pnpm --filter @openpump/server exec tsx src/seed.t
 pnpm --filter @openpump/web dev                          # http://localhost:5173
 ```
 
-Deploy: `anchor deploy --provider.cluster <cluster>`, then `pnpm --filter @openpump/server admin:init` (AMM config + curve Global) and `admin:fees` (fee tiers + buyback vault). Server runs on Railway (`railway.json`, volume at `/data`), web on Vercel (`web/vercel.json`, `VITE_API_URL`).
+Deploy: `anchor deploy --provider.cluster <cluster>`, then `pnpm --filter @openpump/server admin:init` (AMM config + curve Global) and `admin:fees` (fee tiers + buyback vault). After an upgrade that grew account layouts, `admin:amm-extend` resizes the AMM config and every pool in place. `pnpm --filter @openpump/server pool token|create|show` mints a test token and opens a standalone pool on the AMM (how OpenSwap is validated on devnet before the curve goes live). Server runs on Railway (`railway.json`, volume at `/data`), web on Vercel (`web/vercel.json`, `VITE_API_URL`).
 
 ## Repository layout
 

@@ -61,7 +61,7 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
     if (!graduated) return;
     let alive = true;
     const load = async () => {
-      const p = await client.fetchPool(mint, quoteMint);
+      const p = coin.pool ? await client.fetchPoolByAddress(new PublicKey(coin.pool)) : await client.fetchPool(mint, quoteMint);
       if (!p || !alive) return;
       setPool(p);
       setReserves(await client.fetchPoolReserves(p));
@@ -69,7 +69,7 @@ export default function TradePanel({ coin, cfg, onTraded }: { coin: Coin; cfg: C
     load();
     const id = setInterval(load, 8000);
     return () => { alive = false; clearInterval(id); };
-  }, [graduated, client, mint, quoteMint, coin.trades]);
+  }, [graduated, client, mint, quoteMint, coin.trades, coin.pool]);
 
   const g = cfg.global;
   const tierNow = currentTier(cfg, coin, reserves);

@@ -10,6 +10,8 @@ import CreatePage from "./pages/Create";
 import ProfilePage from "./pages/Profile";
 import HowItWorks from "./pages/HowItWorks";
 import SwapPage from "./pages/Swap";
+import PoolsPage from "./pages/Pools";
+import CreatePoolPage from "./pages/CreatePool";
 
 function Shell() {
   useLive();
@@ -24,6 +26,8 @@ function Shell() {
           <Route path="/profile/:pubkey?" element={<ProfilePage />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/swap" element={<SwapPage />} />
+          <Route path="/pools" element={<PoolsPage />} />
+          <Route path="/pools/new" element={<CreatePoolPage />} />
         </Routes>
       </main>
       <Dock />

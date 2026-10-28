@@ -48,6 +48,8 @@ export function apiRouter(db: Db, conn: Connection) {
           boostEnabled: cfg.boostEnabled,
           boostAuthority: cfg.boostAuthority.toBase58(),
           boostBasisPoints: cfg.boostBasisPoints.toString(),
+          creatorFeeConfigurable: cfg.creatorFeeConfigurable,
+          maxConfigurableCreatorFeeBps: cfg.maxConfigurableCreatorFeeBps.toString(),
         },
       };
       globalCache = { at: Date.now(), value };
@@ -217,6 +219,25 @@ export function apiRouter(db: Db, conn: Connection) {
     }
     const sql = `SELECT * FROM coins ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${sort} LIMIT ? OFFSET ?`;
     res.json(db.prepare(sql).all(...params, limit, offset));
+  });
+
+  /** Pools on the AMM: graduated coins (source = migration) and pools anyone created directly (standalone). */
+  r.get("/api/pools", (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    const rows = db
+      .prepare(
+        `SELECT p.pool, p.mint, p.base_mint, p.quote_mint, p.lp_mint, p.creator, p.coin_creator, p.idx, p.base_res, p.quote_res, p.lp_supply, p.virtual_quote, p.created_at, p.source, p.decimals,
+                c.name, c.symbol, c.image, c.price, c.mcap, c.volume_sol, c.trades, c.last_trade_at, c.quote_symbol, c.quote_decimals, c.token_program
+         FROM pools p LEFT JOIN coins c ON c.mint = p.mint
+         ORDER BY CAST(p.quote_res AS INTEGER) DESC LIMIT ?`
+      )
+      .all(limit);
+    res.json(rows);
+  });
+  r.get("/api/pools/:pool", (req, res) => {
+    const row = db.prepare(`SELECT p.*, c.name, c.symbol, c.image, c.price, c.mcap, c.volume_sol, c.trades, c.quote_symbol, c.quote_decimals, c.token_program FROM pools p LEFT JOIN coins c ON c.mint = p.mint WHERE p.pool=?`).get(req.params.pool);
+    if (!row) return res.status(404).json({ error: "not found" });
+    res.json(row);
   });
 
   r.get("/api/coins/:mint", (req, res) => {

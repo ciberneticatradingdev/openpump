@@ -40,7 +40,7 @@ export default function SwapPage() {
   const legState = async (c: Coin) => {
     const mint = new PublicKey(c.mint);
     client.setCoinTokenProgram(mint, new PublicKey(c.token_program || TOKEN_PROGRAM_ID.toBase58()));
-    const pool = c.migrated ? await client.fetchPool(mint) : null;
+    const pool = c.migrated ? (c.pool ? await client.fetchPoolByAddress(new PublicKey(c.pool)) : await client.fetchPool(mint)) : null;
     const curve = c.migrated ? null : { virtualSolReserves: BigInt(c.v_sol), virtualTokenReserves: BigInt(c.v_tok), realSolReserves: BigInt(c.r_sol), realTokenReserves: BigInt(c.r_tok), tokenTotalSupply: BigInt(c.supply), complete: !!c.complete };
     return { mint, creator: new PublicKey(c.creator), pool, curve };
   };

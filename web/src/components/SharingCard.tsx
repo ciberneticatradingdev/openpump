@@ -38,7 +38,7 @@ export default function SharingCard({ coin, sharing }: { coin: Coin; sharing: Sh
       const holders = sharing.shareholders.map((s) => new PublicKey(s.address));
       const ixs = [await client.distributeCreatorFeesIx(mint, holders, new PublicKey(coin.quote_mint || WSOL), publicKey)];
       if (coin.migrated) {
-        const pool = await client.fetchPool(mint, new PublicKey(coin.quote_mint || WSOL));
+        const pool = coin.pool ? await client.fetchPoolByAddress(new PublicKey(coin.pool)) : await client.fetchPool(mint, new PublicKey(coin.quote_mint || WSOL));
         if (pool) ixs.push(await client.distributeCoinCreatorFeesIx(publicKey, mint, pool, holders));
       }
       const sig = await send(ixs, "Pay out shared fees", { cu: 400_000 });

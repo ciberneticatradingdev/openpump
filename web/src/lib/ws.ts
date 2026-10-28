@@ -21,6 +21,8 @@ export type LiveMsg =
   | { type: "complete" | "migrate"; mint: string; ts: number }
   | { type: "holder_rewards"; mint: string; total: string; recipients: number; sig: string; ts: number }
   | { type: "incentive_claim"; user: string; amount: string; ts: number }
+  | { type: "pool"; pool: string; mint: string; source: "migration" | "standalone"; ts: number }
+  | { type: "liquidity"; kind: "deposit" | "withdraw"; pool: string; mint: string | null; user: string; lp: string; base: string; quote: string; ts: number; sig: string }
   | { type: "hello" };
 
 const listeners = new Set<(m: LiveMsg) => void>();
