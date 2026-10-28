@@ -105,7 +105,7 @@
   .token .big .t { font-family: var(--head); font-weight: 800; font-size: clamp(34px, 5vw, 50px); color: var(--acc); letter-spacing: -0.02em; }
   .token .big p { color: rgba(229,253,240,0.72); }
   .ca { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .ca code { font-family: var(--mono); font-size: 13px; padding: 9px 12px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: rgba(229,253,240,0.8); }
+  .ca code { font-family: var(--mono); font-size: 13px; padding: 9px 12px; max-width: 100%; overflow-wrap: anywhere; word-break: break-all; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: rgba(229,253,240,0.8); }
   .token .big .btn { background: var(--acc); color: var(--ink); border-color: transparent; }
   .hooks { display: grid; gap: 12px; }
   .hook { padding: 18px 20px; display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: start; }
@@ -287,13 +287,13 @@
     <div class="sec-head">
       <div class="kicker">The community token</div>
       <h2>$OPENPUMP funds the build and sits inside the protocol.</h2>
-      <p>It launches first, on pump.fun itself, because that is where the audience is. Creator fees go to a public treasury that pays for mainnet deployment, audits and the rest of the roadmap.</p>
+      <p>It launched first, on pump.fun itself, because that is where the audience is. Creator fees go to a public treasury that pays for mainnet deployment, audits and the rest of the roadmap.</p>
     </div>
     <div class="token">
       <div class="card big">
         <div class="t">$OPENPUMP</div>
-        <p style="margin-top:8px">Launching on pump.fun. The contract address will be posted here and on X at launch. Anything else claiming to be $OPENPUMP is not.</p>
-        <div class="ca"><code id="ca">CA: not launched yet</code><a class="btn sm" href="#" id="xlink">Follow on X</a></div>
+        <p style="margin-top:8px">Live on pump.fun. This is the only contract address; it is also pinned on X and listed in the GitHub README. Anything else claiming to be $OPENPUMP is not.</p>
+        <div class="ca"><code id="ca">CA: not launched yet</code><a class="btn sm" href="https://pump.fun/coin/72KTne4FjHhzsu2Gw3i62ncjWdGrvsTykiMniBcxpump" target="_blank" rel="noopener">Buy on pump.fun</a><a class="btn sm" href="#" id="xlink">Follow on X</a></div>
         <p style="margin-top:18px;font-size:13.5px">Treasury wallet, every outflow and the multisig signers get published in the repo before mainnet.</p>
       </div>
       <div class="hooks">
@@ -324,9 +324,9 @@
       <div class="phase now">
         <div class="ph-n">1</div>
         <div>
-          <div class="ph-head"><h3>$OPENPUMP on pump.fun</h3><span class="status">Next</span></div>
+          <div class="ph-head"><h3>$OPENPUMP on pump.fun</h3><span class="status">Live</span></div>
           <p>Validate that people want an open launchpad, build the community, and fund the treasury that pays for everything after.</p>
-          <ul><li>launch $OPENPUMP</li><li>public treasury</li><li>repo public + license</li><li>X and Telegram</li><li>devnet playground with faucet</li><li>bug reports → issues</li></ul>
+          <ul><li>launch $OPENPUMP ✓</li><li>public treasury</li><li>repo public ✓ + license</li><li>X and Telegram</li><li>devnet playground with faucet</li><li>bug reports → issues</li></ul>
           <div class="dod"><b>Done when:</b> the treasury can fund the AMM deploy (~12 SOL) and 100+ people have used the playground.</div>
         </div>
       </div>
@@ -449,7 +449,7 @@
 
 <script>
   // Single place to flip once the token is live: set CA and the X handle here.
-  const LAUNCH = { ca: "", x: "" };
+  const LAUNCH = { ca: "72KTne4FjHhzsu2Gw3i62ncjWdGrvsTykiMniBcxpump", x: "https://x.com/openpumptrade" };
   if (LAUNCH.ca) {
     const el = document.getElementById("ca"); el.textContent = LAUNCH.ca; el.style.color = "#e5fdf0";
     el.style.cursor = "pointer"; el.title = "Copy";

@@ -32,10 +32,11 @@ Progress is tracked with checkboxes here and in GitHub issues tagged `phase-N`.
 
 **Goal.** Validate that people want an open launchpad, build the community, and fund the treasury that pays for everything after. Launching on pump.fun itself is deliberate: it is where the audience is, and it proves the thesis in front of them.
 
-- [ ] Launch $OPENPUMP on pump.fun (ticker, image, this repo as the link)
+- [x] Launch $OPENPUMP on pump.fun — `72KTne4FjHhzsu2Gw3i62ncjWdGrvsTykiMniBcxpump` (2026-10-28)
 - [ ] Publish the treasury wallet: creator fees from $OPENPUMP go there, every outflow is listed in `TREASURY.md`
-- [ ] Make this repository public with a license, the roadmap and the parity matrix
-- [ ] X account and Telegram; weekly build updates linked to commits
+- [x] Make this repository public with the roadmap and the parity matrix (license: pending)
+- [x] X account: [@openpumptrade](https://x.com/openpumptrade)
+- [ ] Telegram; weekly build updates linked to commits
 - [ ] Testnet playground: the full launchpad on devnet with a faucet so the community can launch and trade test coins and file bugs
 - [ ] Bug reports from the playground triaged into Phase 2 and 3 issues
 

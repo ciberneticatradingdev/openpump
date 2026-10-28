@@ -99,13 +99,21 @@ Fixed across clusters (localnet, devnet, mainnet).
 
 ## $OPENPUMP
 
-The community token. It launches first, on pump.fun itself, because that is where the audience is; creator fees go to a public treasury that pays for mainnet deployment, audits and the rest of the roadmap. Its hooks are already in the code:
+The community token, live on pump.fun since 2026-10-28. It launched there first because that is where the audience is; creator fees go to a public treasury that pays for mainnet deployment, audits and the rest of the roadmap.
+
+| | |
+|---|---|
+| **Contract** | `72KTne4FjHhzsu2Gw3i62ncjWdGrvsTykiMniBcxpump` |
+| **Trade** | [pump.fun/coin/72KTne4FjHhzsu2Gw3i62ncjWdGrvsTykiMniBcxpump](https://pump.fun/coin/72KTne4FjHhzsu2Gw3i62ncjWdGrvsTykiMniBcxpump) |
+| **X** | [@openpumptrade](https://x.com/openpumptrade) |
+
+Its hooks are already in the code:
 
 1. **Buyback share.** The curve and the AMM route a configurable share of the protocol fee into buyback vaults; the vault authority spends it on $OPENPUMP.
 2. **Quote mint.** Custom pairs let coins trade against any enabled mint. With $OPENPUMP enabled, every coin launched that way is bought and sold with $OPENPUMP.
 3. **Trade-to-earn.** 30-day volume campaigns pay traders in a configured mint across curve and AMM volume, with one claim.
 
-Contract address, treasury wallet and multisig signers will be published here and on [openpump.trade](https://openpump.trade) at launch. Anything else claiming to be $OPENPUMP is not.
+This is the only contract. It is also pinned on X and listed on [openpump.trade](https://openpump.trade). Anything else claiming to be $OPENPUMP is not. Treasury wallet and multisig signers get published here before mainnet.
 
 ## Roadmap at a glance
 
@@ -114,7 +122,7 @@ Full version with deliverables and definitions of done: **[ROADMAP.md](ROADMAP.m
 | Phase | Goal | Status |
 |:--:|---|:--:|
 | 0 | **Build** — clean-room programs at parity with pump.fun, tested | ✅ |
-| 1 | **$OPENPUMP on pump.fun** — validate demand, build the community, fund the treasury | ▶ next |
+| 1 | **$OPENPUMP on pump.fun** — validate demand, build the community, fund the treasury | ▶ live |
 | 2 | **OpenSwap on mainnet** — the AMM under a Squads multisig, verified build, swap UI, first buyback | |
 | 3 | **First launch on OpenPump** — curve + fees on mainnet, first coin graduated end to end | |
 | 4 | **Full launchpad** — pairs quoted in $OPENPUMP, holder rewards, trade-to-earn, tiers, sharing, social fees, boost | |
