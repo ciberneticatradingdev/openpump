@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { ConnectionProvider, WalletProvider, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { ComputeBudgetProgram, PublicKey, Transaction, type TransactionInstruction } from "@solana/web3.js";
+import { ComputeBudgetProgram, PublicKey, Transaction, type Connection, type TransactionInstruction } from "@solana/web3.js";
 import { OpenpumpClient } from "@openpump/sdk";
 import { useConfig } from "./api";
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -49,9 +49,30 @@ export function useClient() {
 }
 
 /** Sign + send + confirm with toasts; returns the signature or null. */
+/**
+ * Confirm a signature by polling getSignatureStatuses over HTTP, re-broadcasting the raw tx every 3 s until it
+ * lands or the blockhash expires. Devnet RPCs regularly accept a send and then drop it (or drop the websocket
+ * subscription), which made confirmed trades show up as "failed" in the UI.
+ */
+async function confirmWithRebroadcast(connection: Connection, sig: string, raw: Uint8Array | null, lastValidBlockHeight: number) {
+  const started = Date.now();
+  for (;;) {
+    const st = (await connection.getSignatureStatuses([sig])).value[0];
+    if (st && (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized")) {
+      if (st.err) throw new Error(JSON.stringify(st.err));
+      return;
+    }
+    if (st?.err) throw new Error(JSON.stringify(st.err));
+    const height = await connection.getBlockHeight("confirmed").catch(() => 0);
+    if ((height && height > lastValidBlockHeight) || Date.now() - started > 120_000) throw new Error("Transaction expired before it was confirmed. Nothing was charged; please try again.");
+    if (raw) await connection.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 0 }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+
 export function useSendTx() {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction, signTransaction } = useWallet();
   const toast = useToast();
   const { data: cfg } = useConfig();
   return useCallback(
@@ -69,12 +90,25 @@ export function useSendTx() {
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
         tx.feePayer = publicKey;
-        const sig = await sendTransaction(tx, connection, { signers: opts.signers, skipPreflight: false, preflightCommitment: "confirmed" });
+        let sig: string;
+        let raw: Uint8Array | null = null;
+        if (signTransaction) {
+          // Sign locally so we keep the raw bytes: public RPCs drop single sends under load, so we re-broadcast
+          // every few seconds and poll the status over HTTP instead of trusting one send + a websocket.
+          if (opts.signers?.length) tx.partialSign(...opts.signers);
+          const signed = await signTransaction(tx);
+          raw = signed.serialize();
+          sig = await connection.sendRawTransaction(raw, { skipPreflight: false, preflightCommitment: "confirmed", maxRetries: 0 });
+        } else {
+          sig = await sendTransaction(tx, connection, { signers: opts.signers, skipPreflight: false, preflightCommitment: "confirmed" });
+        }
         toast.dismiss(id);
         const pending = toast.push({ kind: "info", title: label, body: "Confirming…" });
-        const res = await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-        toast.dismiss(pending);
-        if (res.value.err) throw new Error(JSON.stringify(res.value.err));
+        try {
+          await confirmWithRebroadcast(connection, sig, raw, lastValidBlockHeight);
+        } finally {
+          toast.dismiss(pending);
+        }
         const cluster = cfg?.cluster || "devnet";
         const href = `https://solscan.io/tx/${sig}${cluster.startsWith("mainnet") ? "" : cluster === "localnet" ? "?cluster=custom&customUrl=http://127.0.0.1:8899" : `?cluster=${cluster}`}`;
         toast.push({ kind: "ok", title: `${label} confirmed`, body: sig.slice(0, 12) + "…", href });
@@ -87,7 +121,7 @@ export function useSendTx() {
         return null;
       }
     },
-    [connection, publicKey, sendTransaction, toast, cfg]
+    [connection, publicKey, sendTransaction, signTransaction, toast, cfg]
   );
 }
 
