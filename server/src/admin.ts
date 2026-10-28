@@ -70,6 +70,9 @@ async function main() {
     tx.add(await client.ammSetBoostAuthorityIx(admin.publicKey, new PublicKey(process.env.BOOST_AUTHORITY || admin.publicKey.toBase58())));
     tx.add(await client.ammUpdateBoostConfigIx(admin.publicKey, boostBps));
     tx.add(await client.ammToggleBoostIx(admin.publicKey, boostBps > 0n));
+    const maxCreatorFeeBps = BigInt(process.env.MAX_CREATOR_FEE_BPS ?? 100);
+    tx.add(await client.ammUpdateCreatorFeeConfigIx(admin.publicKey, true, maxCreatorFeeBps, admin.publicKey));
+    console.log(`creator fee configurable, max ${maxCreatorFeeBps} bps`);
     console.log(`buyback ${buybackBps} bps → ${pda.buybackVault(0).toBase58()}, boost ${boostBps} bps, enabled=${boostBps > 0n}`);
   } else if (cmd === "incentives") {
     const [mint, start, end, day, dayNumber, supply] = process.argv.slice(3);

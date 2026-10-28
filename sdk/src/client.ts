@@ -497,6 +497,10 @@ export class OpenpumpClient {
   async ammUpdateBoostConfigIx(admin: PublicKey, bps: bigint) {
     return this.amm.methods.updateBoostConfig(bn(bps)).accounts({ admin, globalConfig: pda.ammGlobalConfig() } as any).instruction();
   }
+  /** Whether pool creators may set a coin-creator fee, its cap, and who may reassign coin creators. */
+  async ammUpdateCreatorFeeConfigIx(admin: PublicKey, configurable: boolean, maxBps: bigint, adminSetCoinCreatorAuthority: PublicKey) {
+    return this.amm.methods.updateCreatorFeeConfig(configurable, bn(maxBps), adminSetCoinCreatorAuthority).accounts({ admin, globalConfig: pda.ammGlobalConfig() } as any).instruction();
+  }
   async ammUpdateBuybackConfigIx(admin: PublicKey, bps: bigint, recipient: PublicKey) {
     return this.amm.methods.updateBuybackConfig(bn(bps), recipient).accounts({ admin, globalConfig: pda.ammGlobalConfig() } as any).instruction();
   }
